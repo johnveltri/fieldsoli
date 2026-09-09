@@ -173,8 +173,9 @@ export function formatLocalDateLabel(date: string): string {
   }).format(new Date(y, mo - 1, d));
 }
 
-/** View-consistent duration label (e.g. `1.4h`). */
+/** View-consistent duration label (e.g. `1.4h` or `<0.1h` for short positive sessions). */
 export function formatSessionDurationLabel(hours: number): string {
+  if (hours > 0 && hours < 0.05) return '<0.1h';
   return `${hours.toFixed(1)}h`;
 }
 

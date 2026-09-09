@@ -2,6 +2,7 @@ import { formatSessionTimeLabel, JOB_DETAIL_EMPTY_LABELS } from '@fieldsolo/api-
 import type { JobDetailSession } from '@fieldsolo/shared-types';
 
 import {
+  isSessionUsableForCompleteness,
   sessionViewTimeLabel,
   shouldShowSessionTimeRange,
 } from './jobDetailRowHealth';
@@ -87,5 +88,18 @@ describe('sessionViewTimeLabel', () => {
         }),
       ),
     ).toBeNull();
+  });
+});
+
+describe('session duration completeness', () => {
+  it('treats zero as missing and a short positive duration as usable', () => {
+    expect(
+      isSessionUsableForCompleteness(
+        session({ durationLabel: JOB_DETAIL_EMPTY_LABELS.sessionDuration }),
+      ),
+    ).toBe(false);
+    expect(
+      isSessionUsableForCompleteness(session({ durationLabel: '<0.1h' })),
+    ).toBe(true);
   });
 });

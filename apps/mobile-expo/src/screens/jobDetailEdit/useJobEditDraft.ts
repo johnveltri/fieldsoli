@@ -432,6 +432,9 @@ export function buildApplyJobDetailEditPayload(
       customerName: draft.customerName.trim(),
       serviceAddress: draft.serviceAddress.trim(),
       revenueCents: draft.revenueCents,
+      noRevenueConfirmed: draft.noRevenueConfirmed,
+      noMaterialsConfirmed: draft.noMaterialsConfirmed,
+      noOtherCostsConfirmed: draft.noOtherCostsConfirmed,
     },
     sessions: { create: [], update: [], deleteIds: [] },
     notes: { create: [], update: [], deleteIds: [] },
@@ -536,6 +539,7 @@ export function buildApplyJobDetailEditPayload(
 export function useJobEditDraft(job: JobDetailViewModel | null) {
   const [snapshot, setSnapshot] = useState<JobEditSnapshot | null>(null);
   const [draft, setDraft] = useState<JobEditDraft | null>(null);
+  const [resetVersion, setResetVersion] = useState(0);
   const snapshotRef = useRef(snapshot);
   const draftRef = useRef(draft);
   snapshotRef.current = snapshot;
@@ -547,6 +551,7 @@ export function useJobEditDraft(job: JobDetailViewModel | null) {
     draftRef.current = next;
     setSnapshot(next);
     setDraft(next);
+    setResetVersion((version) => version + 1);
   }, []);
 
   const dirty = useMemo(
@@ -743,6 +748,7 @@ export function useJobEditDraft(job: JobDetailViewModel | null) {
     if (snapshotRef.current) {
       draftRef.current = snapshotRef.current;
       setDraft(snapshotRef.current);
+      setResetVersion((version) => version + 1);
     }
   }, []);
 
@@ -759,9 +765,31 @@ export function useJobEditDraft(job: JobDetailViewModel | null) {
     fallback?.();
   }, []);
 
+  /** Edit mode registers a field-flushing Back handler; shared chrome calls this. */
+  const backHandlerRef = useRef<(() => void) | null>(null);
+  const setBackHandler = useCallback((handler: (() => void) | null) => {
+    backHandlerRef.current = handler;
+  }, []);
+  const requestBack = useCallback((fallback?: () => void) => {
+    if (backHandlerRef.current) {
+      backHandlerRef.current();
+      return;
+    }
+    fallback?.();
+  }, []);
+
+  const isDirty = useCallback(() => {
+    const currentSnapshot = snapshotRef.current;
+    const currentDraft = draftRef.current;
+    return currentSnapshot && currentDraft
+      ? isJobEditDraftDirty(currentSnapshot, currentDraft)
+      : false;
+  }, []);
+
   return {
     snapshot,
     draft,
+    resetVersion,
     dirty,
     validation,
     resetFromJob,
@@ -780,5 +808,8 @@ export function useJobEditDraft(job: JobDetailViewModel | null) {
     discardDraft,
     setDoneHandler,
     requestDone,
+    setBackHandler,
+    requestBack,
+    isDirty,
   };
 }

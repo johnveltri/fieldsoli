@@ -1,5 +1,6 @@
 import { act, renderHook } from '@testing-library/react-native';
 import type { JobDetailViewModel } from '@fieldsolo/shared-types';
+import { describe, expect, it, jest } from '@jest/globals';
 
 import {
   buildMaterialUnitPriceBlurPatch,
@@ -376,7 +377,7 @@ describe('validateJobEditDraft capture-now', () => {
 
   it('preserves the captured total when a unit price is cleared on blur', () => {
     const patch = buildMaterialUnitPriceBlurPatch(
-      { quantity: 2, quantityExplicit: true, unit: 'gal' },
+      { quantityExplicit: true, unit: 'gal' },
       0,
       false,
     );
@@ -391,7 +392,7 @@ describe('validateJobEditDraft capture-now', () => {
 
   it('does not recompute the total when a unit price is committed on blur', () => {
     const patch = buildMaterialUnitPriceBlurPatch(
-      { quantity: 2.5, quantityExplicit: true, unit: 'gal' },
+      { quantityExplicit: true, unit: 'gal' },
       349,
       true,
     );
@@ -478,6 +479,36 @@ describe('useJobEditDraft confirm-none and refs', () => {
     expect(buildApplyJobDetailEditPayload(snapshot, draft).job.longDescription).toBe(
       'Replace the valve.',
     );
+  });
+
+  it('includes all confirm-none values in the atomic apply payload', () => {
+    const snapshot = createJobEditDraft(minimalJob());
+    const draft: JobEditDraft = {
+      ...snapshot,
+      revenueCents: 0,
+      noRevenueConfirmed: true,
+      noMaterialsConfirmed: true,
+      noOtherCostsConfirmed: true,
+    };
+
+    expect(buildApplyJobDetailEditPayload(snapshot, draft).job).toMatchObject({
+      revenueCents: 0,
+      noRevenueConfirmed: true,
+      noMaterialsConfirmed: true,
+      noOtherCostsConfirmed: true,
+    });
+  });
+
+  it('delegates shared Back through the registered field-flushing handler', () => {
+    const result = setupHook(minimalJob());
+    const handler = jest.fn();
+    const fallback = jest.fn();
+
+    act(() => result.current.setBackHandler(handler));
+    act(() => result.current.requestBack(fallback));
+
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect(fallback).not.toHaveBeenCalled();
   });
 
   it('clamps short description to 60 characters on the apply payload', () => {

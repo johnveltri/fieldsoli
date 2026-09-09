@@ -71,13 +71,13 @@ This model does not change payment state. A newly created ended session may move
 - App termination or navigation away: draft is discarded (REQ-13). No local draft persistence.
 - Network loss or timeout: STATE-05 → EditDirty; copy UX-12; retry is another Done with the same client-generated IDs.
 - Retry ownership: user only; no automatic retry loop.
-- Stale or partially completed work: RPC is one transaction; a failure writes nothing. If commit succeeds but the response is lost, an identical retry succeeds idempotently and does not duplicate children. No compensating rollback UI.
+- Stale or partially completed work: RPC is one transaction, including confirm-none timestamps; a failure writes nothing. If commit succeeds but the response is lost, an identical retry succeeds idempotently and does not duplicate children. No compensating rollback UI.
 - Reconciliation: after success, `fetchJobDetail` is the View source of truth.
 
 ## Invariants
 
 - The draft never includes an in-progress session.
-- Back discard never calls the apply RPC.
+- Back first flushes focused numeric buffers into the in-memory draft so dirty detection is accurate; confirmed discard never calls the apply RPC.
 - Delete job never waits for Done and is not undone by Back.
 - Synthesized session timestamps are not shown as clock times unless `clock_times_explicit` is true.
 - Removing a session immediately sets `sessionId = null` on each visible, unremoved draft note, material, and other cost that referenced it.

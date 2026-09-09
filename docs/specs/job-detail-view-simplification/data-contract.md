@@ -5,7 +5,7 @@
 - **Job health** — list-level incomplete pills (`revenue`, `sessions`, `materials`, `costs`).
 - **Row health** — a persisted child that is not yet countable / is missing required capture fields.
 - **Read expand** — UI only; applies to **truncated notes** on View. Sessions are not expandable on View.
-- Confirm-none timestamps persist from Edit Done (draft refs + reviewed/confirm APIs), not from a Complete bottom sheet.
+- Confirm-none timestamps persist from Edit Done in the same atomic apply RPC as the rest of the draft, not from a Complete bottom sheet.
 
 No new tables. No new RPC for View. Live Session create/start APIs are unchanged this phase; Phase 3 will use existing create note/material and update start APIs for expanded capture.
 
@@ -39,7 +39,7 @@ Job completeness formulas in `jobFinancialCompleteness.ts`, Open Jobs `hasMateri
 
 ## Interfaces
 
-Existing: `fetchJobDetail`, `apply_job_detail_edit`, reviewed-at / `updateJobNoRevenueConfirmed` APIs, PostHog flag.
+Existing: `fetchJobDetail`, the client-facing `apply_job_detail_edit_atomic` wrapper plus its internal row-diff apply function, legacy reviewed-at APIs for flag-off View, and the PostHog flag.
 
 Live Session `createNote`, `createMaterial`, `updateLiveSessionStart` / equivalent, and `startLiveSession` stay as today; Phase 3 will bind new UX to them.
 

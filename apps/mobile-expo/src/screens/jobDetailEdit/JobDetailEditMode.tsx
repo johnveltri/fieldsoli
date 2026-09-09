@@ -229,6 +229,7 @@ export function JobDetailEditMode({
   const {
     snapshot,
     draft,
+    resetVersion,
     validation,
     updateDraft,
     addSession,
@@ -242,6 +243,7 @@ export function JobDetailEditMode({
     updateOtherCost,
     getDraftSnapshot,
     setDoneHandler,
+    setBackHandler,
   } = editApi;
 
   const editSections = useMemo(
@@ -285,6 +287,11 @@ export function JobDetailEditMode({
     if (!active || isRevenueFocused) return;
     setRevenueText(revenueCentsToInput(draft?.revenueCents ?? null));
   }, [active, draft?.revenueCents, draft?.noRevenueConfirmed, isRevenueFocused]);
+
+  useEffect(() => {
+    setRevenueText(revenueCentsToInput(getDraftSnapshot().draft?.revenueCents ?? null));
+    setIsRevenueFocused(false);
+  }, [getDraftSnapshot, resetVersion]);
 
   const openPicker = useCallback((target: EditPickerTarget) => {
     Keyboard.dismiss();
@@ -335,20 +342,38 @@ export function JobDetailEditMode({
     });
   }, [commitRevenueFromText, registerFieldFlusher]);
 
-  const handleDonePress = useCallback(() => {
-    // Commit any in-progress TextInput values before save — Done often fires
-    // without a blur (shared header / keyboard still open).
+  const flushFields = useCallback(() => {
     for (const flush of fieldFlushersRef.current) {
       flush();
     }
+  }, []);
+
+  const handleDonePress = useCallback(() => {
+    // Commit any in-progress TextInput values before save — Done often fires
+    // without a blur (shared header / keyboard still open).
+    flushFields();
     Keyboard.dismiss();
     setTimeout(onDone, 0);
-  }, [onDone]);
+  }, [flushFields, onDone]);
+
+  const handleBackPress = useCallback(() => {
+    if (saving) return;
+    // Numeric fields commit on blur. Flush before the dirty check so Close and
+    // hardware Back cannot discard an in-focus value without confirmation.
+    flushFields();
+    Keyboard.dismiss();
+    setTimeout(onBack, 0);
+  }, [flushFields, onBack, saving]);
 
   useEffect(() => {
     setDoneHandler(handleDonePress);
     return () => setDoneHandler(null);
   }, [handleDonePress, setDoneHandler]);
+
+  useEffect(() => {
+    setBackHandler(handleBackPress);
+    return () => setBackHandler(null);
+  }, [handleBackPress, setBackHandler]);
 
   if (!draft) return null;
 
@@ -390,9 +415,7 @@ export function JobDetailEditMode({
           <View style={styles.topHeader}>
             <PlatformHeaderAction
               accessibilityLabel="Close"
-              onPress={() => {
-                if (!saving) onBack();
-              }}
+              onPress={handleBackPress}
               style={saving ? styles.controlDisabled : undefined}
             >
               <JobDetailIconTopClose color={fg.primary} />
@@ -561,6 +584,7 @@ export function JobDetailEditMode({
             {visibleMaterials.map((row, index) => (
                 <View key={row.id} ref={setFocusAnchor(`material:${row.id}`)} collapsable={false}>
                 <MaterialEditBlock
+                  key={`${row.id}:${resetVersion}`}
                   row={row}
                   typography={typography}
                   sessions={endedSessionsForPicker}
@@ -604,6 +628,7 @@ export function JobDetailEditMode({
             {visibleOtherCosts.map((row, index) => (
                 <View key={row.id} ref={setFocusAnchor(`otherCost:${row.id}`)} collapsable={false}>
                 <OtherCostEditBlock
+                  key={`${row.id}:${resetVersion}`}
                   row={row}
                   typography={typography}
                   sessions={endedSessionsForPicker}
@@ -814,6 +839,8 @@ function MaterialEditBlock({
     quantityToInput(row.quantity, row.quantityExplicit),
   );
   const [isTotalCostFocused, setIsTotalCostFocused] = useState(false);
+  const [isUnitPriceFocused, setIsUnitPriceFocused] = useState(false);
+  const [isQuantityFocused, setIsQuantityFocused] = useState(false);
   const totalCostTextRef = useRef(totalCostText);
   const unitPriceTextRef = useRef(unitPriceText);
   const quantityTextRef = useRef(quantityText);
@@ -852,6 +879,18 @@ function MaterialEditBlock({
     row.quantity,
     row.unitCostCents,
   ]);
+
+  useEffect(() => {
+    if (isUnitPriceFocused) return;
+    setUnitPriceText(
+      row.unitCostExplicit ? `@ ${formatUsdCombined(row.unitCostCents)}` : '',
+    );
+  }, [isUnitPriceFocused, row.unitCostCents, row.unitCostExplicit]);
+
+  useEffect(() => {
+    if (isQuantityFocused) return;
+    setQuantityText(quantityToInput(row.quantity, row.quantityExplicit));
+  }, [isQuantityFocused, row.quantity, row.quantityExplicit]);
 
   const commitTotalCost = useCallback(() => {
     const current = rowRef.current;
@@ -942,8 +981,12 @@ function MaterialEditBlock({
                 if (row.unitCostExplicit) {
                   setUnitPriceText(centsToEditText(row.unitCostCents));
                 }
+                setIsUnitPriceFocused(true);
               }}
-              onBlur={commitUnitPrice}
+              onBlur={() => {
+                commitUnitPrice();
+                setIsUnitPriceFocused(false);
+              }}
               onChangeText={setUnitPriceText}
             />
           }
@@ -955,7 +998,11 @@ function MaterialEditBlock({
               value={quantityText}
               keyboardType="decimal-pad"
               inputMode="decimal"
-              onBlur={commitQuantity}
+              onFocus={() => setIsQuantityFocused(true)}
+              onBlur={() => {
+                commitQuantity();
+                setIsQuantityFocused(false);
+              }}
               onChangeText={setQuantityText}
             />
           }
@@ -1005,8 +1052,14 @@ function OtherCostEditBlock({
   registerFieldFlusher: (flush: () => void) => () => void;
 }) {
   const [amountText, setAmountText] = useState(() => revenueCentsToInput(row.costCents));
+  const [isAmountFocused, setIsAmountFocused] = useState(false);
   const amountTextRef = useRef(amountText);
   amountTextRef.current = amountText;
+
+  useEffect(() => {
+    if (isAmountFocused) return;
+    setAmountText(revenueCentsToInput(row.costCents));
+  }, [isAmountFocused, row.costCents]);
 
   const commitAmount = useCallback(() => {
     formatMoneyFieldOnBlur(amountTextRef.current, setAmountText);
@@ -1044,8 +1097,12 @@ function OtherCostEditBlock({
             if (row.costCents > 0) {
               setAmountText(centsToEditText(row.costCents));
             }
+            setIsAmountFocused(true);
           }}
-          onBlur={commitAmount}
+          onBlur={() => {
+            commitAmount();
+            setIsAmountFocused(false);
+          }}
           onChangeText={setAmountText}
         />
         <EditFieldInput

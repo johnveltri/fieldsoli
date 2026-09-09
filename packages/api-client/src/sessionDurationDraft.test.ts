@@ -29,6 +29,14 @@ describe('sessionDurationDraft', () => {
     expect(formatSessionTimeLabel('2026-03-25T14:02:00.000Z')).toMatch(/\d{1,2}:\d{2} (AM|PM)/);
   });
 
+  it('keeps every positive duration visibly distinct from zero at the old 0.01-hour cutoff', async () => {
+    const { formatSessionDurationLabel } = await import('./sessionDurationDraft');
+    expect(formatSessionDurationLabel(0)).toBe('0.0h');
+    expect(formatSessionDurationLabel(1 / 3_600)).toBe('<0.1h');
+    expect(formatSessionDurationLabel(36 / 3_600)).toBe('<0.1h');
+    expect(formatSessionDurationLabel(37 / 3_600)).toBe('<0.1h');
+  });
+
   it('resolves draft times when startedTz was incorrectly set to a date', async () => {
     const { resolveSessionDraftTimes } = await import('./sessionDurationDraft');
     const resolved = resolveSessionDraftTimes({

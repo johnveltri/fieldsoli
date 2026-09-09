@@ -1892,8 +1892,15 @@ describe('JobDetailScreen simplified view (flag on)', () => {
     fireEvent.press(screen.getByLabelText('Confirm no materials'));
     fireEvent.press(screen.getByLabelText('Done'));
     await waitFor(() =>
-      expect(apiClient.updateJobCostsReviewed).toHaveBeenCalledWith({}, 'job-1', true),
+      expect(apiClient.applyJobDetailEdit).toHaveBeenCalledWith(
+        {},
+        'job-1',
+        expect.objectContaining({
+          job: expect.objectContaining({ noMaterialsConfirmed: true }),
+        }),
+      ),
     );
+    expect(apiClient.updateJobCostsReviewed).not.toHaveBeenCalled();
   });
 
   it('ends the live session before opening the mark-complete gate', async () => {

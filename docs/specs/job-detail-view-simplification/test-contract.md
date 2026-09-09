@@ -11,6 +11,7 @@
 | Partial session looks complete | High | TEST-V15 |
 | Flag-off regression | High | TEST-V09 |
 | Wizard discard completes job | High | TEST-V07 |
+| Tappable View rows hide their readable content from screen readers | High | TEST-V18 |
 
 ## Traceability
 
@@ -30,7 +31,8 @@
 | TEST-V12 | UX | Dynamic Type session row | Manual | Manual |
 | TEST-V13 | REQ-V11 | X/pill alignment; fade (or reduced-motion cut) | Component + manual | Both |
 | TEST-V14 | REQ-V12, UX-V18 | Untitled Job + unconfirmed $0 shows `Missing: revenue, sessions, materials, costs` (no `description`) | Component | Auto |
-| TEST-V15 | REQ-V13 | Session without duration shows missing | Component | Auto |
+| TEST-V15 | REQ-V13 | Zero-duration session shows missing; every positive duration, including 1 second and values on either side of 0.01h, does not | Component + API | Auto |
+| TEST-V18 | REQ-V02, REQ-V05 | Tappable header, session, material, cost, and note rows retain visible content in their accessibility labels and expose edit as a hint | Component | Auto |
 
 TEST-V06 (live start tile) and TEST-V16 (live add note immediate persist) are Phase 3 with REQ-V06 / REQ-V14.
 

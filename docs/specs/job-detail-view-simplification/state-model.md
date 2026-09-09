@@ -31,7 +31,7 @@ StartLiveFromView, LiveAddNote, LiveAddMaterial, and LiveChangeStart are Phase 3
 
 ## Transitions
 
-Wizard transitions: MinimumInfo → WizardEdit (scoped; revenue gap always opens revenue Edit). Edit discard cancels wizard. Edit Done persists confirm-none (materials, other costs, no revenue) from draft refs via reviewed/confirm APIs.
+Wizard transitions: MinimumInfo → WizardEdit (scoped; revenue gap always opens revenue Edit). Edit discard cancels wizard. Edit Done persists confirm-none (materials, other costs, no revenue) with the rest of the draft through the atomic apply RPC.
 
 ViewReady + OpenEditFromView → Phase 1 Edit (not wizard unless wizardActive).
 
@@ -40,7 +40,7 @@ BeginComplete / status-sheet Completed or Paid: end this job’s live in-progres
 ## Interruption
 
 - Kill in WizardEdit: Phase 1 draft lost; wizard flag lost.
-- Confirm-none (materials, other costs, no revenue) persist from Edit Done via draft refs + reviewed/confirm APIs — not a Complete bottom sheet.
+- Confirm-none (materials, other costs, no revenue) persist from Edit Done through the atomic apply RPC — not a Complete bottom sheet.
 - Kill during an existing live session: session remains on the server (current product). Unsaved overlay drafts stay as today.
 
 ## Invariants

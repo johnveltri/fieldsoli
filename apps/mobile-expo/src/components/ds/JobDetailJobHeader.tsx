@@ -50,7 +50,8 @@ export function JobDetailJobHeader({
         {onTitlePress ? (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Edit job title"
+            accessibilityLabel={description ? `${title}. ${description}` : title}
+            accessibilityHint="Opens job title and description editing"
             onPress={onTitlePress}
             style={({ pressed }) => [styles.titleBlock, pressed && styles.pressed]}
           >
@@ -68,7 +69,8 @@ export function JobDetailJobHeader({
         {onCustomerPress ? (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Edit customer"
+            accessibilityLabel={subtitleLabel}
+            accessibilityHint="Opens customer and address editing"
             onPress={onCustomerPress}
             style={({ pressed }) => [styles.subtitlePressable, pressed && styles.pressed]}
           >

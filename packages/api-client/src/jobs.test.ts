@@ -1386,6 +1386,105 @@ describe('jobs api client', () => {
     expect(detail?.noRevenueConfirmed).toBe(false);
   });
 
+  it('fetchJobDetail distinguishes zero duration from short positive sessions', async () => {
+    const startedAt = '2026-04-16T09:00:00.000Z';
+    const client = makeClient({
+      authUserId: 'user-1',
+      buildersByTable: {
+        jobs: [
+          makeBuilder({
+            maybeSingleResult: {
+              data: {
+                id: 'job-short-sessions',
+                short_description: 'Quick check',
+                customer_name: 'Casey',
+                service_address: '44 North Ave',
+                job_type: 'electrical',
+                job_work_status: 'in_progress',
+                job_payment_state: 'unpaid',
+                revenue_cents: 5000,
+                collected_cents: 0,
+                updated_at: '2026-04-17T10:00:00.000Z',
+                last_worked_at: '2026-04-16T09:00:37.000Z',
+              },
+              error: null,
+            },
+          }),
+        ],
+        sessions: [
+          makeBuilder({
+            awaitResult: {
+              data: [
+                {
+                  id: 'sess-zero',
+                  job_id: 'job-short-sessions',
+                  session_status: 'ended',
+                  started_at: startedAt,
+                  ended_at: startedAt,
+                  calendar_date_explicit: true,
+                  clock_start_explicit: true,
+                  clock_end_explicit: true,
+                },
+                {
+                  id: 'sess-one-second',
+                  job_id: 'job-short-sessions',
+                  session_status: 'ended',
+                  started_at: startedAt,
+                  ended_at: '2026-04-16T09:00:01.000Z',
+                  calendar_date_explicit: true,
+                  clock_start_explicit: true,
+                  clock_end_explicit: true,
+                },
+                {
+                  id: 'sess-thirty-six-seconds',
+                  job_id: 'job-short-sessions',
+                  session_status: 'ended',
+                  started_at: startedAt,
+                  ended_at: '2026-04-16T09:00:36.000Z',
+                  calendar_date_explicit: true,
+                  clock_start_explicit: true,
+                  clock_end_explicit: true,
+                },
+                {
+                  id: 'sess-thirty-seven-seconds',
+                  job_id: 'job-short-sessions',
+                  session_status: 'ended',
+                  started_at: startedAt,
+                  ended_at: '2026-04-16T09:00:37.000Z',
+                  calendar_date_explicit: true,
+                  clock_start_explicit: true,
+                  clock_end_explicit: true,
+                },
+              ],
+              error: null,
+            },
+          }),
+        ],
+        notes: [makeBuilder({ awaitResult: { data: [], error: null } })],
+        job_costs: [
+          makeBuilder({ awaitResult: { data: [], error: null } }),
+          makeBuilder({ awaitResult: { data: [], error: null } }),
+        ],
+      },
+    });
+
+    const detail = await fetchJobDetail(client as never, 'job-short-sessions');
+
+    expect(detail?.displaySessions.map((session) => session.durationLabel)).toEqual([
+      'No duration',
+      '<0.1h',
+      '<0.1h',
+      '<0.1h',
+    ]);
+    expect(detail?.displaySessions[0]?.timeRangeLabel).not.toContain('–');
+    expect(
+      detail?.displaySessions
+        .slice(1)
+        .every((session) => session.timeRangeLabel.includes('–')),
+    ).toBe(true);
+    expect(detail?.metrics.timeLabel).toBe('<0.1h');
+  });
+
   it('fetchJobDetail maps note id/body/sessionId and filters soft-deleted notes', async () => {
     const notesBuilder = makeBuilder({
       awaitResult: {

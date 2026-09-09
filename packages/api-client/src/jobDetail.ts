@@ -15,6 +15,7 @@ import type {
 
 import type { FieldSoloSupabaseClient } from './client';
 import { JOB_DETAIL_EMPTY_LABELS } from './jobDetailLabels';
+import { formatSessionDurationLabel } from './sessionDurationDraft';
 
 type JobWorkStatusDb =
   | 'not_started'
@@ -157,12 +158,12 @@ function mapSession(row: SessionRow, attachments: JobDetailSessionAttachment[] =
   const endStr = end ? timeFmt.format(end) : '';
   const hours = sessionDurationHours(row.started_at, row.ended_at);
   const durationLabel =
-    hours > 0.01 ? `${hours.toFixed(1)}h` : JOB_DETAIL_EMPTY_LABELS.sessionDuration;
+    hours > 0 ? formatSessionDurationLabel(hours) : JOB_DETAIL_EMPTY_LABELS.sessionDuration;
 
   let timeRangeLabel = '';
   if (clockStartExplicit && clockEndExplicit && endStr) {
     // Full range only when there is a real duration; otherwise drop the dangling end.
-    timeRangeLabel = hours > 0.01 ? `${startStr} – ${endStr}` : startStr;
+    timeRangeLabel = hours > 0 ? `${startStr} – ${endStr}` : startStr;
   } else if (clockStartExplicit) {
     // Start only (no explicit end) — omit "– end" / "– …".
     timeRangeLabel = startStr;
@@ -543,7 +544,7 @@ export async function fetchJobDetail(
       netEarningsCents,
     },
     metrics: {
-      timeLabel: `${totalHours.toFixed(1)}h`,
+      timeLabel: formatSessionDurationLabel(totalHours),
       netPerHrDisplay,
       sessionCount,
     },

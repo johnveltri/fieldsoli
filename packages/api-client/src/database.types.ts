@@ -659,6 +659,10 @@ export type Database = {
         Args: { p_job_id: string; p_payload: Json }
         Returns: Json
       }
+      apply_job_detail_edit_atomic: {
+        Args: { p_job_id: string; p_payload: Json }
+        Returns: Json
+      }
       claim_job_export_queue_messages: {
         Args: { p_quantity?: number }
         Returns: {

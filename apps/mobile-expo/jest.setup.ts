@@ -33,6 +33,7 @@ jest.mock('react-native-gesture-handler', () => {
     GestureHandlerRootView: View,
     PanGestureHandler: passthrough,
     NativeViewGestureHandler: passthrough,
+    Swipeable: passthrough,
     ScrollView,
     State: { BEGAN: 2, ACTIVE: 4, END: 5, CANCELLED: 3, FAILED: 1 },
   };

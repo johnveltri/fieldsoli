@@ -25,7 +25,9 @@ declare
   result jsonb;
 begin
   if has_function_privilege('anon', 'public.apply_job_detail_edit(uuid,jsonb)', 'EXECUTE')
-     or not has_function_privilege('authenticated', 'public.apply_job_detail_edit(uuid,jsonb)', 'EXECUTE') then
+     or not has_function_privilege('authenticated', 'public.apply_job_detail_edit(uuid,jsonb)', 'EXECUTE')
+     or has_function_privilege('anon', 'public.apply_job_detail_edit_atomic(uuid,jsonb)', 'EXECUTE')
+     or not has_function_privilege('authenticated', 'public.apply_job_detail_edit_atomic(uuid,jsonb)', 'EXECUTE') then
     raise exception 'apply_job_detail_edit execute grants are not authenticated-only';
   end if;
 
@@ -80,6 +82,59 @@ begin
   end if;
   if (select long_description from public.jobs where id = job_a) is distinct from 'Replace the valve and recaulk.' then
     raise exception 'job long_description not updated';
+  end if;
+
+  -- The client-facing wrapper owns all three confirmation fields in the same
+  -- transaction as the existing job/child diff.
+  retry_payload := jsonb_build_object(
+    'job', jsonb_build_object(
+      'shortDescription', 'Updated title',
+      'longDescription', 'Replace the valve and recaulk.',
+      'customerName', 'Pat',
+      'serviceAddress', '1 Main St',
+      'revenueCents', 6000,
+      'noRevenueConfirmed', true,
+      'noMaterialsConfirmed', false,
+      'noOtherCostsConfirmed', false
+    ),
+    'sessions', jsonb_build_object('create', '[]'::jsonb, 'update', '[]'::jsonb, 'deleteIds', '[]'::jsonb),
+    'notes', jsonb_build_object('create', '[]'::jsonb, 'update', '[]'::jsonb, 'deleteIds', '[]'::jsonb),
+    'materials', jsonb_build_object('create', '[]'::jsonb, 'update', '[]'::jsonb, 'deleteIds', '[]'::jsonb),
+    'otherCosts', jsonb_build_object('create', '[]'::jsonb, 'update', '[]'::jsonb, 'deleteIds', '[]'::jsonb)
+  );
+  result := public.apply_job_detail_edit_atomic(job_a, retry_payload);
+  if result ->> 'status' <> 'ok' or not exists (
+    select 1 from public.jobs
+    where id = job_a
+      and revenue_cents = 0
+      and no_revenue_confirmed_at is not null
+      and materials_reviewed_at is null
+      and other_costs_reviewed_at is null
+  ) then
+    raise exception 'atomic apply did not persist confirmation fields: %', (
+      select row_to_json(state)
+      from (
+        select revenue_cents, no_revenue_confirmed_at,
+          materials_reviewed_at, other_costs_reviewed_at
+        from public.jobs where id = job_a
+      ) state
+    );
+  end if;
+
+  retry_payload := jsonb_set(retry_payload, '{job,revenueCents}', '6000'::jsonb);
+  retry_payload := jsonb_set(retry_payload, '{job,noRevenueConfirmed}', 'false'::jsonb);
+  retry_payload := jsonb_set(retry_payload, '{job,noMaterialsConfirmed}', 'true'::jsonb);
+  retry_payload := jsonb_set(retry_payload, '{job,noOtherCostsConfirmed}', 'true'::jsonb);
+  perform public.apply_job_detail_edit_atomic(job_a, retry_payload);
+  if not exists (
+    select 1 from public.jobs
+    where id = job_a
+      and revenue_cents = 6000
+      and no_revenue_confirmed_at is null
+      and materials_reviewed_at is not null
+      and other_costs_reviewed_at is not null
+  ) then
+    raise exception 'atomic apply did not clear and restore confirmation fields';
   end if;
 
   if not exists (
@@ -290,13 +345,33 @@ begin
     raise exception 'completed partial session did not drive derived job state';
   end if;
 
+  perform public.apply_job_detail_edit_atomic(job_a, jsonb_build_object(
+    'job', jsonb_build_object(
+      'shortDescription', 'Updated title',
+      'longDescription', 'Replace the valve and recaulk.',
+      'customerName', 'Pat',
+      'serviceAddress', '1 Main St',
+      'revenueCents', 6000,
+      'noRevenueConfirmed', false,
+      'noMaterialsConfirmed', true,
+      'noOtherCostsConfirmed', true
+    ),
+    'sessions', jsonb_build_object('create', '[]'::jsonb, 'update', '[]'::jsonb, 'deleteIds', '[]'::jsonb),
+    'notes', jsonb_build_object('create', '[]'::jsonb, 'update', '[]'::jsonb, 'deleteIds', '[]'::jsonb),
+    'materials', jsonb_build_object('create', '[]'::jsonb, 'update', '[]'::jsonb, 'deleteIds', '[]'::jsonb),
+    'otherCosts', jsonb_build_object('create', '[]'::jsonb, 'update', '[]'::jsonb, 'deleteIds', '[]'::jsonb)
+  ));
+
   begin
-    result := public.apply_job_detail_edit(job_a, jsonb_build_object(
+    result := public.apply_job_detail_edit_atomic(job_a, jsonb_build_object(
       'job', jsonb_build_object(
         'shortDescription', 'Should not stick',
         'customerName', '',
         'serviceAddress', '',
-        'revenueCents', null
+        'revenueCents', null,
+        'noRevenueConfirmed', true,
+        'noMaterialsConfirmed', false,
+        'noOtherCostsConfirmed', false
       ),
       'sessions', jsonb_build_object(
         'create', '[]'::jsonb,
@@ -317,6 +392,16 @@ begin
 
   if (select short_description from public.jobs where id = job_a) <> 'Updated title' then
     raise exception 'job title rolled back after conflict';
+  end if;
+  if not exists (
+    select 1 from public.jobs
+    where id = job_a
+      and revenue_cents = 6000
+      and no_revenue_confirmed_at is null
+      and materials_reviewed_at is not null
+      and other_costs_reviewed_at is not null
+  ) then
+    raise exception 'confirmation fields did not roll back after conflict';
   end if;
 
   begin

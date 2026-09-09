@@ -17,6 +17,9 @@ describe('applyJobDetailEdit', () => {
           customerName: '',
           serviceAddress: '',
           revenueCents: null,
+          noRevenueConfirmed: true,
+          noMaterialsConfirmed: true,
+          noOtherCostsConfirmed: false,
         },
         sessions: { create: [], update: [], deleteIds: [] },
         notes: { create: [], update: [], deleteIds: [] },
@@ -24,7 +27,16 @@ describe('applyJobDetailEdit', () => {
         otherCosts: { create: [], update: [], deleteIds: [] },
       }),
     ).resolves.toBeUndefined();
-    expect(rpc).toHaveBeenCalledWith('apply_job_detail_edit', expect.objectContaining({ p_job_id: 'job-1' }));
+    expect(rpc).toHaveBeenCalledWith('apply_job_detail_edit_atomic', {
+      p_job_id: 'job-1',
+      p_payload: expect.objectContaining({
+        job: expect.objectContaining({
+          noRevenueConfirmed: true,
+          noMaterialsConfirmed: true,
+          noOtherCostsConfirmed: false,
+        }),
+      }),
+    });
   });
 
   it('throws ApplyJobDetailEditError on conflict', async () => {
@@ -40,6 +52,9 @@ describe('applyJobDetailEdit', () => {
           customerName: '',
           serviceAddress: '',
           revenueCents: null,
+          noRevenueConfirmed: false,
+          noMaterialsConfirmed: false,
+          noOtherCostsConfirmed: false,
         },
         sessions: { create: [], update: [], deleteIds: ['sess-live'] },
         notes: { create: [], update: [], deleteIds: [] },

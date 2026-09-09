@@ -7,6 +7,7 @@ import type {
 import { JOB_SHORT_DESCRIPTION_MAX_LENGTH } from '@fieldsolo/shared-types';
 
 import type { FieldSoloSupabaseClient } from './client';
+import { formatSessionDurationLabel } from './sessionDurationDraft';
 
 type JobsRow = {
   id: string;
@@ -382,7 +383,7 @@ async function enrichJobsRowsWithSessionRollups(
       createdAt: row.created_at,
       lastWorkedAt,
       lastWorkedLabel: lastWorkedLabelFromColumn(lastWorkedAt),
-      timeLabel: `${totalHours.toFixed(1)}h`,
+      timeLabel: formatSessionDurationLabel(totalHours),
       jobType: row.job_type,
       workStatus: mapWorkStatus(row),
       jobPaymentState: row.job_payment_state,

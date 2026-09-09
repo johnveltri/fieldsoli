@@ -90,7 +90,6 @@ import {
   createOtherCost,
   deleteOtherCost,
   updateJobCostsReviewed,
-  updateJobNoRevenueConfirmed,
   updateJobOtherCostsReviewed,
   updateJobStatusById,
   updateOtherCost,
@@ -2597,7 +2596,7 @@ export function JobDetailScreen({
 
   const onBackFromEdit = useCallback(() => {
     if (editSavingRef.current) return;
-    if (editApi.dirty) {
+    if (editApi.isDirty()) {
       Alert.alert('Discard changes?', undefined, [
         { text: 'Keep editing', style: 'cancel' },
         {
@@ -2627,33 +2626,20 @@ export function JobDetailScreen({
       return;
     }
     onAndroidHardwareBackHandlerChange(() => {
-      onBackFromEdit();
+      editApi.requestBack(onBackFromEdit);
       return true;
     });
     return () => onAndroidHardwareBackHandlerChange(null);
-  }, [detailMode, onAndroidHardwareBackHandlerChange, onBackFromEdit]);
+  }, [detailMode, editApi, onAndroidHardwareBackHandlerChange, onBackFromEdit]);
 
   const onDoneFromEdit = useCallback(async () => {
     if (!job || editSavingRef.current) return;
     const payload = editApi.buildPayload();
-    const persist =
-      editApi.getDraftSnapshot?.() ?? { snapshot: editApi.snapshot, draft: editApi.draft };
-    const snap = persist.snapshot;
-    const draft = persist.draft;
-    if (!payload || !snap || !draft) return;
+    if (!payload) return;
     editSavingRef.current = true;
     setEditSaving(true);
     try {
       await applyJobDetailEdit(supabase, job.id, payload);
-      if (draft.noMaterialsConfirmed !== snap.noMaterialsConfirmed) {
-        await updateJobCostsReviewed(supabase, job.id, draft.noMaterialsConfirmed);
-      }
-      if (draft.noOtherCostsConfirmed !== snap.noOtherCostsConfirmed) {
-        await updateJobOtherCostsReviewed(supabase, job.id, draft.noOtherCostsConfirmed);
-      }
-      if (draft.noRevenueConfirmed !== snap.noRevenueConfirmed) {
-        await updateJobNoRevenueConfirmed(supabase, job.id, draft.noRevenueConfirmed);
-      }
       const refreshed = await fetchJobDetail(supabase, job.id);
       if (refreshed) {
         setJob(refreshed);
@@ -2808,7 +2794,11 @@ export function JobDetailScreen({
     <View style={styles.sharedTopHeader}>
       <PlatformHeaderAction
         accessibilityLabel="Close"
-        onPress={detailMode === 'edit' ? onBackFromEdit : onClose}
+        onPress={
+          detailMode === 'edit'
+            ? () => editApi.requestBack(onBackFromEdit)
+            : onClose
+        }
         disabled={detailMode === 'edit' && editSaving}
         style={detailMode === 'edit' && editSaving ? styles.controlDisabled : undefined}
       >

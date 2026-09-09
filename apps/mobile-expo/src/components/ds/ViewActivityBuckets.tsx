@@ -39,6 +39,7 @@ type NoteFooterOptions = { expanded: boolean; onToggle: () => void };
 function ViewRowShell({
   typography,
   accessibilityLabel,
+  accessibilityHint,
   onDelete,
   onPress,
   style,
@@ -46,6 +47,7 @@ function ViewRowShell({
 }: {
   typography: TextStyles;
   accessibilityLabel: string;
+  accessibilityHint?: string;
   onDelete?: () => void;
   onPress?: () => void;
   style?: object | (object | false | null | undefined)[];
@@ -55,6 +57,7 @@ function ViewRowShell({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
+      accessibilityHint={accessibilityHint}
       onPress={onPress}
       style={({ pressed }) => [style, pressed && styles.pressed]}
     >
@@ -169,7 +172,13 @@ export function ViewSessionsBuckets({
             <ViewRowShell
               key={session.id}
               typography={typography}
-              accessibilityLabel={`Session ${session.dateLabel}`}
+              accessibilityLabel={[
+                'Session',
+                session.dateLabel,
+                timeLabel,
+                session.durationLabel,
+              ].filter(Boolean).join('. ')}
+              accessibilityHint={onCardPress ? 'Opens session editing' : undefined}
               onPress={onCardPress}
               onDelete={onDeleteSession ? () => onDeleteSession(session.id) : undefined}
               style={[
@@ -309,7 +318,13 @@ export function ViewMaterialsBuckets({
                 <ViewRowShell
                   key={`${bucket.id}-${item.id}`}
                   typography={typography}
-                  accessibilityLabel="Edit material"
+                  accessibilityLabel={[
+                    'Material',
+                    item.name,
+                    showQuantity ? item.quantityLabel : '',
+                    totalEmpty ? 'No total' : item.priceLabel,
+                  ].filter(Boolean).join('. ')}
+                  accessibilityHint={rowPress ? 'Opens material editing' : undefined}
                   onPress={rowPress}
                   onDelete={onDeleteMaterial ? () => onDeleteMaterial(item.id) : undefined}
                   style={rowStyle}
@@ -406,7 +421,13 @@ export function ViewOtherCostsBuckets({
                 <ViewRowShell
                   key={`${bucket.id}-${item.id}`}
                   typography={typography}
-                  accessibilityLabel="Edit other cost"
+                  accessibilityLabel={[
+                    'Other cost',
+                    item.typeLabel,
+                    item.description,
+                    amountEmpty ? 'No amount' : item.priceLabel,
+                  ].filter(Boolean).join('. ')}
+                  accessibilityHint={rowPress ? 'Opens other cost editing' : undefined}
                   onPress={rowPress}
                   onDelete={onDeleteOtherCost ? () => onDeleteOtherCost(item.id) : undefined}
                   style={rowStyle}
@@ -533,9 +554,11 @@ export function ViewNotesBuckets({
 
   const renderNoteRow = (n: JobDetailNote, ni: number, bucketId: string) => {
     const expanded = expandedNoteIds.has(n.id);
-    const rowChrome = [
+    const rowChrome: object[] = [
       showNoteIcon ? styles.noteRow : styles.noteRowPlain,
-      ni > 0 && { borderTopWidth: 1, borderTopColor: color('Foundation/Border/Subtle') },
+      ...(ni > 0
+        ? [{ borderTopWidth: 1, borderTopColor: color('Foundation/Border/Subtle') }]
+        : []),
     ];
     const noteIconSlot = showNoteIcon ? (
       <View style={{ marginTop: space('Spacing/2') }}>
@@ -575,7 +598,8 @@ export function ViewNotesBuckets({
       <ViewRowShell
         key={`${bucketId}-n-${n.id}`}
         typography={typography}
-        accessibilityLabel="Edit note"
+        accessibilityLabel={['Note', n.body, n.dateLabel].filter(Boolean).join('. ')}
+        accessibilityHint={rowPress ? 'Opens note editing' : undefined}
         onPress={rowPress}
         onDelete={onDeleteNote ? () => onDeleteNote(n.id) : undefined}
       >

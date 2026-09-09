@@ -4,7 +4,7 @@
 
 - Canonical business terms: Job, Session, Note, Material, Other cost, Edit draft, Done, explicit date/clock/material breakdown state. **Customer** in this release means the job’s display name string, not a Customer entity.
 - Existing source of truth: `public.jobs`, `public.sessions`, `public.notes`, `public.job_costs` (materials and other costs). There is no `customers` table.
-- New or changed data boundaries: session date/clock explicitness, material quantity/unit-price explicitness, nullable revenue preserved through the view model, and RPC `public.apply_job_detail_edit` applying an idempotent draft **diff** in one transaction.
+- New or changed data boundaries: session date/clock explicitness, material quantity/unit-price explicitness, nullable revenue and confirm-none values preserved through the view model, and RPC `public.apply_job_detail_edit_atomic` applying the full Edit commit in one transaction.
 
 ## Entities and ownership
 
@@ -26,6 +26,9 @@
 | DATA-02 | jobs.customer_name | text | Optional, empty string stored as empty/null per existing writer | Customer **display name on the job only**. Not a foreign key. A later Customers feature may add `jobs.customer_id` and keep this as a denormalized label; this RPC must not invent that column. | User | Yes |
 | DATA-03 | jobs.service_address | text | Optional | Service address | User | Yes |
 | DATA-04 | jobs.revenue_cents | bigint null | Optional; empty field → null; must be ≥ 0 if set | Quoted/earned revenue | User | No |
+| DATA-04b | jobs.no_revenue_confirmed_at | timestamptz null | Set when confirm-no-revenue is true; forces revenue to 0 | Confirms intentionally empty revenue | User/System | No |
+| DATA-04c | jobs.materials_reviewed_at | timestamptz null | Set when confirm-no-materials is true | Confirms no usable materials | User/System | No |
+| DATA-04d | jobs.other_costs_reviewed_at | timestamptz null | Set when confirm-no-other-costs is true | Confirms no usable other costs | User/System | No |
 | DATA-05 | sessions.started_at / ended_at | timestamptz | Required storage bounds for ended sessions | Clock bounds. Missing user date/time may use a synthesized current-date 09:00 local start. `ended_at >= started_at`; zero-duration is valid partial data but is not meaningful work evidence. | User or system | No |
 | DATA-06 | sessions.clock_times_explicit | boolean | NOT NULL, default **true** | True when the user set start or end on Edit (or the row came from live/manual time pickers). False for duration-only Edit saves. Existing rows backfill **true**. | User/System | No |
 | DATA-07 | sessions.started_tz | text | Set on duration-only and timed saves when known | IANA zone used to interpret the local date / 09:00 synthesis | System | No |
@@ -49,23 +52,23 @@ Child client ids: new rows use client-generated UUIDs. Create operations are own
 
 ## Invariants and calculations
 
-- Apply is one database transaction. Failure → no partial child or identity writes.
+- Apply is one database transaction. Failure → no partial child, identity, or confirmation writes.
 - Diff only: update/delete ids must already belong to the job and user. Unknown ids → reject the transaction.
 - Do not delete or update `session_status = 'in_progress'`.
 - Do not set `clock_times_explicit = false` on a live (`entry_mode = live`) row.
 - When `clock_times_explicit` is false, View **must not** present `timeRangeLabel`; show date + duration only (DATA-06 + REQ-07).
-- Duration hours = (`ended_at` − `started_at`) in hours, same as `sessionDurationHours` today.
+- Duration hours = (`ended_at` − `started_at`) in hours, same as `sessionDurationHours` today. Zero duration remains partial; every positive duration (`ended_at > started_at`) is meaningful work evidence with no minimum cutoff. Positive totals below the one-decimal display resolution render as `<0.1h` rather than `No duration` or `0.0h`.
 - Material `total_cost_cents` is primary. Recompute it as `round(unit_cost_cents * quantity)` only when both breakdown values are explicit; otherwise preserve the entered total independently.
 - Skip brand-new rows that are completely empty. Persist non-empty partial sessions, materials, and other costs. Blank new notes are omitted; a cleared existing note is deleted. The job title is the only client-side Done blocker.
 - A session contributes to `last_worked_at`, record completeness, or automatic `not_started` → `in_progress` only when it has an explicit calendar date and meaningful duration; live sessions retain existing behavior.
 - Delete job uses existing `deleteJobById` (not the apply RPC) and is immediate.
-- `apply_job_detail_edit` must not create or update a customers table. `payload.job` identity fields are `shortDescription`, `longDescription`, `customerName`, `serviceAddress`, `revenueCents` only.
+- `apply_job_detail_edit_atomic` must not create or update a customers table. `payload.job` fields are `shortDescription`, `longDescription`, `customerName`, `serviceAddress`, `revenueCents`, `noRevenueConfirmed`, `noMaterialsConfirmed`, and `noOtherCostsConfirmed` only.
 
 ## Interfaces
 
 | Interface | Direction | Request/event/file shape | Response/result | Auth | Idempotency/versioning |
 |---|---|---|---|---|---|
-| `public.apply_job_detail_edit(p_job_id uuid, p_payload jsonb)` | Client → DB | See payload below | `{ "status": "ok" }` on success; validation failures **raise** `apply_job_detail_edit:<code>` so the transaction rolls back | `authenticated`; invoker RLS | Same payload retry is owner/job-safe upsert by client ids; not a replace-all |
+| `public.apply_job_detail_edit_atomic(p_job_id uuid, p_payload jsonb)` | Client → DB | See payload below; invokes the existing row-diff function inside the same transaction | `{ "status": "ok" }` on success; validation failures **raise** `apply_job_detail_edit:<code>` so the transaction rolls back | `authenticated`; invoker RLS | Same payload retry is owner/job-safe upsert by client ids; not a replace-all |
 | `deleteJobById` | Client → DB | Existing | Existing | Existing | Existing |
 | `fetchJobDetail` | Client → DB | Existing + session/material explicitness columns | View model includes explicit date/clock flags, nullable revenue, authoritative material total, and nullable quantity/unit cost with explicitness | Existing | — |
 
@@ -78,7 +81,10 @@ Child client ids: new rows use client-generated UUIDs. Create operations are own
     "longDescription": "string",
     "customerName": "string",
     "serviceAddress": "string",
-    "revenueCents": 0
+    "revenueCents": 0,
+    "noRevenueConfirmed": true,
+    "noMaterialsConfirmed": false,
+    "noOtherCostsConfirmed": false
   },
   "sessions": {
     "create": [{ "id": "uuid", "startedAt": "iso", "endedAt": "iso", "calendarDateExplicit": false, "clockStartExplicit": false, "clockEndExplicit": false, "startedTz": "IANA" }],
@@ -116,12 +122,12 @@ Child client ids: new rows use client-generated UUIDs. Create operations are own
 
 - Existing-row behavior: existing sessions retain captured date/clock semantics. Existing material rows backfill quantity and unit-price explicitness to true because the legacy material forms captured both values; new total-only rows write both flags false.
 - Backfill: new explicitness columns receive deterministic values that preserve the existing View/Edit presentation; new writes always provide explicitness in the RPC payload.
-- Old-client compatibility: old app does not send the flag; View still formats a time range from `started_at`/`ended_at`, so duration-only sessions created by a new client may show 9:00–10:00 on old builds.
+- Old-client compatibility: old clients continue calling `apply_job_detail_edit`; the new client calls `apply_job_detail_edit_atomic` and supplies all three required confirmation booleans. View still formats a time range from `started_at`/`ended_at`, so duration-only sessions created by a new client may show 9:00–10:00 on old builds.
 - Rollback or forward-fix: drop RPC and stop calling it; column can remain (harmless). Forward-fix View hide rule is the honest display.
 
 ## Cost and quota envelope
 
-- Free-tier resources consumed: one Postgres function invocation and a handful of row writes per Done (typically less than today’s N sheet round-trips).
+- Free-tier resources consumed: one client RPC per Done and a handful of row writes; the atomic wrapper invokes the existing row-diff function within that database transaction.
 - Expected usage: a few Dones per job per day per user.
 - Limit/upgrade trigger: ordinary DB CPU/row volume, not a new product quota.
 - Lock-in: none beyond existing Supabase.
@@ -129,6 +135,6 @@ Child client ids: new rows use client-generated UUIDs. Create operations are own
 ## Verification obligations
 
 - Column default true; new duration-only false (TEST-09, TEST-10).
-- RPC transaction atomicity and in_progress rejection (TEST-07, TEST-15, TEST-18).
+- RPC transaction atomicity, including confirmation timestamps, and in_progress rejection (TEST-07, TEST-15, TEST-18).
 - Material total calculation (TEST-11).
 - RLS: other user’s job rejected (TEST-18).
