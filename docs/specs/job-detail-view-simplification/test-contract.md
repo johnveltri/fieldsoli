@@ -26,6 +26,7 @@
 | TEST-V09 | REQ-V09 | Flag off ADD + confirm card | Component | Auto |
 | TEST-V10 | REQ-V10 | focusTarget | Component | Auto |
 | TEST-V11 | UX copy | Empty + gate strings | Component | Auto |
+| TEST-V17 | Completeness | Status-sheet Paid and Mark Paid require the same financial completeness gate as Completed | Component | Auto |
 | TEST-V12 | UX | Dynamic Type session row | Manual | Manual |
 | TEST-V13 | REQ-V11 | X/pill alignment; fade (or reduced-motion cut) | Component + manual | Both |
 | TEST-V14 | REQ-V12, UX-V18 | Untitled Job + unconfirmed $0 shows `Missing: revenue, sessions, materials, costs` (no `description`) | Component | Auto |

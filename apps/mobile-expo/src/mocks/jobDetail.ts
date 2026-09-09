@@ -18,6 +18,7 @@ export type {
 export const mockJobDetail: JobDetailViewModel = {
   id: '00000000-0000-0000-0000-000000000001',
   shortDescription: 'Bathroom Remodel Phase 1',
+  longDescription: '',
   customerName: 'Andrew G',
   serviceAddress: '123 Main Street\nPerrysburg, OH 43551',
   jobType: 'plumbing',

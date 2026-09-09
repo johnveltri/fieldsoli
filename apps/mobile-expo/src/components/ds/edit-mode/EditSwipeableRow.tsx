@@ -71,6 +71,8 @@ export function EditSwipeableRow({
 const styles = StyleSheet.create({
   row: {
     backgroundColor: bg.surfaceWhite,
+    width: '100%',
+    alignSelf: 'stretch',
   },
   deleteAction: {
     backgroundColor: color('Semantic/Status/Error/Text'),

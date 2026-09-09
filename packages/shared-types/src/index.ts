@@ -1,3 +1,6 @@
+export {
+  JOB_SHORT_DESCRIPTION_MAX_LENGTH,
+} from './jobDetailView';
 export type {
   JobDetailMaterialBucket,
   JobDetailMaterialLine,

@@ -3,6 +3,9 @@
  * Maps from Supabase via `@fieldsolo/api-client` `fetchJobDetail`.
  */
 
+/** Max length for `jobs.short_description` / job title on Edit and writers. */
+export const JOB_SHORT_DESCRIPTION_MAX_LENGTH = 60;
+
 /** Mirrors design-system `StatusPill` kinds for the job header pill (includes derived `paid`). */
 export type JobDetailWorkStatus =
   | 'paid'
@@ -153,6 +156,8 @@ export type JobDetailOtherCostBucket = {
 export type JobDetailViewModel = {
   id: string;
   shortDescription: string;
+  /** Optional longer description under the title. Empty string when unset. */
+  longDescription: string;
   customerName: string;
   serviceAddress: string;
   jobType: string;

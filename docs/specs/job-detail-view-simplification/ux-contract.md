@@ -31,6 +31,7 @@ Live Session start from View and expanded live capture (add note/material, start
 
 | Card                  | Collapsed                              | Expand                 | Mutate                                           |
 | --------------------- | -------------------------------------- | ---------------------- | ------------------------------------------------ |
+| Title / description   | Title (display) + optional long description (body) | None | Tap either → scoped Title Edit (title + description) |
 | Sessions (one white card) | Rows: date, start–end, duration, missing | None               | Row tap → scoped Sessions Edit; swipe → Delete |
 | Notes (one white card) | Excerpt (up to 4 lines) + date       | Show More / Show Less  | Row tap → scoped Notes Edit; swipe → Delete |
 | Materials / other costs | Name, amount, missing line           | None                   | Row tap → scoped section Edit; swipe → Delete |
@@ -40,7 +41,7 @@ Live Session start from View and expanded live capture (add note/material, start
 
 Header **EDIT** opens full Edit (all white tiles). Scoped Edit still uses Done / X (discard) and can Add rows within the visible section(s); Done persists the full job draft.
 
-On Edit, customer + address share one white tile; revenue is its own white tile.
+On Edit, title + long description share one white tile; customer + address share one white tile; revenue is its own white tile. Title and long description are both multiline (Return inserts a newline; text wraps and the field grows like a note). Title has a **60-character** max.
 
 **Swipe to delete (View):** Swipe a session, material, other-cost, or note row to reveal Delete; confirm soft-deletes immediately and refreshes the job.
 

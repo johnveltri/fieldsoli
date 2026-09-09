@@ -36,6 +36,7 @@ import {
   EditSplitTimeRow,
   EditTappableValue,
   EditTitleField,
+  EditDescriptionField,
   editSheetRowSeparator,
 } from '../../components/ds/edit-mode/EditFormRows';
 import { EditIconLink, EditIconLocation, EditIconPerson } from '../../components/ds/edit-mode/EditModeIcons';
@@ -60,6 +61,7 @@ import {
   buildMaterialUnitPriceBlurPatch,
   isDraftMaterialUsable,
   isDraftOtherCostUsable,
+  JOB_SHORT_DESCRIPTION_MAX_LENGTH,
   materialHasBreakdown,
   useJobEditDraft,
   type DraftMaterialRow,
@@ -423,7 +425,11 @@ export function JobDetailEditMode({
               accessibilityLabel="Job title"
               placeholder="Job title"
               value={draft.shortDescription}
-              onChangeText={(t) => updateDraft({ shortDescription: t })}
+              onChangeText={(t) =>
+                updateDraft({
+                  shortDescription: t.slice(0, JOB_SHORT_DESCRIPTION_MAX_LENGTH),
+                })
+              }
               onBlur={() => {
                 const current = getDraftSnapshot().draft?.shortDescription ?? '';
                 if (current.trim() !== '') return;
@@ -432,6 +438,13 @@ export function JobDetailEditMode({
                     snapshot?.shortDescription.trim() || 'Untitled Job',
                 });
               }}
+            />
+            <EditDescriptionField
+              typography={typography}
+              accessibilityLabel="Job description"
+              placeholder="Description"
+              value={draft.longDescription}
+              onChangeText={(t) => updateDraft({ longDescription: t })}
             />
           </EditSheet>
           </View>

@@ -15,6 +15,7 @@ function minimalJob(overrides: Partial<JobDetailViewModel> = {}): JobDetailViewM
   return {
     id: 'job-1',
     shortDescription: 'Test job',
+    longDescription: '',
     customerName: '',
     serviceAddress: '',
     displaySessions: [],
@@ -33,6 +34,7 @@ describe('validateJobEditDraft capture-now', () => {
   it('only blocks Done when the job title is blank', () => {
     const partialDraft: JobEditDraft = {
       shortDescription: 'Titled job',
+      longDescription: '',
       customerName: '',
       serviceAddress: '',
       revenueCents: null,
@@ -465,5 +467,27 @@ describe('useJobEditDraft confirm-none and refs', () => {
     expect(snap.draft?.noRevenueConfirmed).toBe(true);
     expect(snap.draft?.revenueCents).toBe(0);
     expect(snap.snapshot?.customerName).toBe('');
+  });
+
+  it('includes long description on the apply payload', () => {
+    const snapshot = createJobEditDraft(minimalJob());
+    const draft: JobEditDraft = {
+      ...snapshot,
+      longDescription: '  Replace the valve.  ',
+    };
+    expect(buildApplyJobDetailEditPayload(snapshot, draft).job.longDescription).toBe(
+      'Replace the valve.',
+    );
+  });
+
+  it('clamps short description to 60 characters on the apply payload', () => {
+    const snapshot = createJobEditDraft(minimalJob());
+    const draft: JobEditDraft = {
+      ...snapshot,
+      shortDescription: `${'A'.repeat(60)}EXTRA`,
+    };
+    expect(buildApplyJobDetailEditPayload(snapshot, draft).job.shortDescription).toBe(
+      'A'.repeat(60),
+    );
   });
 });

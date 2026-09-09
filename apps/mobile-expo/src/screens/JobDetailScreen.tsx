@@ -153,6 +153,7 @@ type MarkCompleteWizardCloseOptions = {
 import {
   financialCompletenessGaps,
   incompletePillsForJobDetail,
+  isCompletedOrPaidWorkStatus,
   isJobFinanciallyComplete,
   shouldDemoteCompletedOrPaidForIncompleteFinancials,
   type FinancialCompletenessGap,
@@ -463,6 +464,7 @@ export function JobDetailScreen({
   const [otherCostSheetMounted, setOtherCostSheetMounted] = useState(false);
 
   const completeWizardActiveRef = useRef(false);
+  const pendingStatusAfterWizardRef = useRef<'completed' | 'paid'>('completed');
   const [markCompleteWizardActive, setMarkCompleteWizardActive] = useState(false);
   const advanceMarkCompleteWizardRef = useRef<(refreshedJob: JobDetailViewModel) => void>(() => {});
   const [minimumInfoGateMounted, setMinimumInfoGateMounted] = useState(false);
@@ -481,6 +483,7 @@ export function JobDetailScreen({
 
   const cancelMarkCompleteWizard = useCallback(() => {
     setCompleteWizardActive(false);
+    pendingStatusAfterWizardRef.current = 'completed';
     setMaterialWizardMode(false);
     setMaterialWizardError(undefined);
     setOtherCostWizardMode(false);
@@ -693,6 +696,7 @@ export function JobDetailScreen({
         });
     return {
       shortDescription: j.shortDescription,
+      longDescription: j.longDescription ?? '',
       customerName: j.customerName,
       serviceAddress: j.serviceAddress,
       revenue,
@@ -711,6 +715,7 @@ export function JobDetailScreen({
         const before = toEditValues(job);
         await updateJobById(supabase, job.id, {
           shortDescription: values.shortDescription,
+          longDescription: values.longDescription,
           customerName: values.customerName.trim(),
           serviceAddress: values.serviceAddress.trim(),
           revenueCents,
@@ -1299,35 +1304,32 @@ export function JobDetailScreen({
     }
   }, [sessionUserId]);
 
-  const onPrimaryStatusCta = useCallback(async () => {
-    if (!job || statusActionPending) return;
-    const next = nextStatusAfterPrimaryAction(job.workStatus);
-    const revenueOk =
-      job.noRevenueConfirmed || (job.earnings.revenueCents ?? 0) > 0;
-    if (next === 'paid' && !revenueOk) {
-      Alert.alert(
-        'Add revenue first',
-        'Enter job revenue before marking this job paid.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Edit job', onPress: onEdit },
-        ],
-      );
-      return;
-    }
-    if (next === 'completed') {
+  const prepareCompletenessGatedStatus = useCallback(
+    async (next: 'completed' | 'paid'): Promise<'proceed' | 'stopped'> => {
       setStatusActionPending(true);
       const prepared = await endLiveSessionBeforeMarkComplete();
       if (!prepared) {
         setStatusActionPending(false);
-        return;
+        return 'stopped';
       }
       if (!isJobFinanciallyComplete(jobFinancialContext(prepared))) {
         setStatusActionPending(false);
+        pendingStatusAfterWizardRef.current = next;
         setMinimumInfoGateMounted(true);
         setMinimumInfoGateVisible(true);
-        return;
+        return 'stopped';
       }
+      return 'proceed';
+    },
+    [endLiveSessionBeforeMarkComplete],
+  );
+
+  const onPrimaryStatusCta = useCallback(async () => {
+    if (!job || statusActionPending) return;
+    const next = nextStatusAfterPrimaryAction(job.workStatus);
+    if (isCompletedOrPaidWorkStatus(next)) {
+      const prepared = await prepareCompletenessGatedStatus(next);
+      if (prepared === 'stopped') return;
     } else {
       setStatusActionPending(true);
     }
@@ -1359,13 +1361,12 @@ export function JobDetailScreen({
       setStatusActionPending(false);
     }
   }, [
-    endLiveSessionBeforeMarkComplete,
-    job,
-    statusActionPending,
-    refetchJob,
     formatErrorMessage,
+    job,
     maybeShowCompletionFeedbackPrompt,
-    onEdit,
+    prepareCompletenessGatedStatus,
+    refetchJob,
+    statusActionPending,
   ]);
 
   const onSelectJobStatusFromSheet = useCallback(
@@ -1373,18 +1374,10 @@ export function JobDetailScreen({
       if (!job || statusActionPending) return;
       if (!isJobDetailWorkStatus(value)) return;
       const next = value;
-      if (next === 'completed') {
-        setStatusActionPending(true);
-        const prepared = await endLiveSessionBeforeMarkComplete();
-        if (!prepared) {
-          setStatusActionPending(false);
-          return;
-        }
-        if (!isJobFinanciallyComplete(jobFinancialContext(prepared))) {
-          setStatusActionPending(false);
+      if (isCompletedOrPaidWorkStatus(next)) {
+        const prepared = await prepareCompletenessGatedStatus(next);
+        if (prepared === 'stopped') {
           closeStatusSheet();
-          setMinimumInfoGateMounted(true);
-          setMinimumInfoGateVisible(true);
           return;
         }
       } else {
@@ -1401,6 +1394,9 @@ export function JobDetailScreen({
           source: 'status_sheet',
         });
         if (job.workStatus !== 'completed' && next === 'completed') {
+          void maybeShowCompletionFeedbackPrompt();
+        }
+        if (job.workStatus !== 'completed' && job.workStatus !== 'paid' && next === 'paid') {
           void maybeShowCompletionFeedbackPrompt();
         }
       } catch (e) {
@@ -1421,10 +1417,10 @@ export function JobDetailScreen({
     },
     [
       closeStatusSheet,
-      endLiveSessionBeforeMarkComplete,
       formatErrorMessage,
       job,
       maybeShowCompletionFeedbackPrompt,
+      prepareCompletenessGatedStatus,
       refetchJob,
       statusActionPending,
     ],
@@ -2071,25 +2067,30 @@ export function JobDetailScreen({
 
   const performMarkJobCompleted = useCallback(async () => {
     if (!job) return;
+    const toStatus = pendingStatusAfterWizardRef.current;
     setStatusActionPending(true);
     try {
       const fromStatus = job.workStatus;
-      await updateJobStatusById(supabase, job.id, 'completed');
+      await updateJobStatusById(supabase, job.id, toStatus);
       await refetchJob();
       analytics.capture('job_status_changed', {
         job_id: job.id,
         from_status: fromStatus,
-        to_status: 'completed',
+        to_status: toStatus,
         source: 'primary_cta',
       });
-      if (fromStatus !== 'completed') {
+      if (
+        fromStatus !== 'completed' &&
+        fromStatus !== 'paid' &&
+        isCompletedOrPaidWorkStatus(toStatus)
+      ) {
         void maybeShowCompletionFeedbackPrompt();
       }
     } catch (e) {
       analytics.capture('job_status_change_failed', {
         job_id: job.id,
         from_status: job.workStatus,
-        attempted_status: 'completed',
+        attempted_status: toStatus,
         source: 'mark_complete_wizard',
         ...errorProperties(e),
       });
@@ -2098,6 +2099,7 @@ export function JobDetailScreen({
         formatErrorMessage(e) || 'Could not update job status.',
       );
     } finally {
+      pendingStatusAfterWizardRef.current = 'completed';
       setStatusActionPending(false);
       setMaterialWizardMode(false);
       setMaterialWizardError(undefined);
@@ -2193,6 +2195,7 @@ export function JobDetailScreen({
   }, [advanceMarkCompleteWizard, job, setCompleteWizardActive]);
 
   const closeMinimumInfoGate = useCallback(() => {
+    pendingStatusAfterWizardRef.current = 'completed';
     setMinimumInfoGateVisible(false);
   }, []);
 
@@ -2879,6 +2882,7 @@ export function JobDetailScreen({
       <View style={styles.slot}>
         <JobDetailJobHeader
           title={job.shortDescription}
+          longDescription={job.longDescription}
           customerName={job.customerName}
           serviceAddress={job.serviceAddress}
           lastWorkedLabel={job.lastWorkedLabel}
@@ -2933,7 +2937,9 @@ export function JobDetailScreen({
       <View style={styles.sessionList}>
         {visibleSessions.length === 0 ? (
           <SectionEmptyStateCard
-            message="No sessions recorded"
+            message={
+              job.inProgressSession ? 'Live session in progress' : 'No sessions recorded'
+            }
             typography={typography}
             onPress={
               simplifiedView

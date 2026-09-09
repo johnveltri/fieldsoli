@@ -26,6 +26,7 @@ type JobWorkStatusDb =
 type JobRow = {
   id: string;
   short_description: string;
+  long_description: string | null;
   customer_name: string | null;
   service_address: string | null;
   job_type: string | null;
@@ -80,7 +81,7 @@ type MaterialRow = {
 };
 
 const JOB_DETAIL_JOB_SELECT_BASE =
-  'id, short_description, customer_name, service_address, job_type, job_work_status, job_payment_state, revenue_cents, collected_cents, updated_at, last_worked_at, materials_reviewed_at, other_costs_reviewed_at, no_revenue_confirmed_at';
+  'id, short_description, long_description, customer_name, service_address, job_type, job_work_status, job_payment_state, revenue_cents, collected_cents, updated_at, last_worked_at, materials_reviewed_at, other_costs_reviewed_at, no_revenue_confirmed_at';
 
 const OTHER_COST_TYPE_LABELS: Record<string, string> = {
   helper_labor: 'Helper Labor',
@@ -528,6 +529,7 @@ export async function fetchJobDetail(
   return {
     id: j.id,
     shortDescription: j.short_description,
+    longDescription: j.long_description ?? '',
     customerName: j.customer_name ?? '',
     serviceAddress: j.service_address ?? '',
     jobType: j.job_type ?? '',

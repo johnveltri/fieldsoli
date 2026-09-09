@@ -13,6 +13,7 @@ describe('applyJobDetailEdit', () => {
       applyJobDetailEdit(makeClient(rpc), 'job-1', {
         job: {
           shortDescription: 'Title',
+          longDescription: '',
           customerName: '',
           serviceAddress: '',
           revenueCents: null,
@@ -35,6 +36,7 @@ describe('applyJobDetailEdit', () => {
       applyJobDetailEdit(makeClient(rpc), 'job-1', {
         job: {
           shortDescription: 'Title',
+          longDescription: '',
           customerName: '',
           serviceAddress: '',
           revenueCents: null,

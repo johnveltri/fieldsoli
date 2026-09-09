@@ -1,4 +1,4 @@
-import { Children, createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, type RefObject } from 'react';
+import { Children, createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import {
   Dimensions,
   Keyboard,
@@ -14,11 +14,11 @@ import { radius, space } from '@fieldsolo/design-system/lib/tokens';
 
 import { bg, border, fg } from '../../../theme/nativeTokens';
 import type { TextStyles } from '../../../theme/nativeTokens';
+import { JOB_SHORT_DESCRIPTION_MAX_LENGTH } from '@fieldsolo/shared-types';
 
 export const EDIT_ICON_SLOT = 28;
 
-/**
- * Body line height from `Typography/Body` (16px @ 140% → 22). Used only for
+/** Body line height from `Typography/Body` (16px @ 140% → 22). Used only for
  * minimum tap-target sizing — never set as a fixed `height` on Text/TextInput
  * (RN pins glyphs to the bottom of a fixed height box and misaligns icons).
  */
@@ -475,6 +475,7 @@ export function EditSheet({ children }: { children: ReactNode }) {
 export function EditTitleField({
   typography,
   onFocus,
+  maxLength = JOB_SHORT_DESCRIPTION_MAX_LENGTH,
   ...props
 }: React.ComponentProps<typeof TextInput> & { typography: TextStyles }) {
   const scroll = useContext(EditKeyboardScrollContext);
@@ -493,6 +494,7 @@ export function EditTitleField({
           // Clip matches the focused single-line edge (partial word visible).
           lineBreakModeIOS="clip"
           numberOfLines={1}
+          maxLength={maxLength}
           onFocus={(event) => {
             scroll?.scrollInputIntoView(event.nativeEvent.target);
             onFocus?.(event);
@@ -501,6 +503,31 @@ export function EditTitleField({
         />
       </View>
     </View>
+  );
+}
+
+/**
+ * Optional long description under the title — same multiline field as notes.
+ */
+export function EditDescriptionField({
+  typography,
+  style,
+  ...props
+}: React.ComponentProps<typeof TextInput> & { typography: TextStyles }) {
+  const dockRef = useRef<View>(null);
+
+  return (
+    <EditEntityBlockScope dockRef={dockRef}>
+      <View ref={dockRef} collapsable={false} style={styles.descriptionFieldWrap}>
+        <EditFieldInput
+          typography={typography}
+          multiline
+          placeholder="Description"
+          style={[styles.descriptionInput, style]}
+          {...props}
+        />
+      </View>
+    </EditEntityBlockScope>
   );
 }
 
@@ -556,6 +583,7 @@ export function EditFieldInput({
   style,
   opticalNudgeY,
   value,
+  placeholder,
   ...props
 }: React.ComponentProps<typeof TextInput> & {
   typography: TextStyles;
@@ -566,53 +594,115 @@ export function EditFieldInput({
   const scroll = useContext(EditKeyboardScrollContext);
   const scrollEntityBlock = useContext(EditEntityBlockContext);
   const iosNudgeY = opticalNudgeY ?? EDIT_FIELD_INPUT_OPTICAL_NUDGE_Y;
-  const caretScreenYRef = useRef<number | null>(null);
 
-  const input = (
+  if (multiline) {
+    return (
+      <EditMultilineField
+        typography={typography}
+        value={value}
+        placeholder={placeholder}
+        onFocus={onFocus}
+        onBlur={onBlur}
+        style={style}
+        {...props}
+      />
+    );
+  }
+
+  return (
     <TextInput
       placeholderTextColor={fg.secondary}
-      multiline={multiline}
       value={value}
+      placeholder={placeholder}
       style={[
         typography.body,
         styles.fieldInput,
-        !multiline && Platform.OS === 'ios' && { transform: [{ translateY: iosNudgeY }] },
-        multiline && styles.fieldInputMultiline,
+        Platform.OS === 'ios' && { transform: [{ translateY: iosNudgeY }] },
         align === 'right' && styles.fieldInputRight,
         style,
       ]}
-      onPressIn={
-        multiline
-          ? (event) => {
-              caretScreenYRef.current = event.nativeEvent.pageY;
-            }
-          : undefined
-      }
       onFocus={(event) => {
         const nativeTarget = event.nativeEvent.target;
         if (scrollEntityBlock) {
-          scrollEntityBlock(true, nativeTarget, caretScreenYRef.current ?? undefined);
+          scrollEntityBlock(true, nativeTarget);
         } else {
           scroll?.scrollInputIntoView(nativeTarget);
         }
         onFocus?.(event);
       }}
-      onBlur={(event) => {
-        caretScreenYRef.current = null;
-        if (scrollEntityBlock && multiline) {
-          scroll?.setSuppressNativeKeyboardScroll(false);
-        }
-        onBlur?.(event);
-      }}
+      onBlur={onBlur}
       {...props}
-      scrollEnabled={multiline ? (props.scrollEnabled ?? false) : props.scrollEnabled}
-      nestedScrollEnabled={false}
     />
   );
+}
 
-  if (!multiline) return input;
+/**
+ * iOS UITextView does not paint wrapped glyphs in these rows. Show the string
+ * with `Text` (same as view-mode notes) and keep a transparent input on top
+ * for typing.
+ */
+function EditMultilineField({
+  typography,
+  onFocus,
+  onBlur,
+  style,
+  value,
+  placeholder,
+  ...props
+}: Omit<React.ComponentProps<typeof TextInput>, 'multiline'> & { typography: TextStyles }) {
+  const scroll = useContext(EditKeyboardScrollContext);
+  const scrollEntityBlock = useContext(EditEntityBlockContext);
+  const caretScreenYRef = useRef<number | null>(null);
+  const hasValue = typeof value === 'string' && value.length > 0;
+  const shown = hasValue ? value : placeholder && placeholder.length > 0 ? placeholder : ' ';
 
-  return <View style={styles.fieldInputMultilineWrap}>{input}</View>;
+  return (
+    <View style={styles.fieldInputMultilineWrap}>
+      <Text
+        pointerEvents="none"
+        accessible={false}
+        importantForAccessibility="no-hide-descendants"
+        style={[
+          typography.body,
+          styles.multilineVisibleText,
+          !hasValue && styles.multilinePlaceholder,
+          style,
+        ]}
+      >
+        {shown}
+      </Text>
+      <TextInput
+        placeholderTextColor="transparent"
+        {...props}
+        value={value}
+        placeholder={placeholder}
+        multiline
+        caretHidden
+        scrollEnabled={false}
+        blurOnSubmit={false}
+        submitBehavior="newline"
+        textAlignVertical="top"
+        style={[typography.body, styles.multilineOverlayInput, style, { color: 'transparent' }]}
+        onPressIn={(event) => {
+          caretScreenYRef.current = event.nativeEvent.pageY;
+        }}
+        onFocus={(event) => {
+          const nativeTarget = event.nativeEvent.target;
+          if (scrollEntityBlock) {
+            scrollEntityBlock(true, nativeTarget, caretScreenYRef.current ?? undefined);
+          } else {
+            scroll?.scrollInputIntoView(nativeTarget);
+          }
+          onFocus?.(event);
+        }}
+        onBlur={(event) => {
+          caretScreenYRef.current = null;
+          scroll?.setSuppressNativeKeyboardScroll(false);
+          onBlur?.(event);
+        }}
+      />
+    </View>
+  );
 }
 
 /** Quantity | UOM | unit price — 25 / 25 / 50 on one row. */
@@ -920,6 +1010,15 @@ const styles = StyleSheet.create({
     margin: 0,
     width: '100%',
   },
+  descriptionFieldWrap: {
+    alignSelf: 'stretch',
+    width: '100%',
+    paddingHorizontal: space('Spacing/16'),
+    paddingBottom: space('Spacing/12'),
+  },
+  descriptionInput: {
+    minHeight: EDIT_BODY_LINE_HEIGHT,
+  },
   iconRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -952,19 +1051,30 @@ const styles = StyleSheet.create({
     includeFontPadding: false,
     ...(Platform.OS === 'android' ? { textAlignVertical: 'center' as const } : null),
   },
-  fieldInputMultiline: {
-    height: undefined,
-    minHeight: EDIT_BODY_LINE_HEIGHT,
-    textAlignVertical: 'top',
-    alignSelf: 'stretch',
-    maxWidth: '100%',
-    flexShrink: 1,
-  },
   fieldInputMultilineWrap: {
-    alignSelf: 'stretch',
+    position: 'relative',
     width: '100%',
-    maxWidth: '100%',
-    overflow: 'hidden',
+  },
+  multilineVisibleText: {
+    color: fg.primary,
+    padding: 0,
+    margin: 0,
+    width: '100%',
+    includeFontPadding: false,
+  },
+  multilinePlaceholder: {
+    color: fg.secondary,
+  },
+  multilineOverlayInput: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    right: 0,
+    bottom: 0,
+    padding: 0,
+    margin: 0,
+    includeFontPadding: false,
+    textAlignVertical: 'top',
   },
   addRow: {
     alignItems: 'center',

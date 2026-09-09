@@ -50,6 +50,7 @@ begin
   result := public.apply_job_detail_edit(job_a, jsonb_build_object(
     'job', jsonb_build_object(
       'shortDescription', 'Updated title',
+      'longDescription', 'Replace the valve and recaulk.',
       'customerName', 'Pat',
       'serviceAddress', '1 Main St',
       'revenueCents', 6000
@@ -76,6 +77,9 @@ begin
 
   if (select short_description from public.jobs where id = job_a) <> 'Updated title' then
     raise exception 'job title not updated';
+  end if;
+  if (select long_description from public.jobs where id = job_a) is distinct from 'Replace the valve and recaulk.' then
+    raise exception 'job long_description not updated';
   end if;
 
   if not exists (

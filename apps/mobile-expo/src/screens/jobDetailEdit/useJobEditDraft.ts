@@ -1,5 +1,8 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import type { JobDetailViewModel } from '@fieldsolo/shared-types';
+import {
+  JOB_SHORT_DESCRIPTION_MAX_LENGTH,
+  type JobDetailViewModel,
+} from '@fieldsolo/shared-types';
 import type {
   ApplyJobDetailEditPayload,
   SessionDurationDraft,
@@ -15,6 +18,12 @@ import {
   todayLocalDateString,
 } from '@fieldsolo/api-client';
 import type { OtherCostTypeDb } from '@fieldsolo/api-client';
+
+export { JOB_SHORT_DESCRIPTION_MAX_LENGTH };
+
+function clampShortDescription(value: string): string {
+  return value.slice(0, JOB_SHORT_DESCRIPTION_MAX_LENGTH);
+}
 
 export type DraftRowBase = {
   id: string;
@@ -57,6 +66,7 @@ export type DraftOtherCostRow = DraftRowBase & {
 
 export type JobEditDraft = {
   shortDescription: string;
+  longDescription: string;
   customerName: string;
   serviceAddress: string;
   revenueCents: number | null;
@@ -185,7 +195,8 @@ export function createJobEditDraft(job: JobDetailViewModel): JobEditDraft {
   );
 
   return {
-    shortDescription: job.shortDescription,
+    shortDescription: clampShortDescription(job.shortDescription),
+    longDescription: job.longDescription ?? '',
     customerName: job.customerName,
     serviceAddress: job.serviceAddress,
     revenueCents: job.earnings.revenueCents,
@@ -416,7 +427,8 @@ export function buildApplyJobDetailEditPayload(
 ): ApplyJobDetailEditPayload {
   const payload: ApplyJobDetailEditPayload = {
     job: {
-      shortDescription: draft.shortDescription.trim(),
+      shortDescription: clampShortDescription(draft.shortDescription.trim()),
+      longDescription: draft.longDescription.trim(),
       customerName: draft.customerName.trim(),
       serviceAddress: draft.serviceAddress.trim(),
       revenueCents: draft.revenueCents,

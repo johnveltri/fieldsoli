@@ -35,7 +35,7 @@ Wizard transitions: MinimumInfo → WizardEdit (scoped; revenue gap always opens
 
 ViewReady + OpenEditFromView → Phase 1 Edit (not wizard unless wizardActive).
 
-BeginComplete / status-sheet Completed: end this job’s live in-progress session first (context `endLiveSessionNow`, else `endLiveSession` for `inProgressSession`); abort with Alert on failure; then run completeness on the refreshed job.
+BeginComplete / status-sheet Completed or Paid: end this job’s live in-progress session first (context `endLiveSessionNow`, else `endLiveSession` for `inProgressSession`); abort with Alert on failure; then run completeness on the refreshed job. Paid uses the same gate as Completed (cannot skip financial completeness via the status sheet).
 
 ## Interruption
 

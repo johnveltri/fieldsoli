@@ -437,6 +437,7 @@ describe('jobs api client', () => {
 
     await updateJobById(client as never, 'job-1', {
       shortDescription: '  Replace ceiling fan  ',
+      longDescription: '  Recaulk and replace the valve.  ',
       customerName: '  Jane Doe ',
       serviceAddress: '  101 Main St ',
       revenueCents: 125000,
@@ -444,6 +445,7 @@ describe('jobs api client', () => {
 
     expect(patch).toEqual({
       short_description: 'Replace ceiling fan',
+      long_description: 'Recaulk and replace the valve.',
       customer_name: 'Jane Doe',
       service_address: '101 Main St',
       revenue_cents: 125000,
@@ -605,6 +607,7 @@ describe('jobs api client', () => {
     await expect(
       updateJobById(client as never, 'job-1', {
         shortDescription: '   ',
+        longDescription: '',
         customerName: '',
         serviceAddress: '',
         revenueCents: 0,
@@ -614,6 +617,7 @@ describe('jobs api client', () => {
     await expect(
       updateJobById(client as never, 'job-1', {
         shortDescription: 'Valid title',
+        longDescription: '',
         customerName: '',
         serviceAddress: '',
         revenueCents: -1,
@@ -623,6 +627,7 @@ describe('jobs api client', () => {
     await expect(
       updateJobById(client as never, 'job-1', {
         shortDescription: 'Valid title',
+        longDescription: '',
         customerName: '',
         serviceAddress: '',
         revenueCents: 99.5,

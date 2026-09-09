@@ -676,6 +676,7 @@ export function LiveSessionOverlay({ onSessionEnded }: LiveSessionOverlayProps) 
       if (!liveSession) return undefined;
       return {
         shortDescription: liveSession.jobShortDescription || '',
+        longDescription: '',
         customerName: '',
         serviceAddress: '',
         revenue: '',
@@ -690,6 +691,7 @@ export function LiveSessionOverlay({ onSessionEnded }: LiveSessionOverlayProps) 
           });
     return {
       shortDescription: jobDetail.shortDescription,
+      longDescription: jobDetail.longDescription ?? '',
       customerName: jobDetail.customerName,
       serviceAddress: jobDetail.serviceAddress,
       revenue,
@@ -720,6 +722,7 @@ export function LiveSessionOverlay({ onSessionEnded }: LiveSessionOverlayProps) 
       try {
         await updateJobById(supabase, liveSession.jobId, {
           shortDescription: values.shortDescription,
+          longDescription: values.longDescription,
           customerName: values.customerName.trim(),
           serviceAddress: values.serviceAddress.trim(),
           revenueCents,

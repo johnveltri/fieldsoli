@@ -5,6 +5,7 @@ import type { OtherCostTypeDb } from './otherCosts';
 
 export type ApplyJobDetailEditJobPatch = {
   shortDescription: string;
+  longDescription: string;
   customerName: string;
   serviceAddress: string;
   revenueCents: number | null;
@@ -108,6 +109,7 @@ function toRpcPayload(payload: ApplyJobDetailEditPayload): Record<string, unknow
   return {
     job: {
       shortDescription: payload.job.shortDescription,
+      longDescription: payload.job.longDescription,
       customerName: payload.job.customerName,
       serviceAddress: payload.job.serviceAddress,
       revenueCents: payload.job.revenueCents,

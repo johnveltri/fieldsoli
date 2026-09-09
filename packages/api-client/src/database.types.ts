@@ -317,6 +317,7 @@ export type Database = {
           job_work_status: Database["public"]["Enums"]["job_work_status_enum"]
           last_worked_at: string | null
           list_recency_at: string | null
+          long_description: string | null
           materials_reviewed_at: string | null
           no_revenue_confirmed_at: string | null
           other_costs_reviewed_at: string | null
@@ -342,6 +343,7 @@ export type Database = {
           job_work_status?: Database["public"]["Enums"]["job_work_status_enum"]
           last_worked_at?: string | null
           list_recency_at?: string | null
+          long_description?: string | null
           materials_reviewed_at?: string | null
           no_revenue_confirmed_at?: string | null
           other_costs_reviewed_at?: string | null
@@ -367,6 +369,7 @@ export type Database = {
           job_work_status?: Database["public"]["Enums"]["job_work_status_enum"]
           last_worked_at?: string | null
           list_recency_at?: string | null
+          long_description?: string | null
           materials_reviewed_at?: string | null
           no_revenue_confirmed_at?: string | null
           other_costs_reviewed_at?: string | null

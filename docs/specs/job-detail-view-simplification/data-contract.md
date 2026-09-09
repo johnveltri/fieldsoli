@@ -22,6 +22,7 @@ No new tables. No new RPC for View. Live Session create/start APIs are unchanged
 | DATA-V07 | Other cost row missing | Missing explicit cost type and/or amount ≤ 0 | Derived |
 | DATA-V08 | View customer card | `jobs.customer_name` and `jobs.service_address` (omit address when blank) | Persisted; display only |
 | DATA-V09 | jobs.no_revenue_confirmed_at | Confirm-no-revenue Edit checkbox; persist on Edit Done. Completes revenue when `revenueCents` is not > 0. Cleared when the flag differs (including after entering positive revenue). | User |
+| DATA-V10 | jobs.long_description | Optional body copy under the title on View/Edit. Same tap target as the title. Not a completeness field. | Persisted; display + Edit |
 
 Job completeness formulas in `jobFinancialCompleteness.ts`, Open Jobs `hasMaterials` / `hasOtherCosts`, and DB `is_job_record_complete` only count **usable** cost rows (material description + total; other-cost type + amount). Incomplete capture-now rows still display on View. A live `inProgressSession` counts as a session. Revenue is complete iff `revenueCents > 0` or `noRevenueConfirmed`. Untitled Job is not a completeness gap.
 

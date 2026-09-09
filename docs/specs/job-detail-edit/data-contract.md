@@ -21,7 +21,8 @@
 
 | ID | Entity.field | Type/format | Required/default | Meaning and validation | Source | Sensitive? |
 |---|---|---|---|---|---|---|
-| DATA-01 | jobs.short_description | text | Required, non-blank | Job title (hero field) | User | No |
+| DATA-01 | jobs.short_description | text | Required, non-blank; **max 60 characters** (client writers clamp) | Job title (hero field) | User | No |
+| DATA-01b | jobs.long_description | text null | Optional; blank stored as null | Longer description under the title. Not a completeness field. | User | No |
 | DATA-02 | jobs.customer_name | text | Optional, empty string stored as empty/null per existing writer | Customer **display name on the job only**. Not a foreign key. A later Customers feature may add `jobs.customer_id` and keep this as a denormalized label; this RPC must not invent that column. | User | Yes |
 | DATA-03 | jobs.service_address | text | Optional | Service address | User | Yes |
 | DATA-04 | jobs.revenue_cents | bigint null | Optional; empty field → null; must be ≥ 0 if set | Quoted/earned revenue | User | No |
@@ -58,7 +59,7 @@ Child client ids: new rows use client-generated UUIDs. Create operations are own
 - Skip brand-new rows that are completely empty. Persist non-empty partial sessions, materials, and other costs. Blank new notes are omitted; a cleared existing note is deleted. The job title is the only client-side Done blocker.
 - A session contributes to `last_worked_at`, record completeness, or automatic `not_started` → `in_progress` only when it has an explicit calendar date and meaningful duration; live sessions retain existing behavior.
 - Delete job uses existing `deleteJobById` (not the apply RPC) and is immediate.
-- `apply_job_detail_edit` must not create or update a customers table. `payload.job` identity fields are `shortDescription`, `customerName`, `serviceAddress`, `revenueCents` only.
+- `apply_job_detail_edit` must not create or update a customers table. `payload.job` identity fields are `shortDescription`, `longDescription`, `customerName`, `serviceAddress`, `revenueCents` only.
 
 ## Interfaces
 
@@ -74,6 +75,7 @@ Child client ids: new rows use client-generated UUIDs. Create operations are own
 {
   "job": {
     "shortDescription": "string",
+    "longDescription": "string",
     "customerName": "string",
     "serviceAddress": "string",
     "revenueCents": 0

@@ -12,6 +12,7 @@ function baseJob(overrides: Partial<JobDetailViewModel> = {}): JobDetailViewMode
   return {
     id: 'job-1',
     shortDescription: 'Install panel',
+    longDescription: '',
     customerName: 'Alice',
     serviceAddress: '1 Main St',
     jobType: 'electrical',
@@ -245,6 +246,13 @@ describe('usable rows for financial completeness', () => {
     expect(financialCompletenessGaps({ job })).toEqual([]);
     expect(incompletePillsForJobDetail(job)).toEqual([]);
     expect(incompletePillsForJobDetail(job)).not.toContain('description');
+  });
+
+  it('does not treat long description as a completeness gap', () => {
+    const withDesc = baseJob({ longDescription: 'Replace the valve and recaulk.' });
+    const without = baseJob({ longDescription: '' });
+    expect(isJobFinanciallyComplete({ job: withDesc })).toBe(true);
+    expect(incompletePillsForJobDetail(withDesc)).toEqual(incompletePillsForJobDetail(without));
   });
 
   it('treats unconfirmed $0 or null revenue as incomplete', () => {

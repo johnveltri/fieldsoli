@@ -8,6 +8,7 @@ import { JobDetailStatusPill } from './JobDetailStatusPill';
 
 export function JobDetailJobHeader({
   title,
+  longDescription,
   customerName,
   serviceAddress,
   lastWorkedLabel,
@@ -17,6 +18,7 @@ export function JobDetailJobHeader({
   onCustomerPress,
 }: {
   title: string;
+  longDescription?: string;
   customerName: string;
   serviceAddress: string;
   lastWorkedLabel: string;
@@ -31,8 +33,13 @@ export function JobDetailJobHeader({
       ? serviceAddress.trim().replace(/\s*\n\s*/g, ', ')
       : 'No Address';
   const subtitleLabel = `${customerLabel} • ${addressLabel} • ${lastWorkedLabel}`;
+  const description = longDescription?.trim() ?? '';
 
   const titleStyle = [typography.displayH1, styles.jobTitle];
+  const descriptionEl =
+    description.length > 0 ? (
+      <Text style={[typography.body, styles.jobDescription]}>{description}</Text>
+    ) : null;
 
   return (
     <View style={styles.jobCardShell}>
@@ -45,14 +52,18 @@ export function JobDetailJobHeader({
             accessibilityRole="button"
             accessibilityLabel="Edit job title"
             onPress={onTitlePress}
-            style={({ pressed }) => [pressed && styles.pressed]}
+            style={({ pressed }) => [styles.titleBlock, pressed && styles.pressed]}
           >
             <Text style={titleStyle}>{title}</Text>
+            {descriptionEl}
           </Pressable>
         ) : (
-          <Text {...screenHeaderA11y(title)} style={titleStyle}>
-            {title}
-          </Text>
+          <View style={styles.titleBlock}>
+            <Text {...screenHeaderA11y(title)} style={titleStyle}>
+              {title}
+            </Text>
+            {descriptionEl}
+          </View>
         )}
         {onCustomerPress ? (
           <Pressable
@@ -87,9 +98,16 @@ const styles = StyleSheet.create({
     width: '100%',
     alignItems: 'flex-start',
   },
+  titleBlock: {
+    width: '100%',
+    gap: space('Spacing/8'),
+  },
   jobTitle: {
     // Display-H1 is uppercase by default; job titles are sentence case.
     textTransform: 'none',
+    width: '100%',
+  },
+  jobDescription: {
     width: '100%',
   },
   subtitlePressable: {

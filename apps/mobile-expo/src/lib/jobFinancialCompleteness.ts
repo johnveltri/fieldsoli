@@ -118,7 +118,7 @@ export function incompletePillsForListJob(job: {
 
 export function isCompletedOrPaidWorkStatus(
   status: JobDetailViewModel['workStatus'],
-): boolean {
+): status is 'completed' | 'paid' {
   return status === 'completed' || status === 'paid';
 }
 

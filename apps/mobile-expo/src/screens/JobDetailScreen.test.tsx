@@ -112,18 +112,31 @@ jest.mock('../components/ds', () => ({
     ) : null;
   },
   EditOtherCostBottomSheet: () => null,
-  JobDetailCtaRow: ({ onPrimaryPress }: { onPrimaryPress: () => void }) => {
+  JobDetailCtaRow: ({
+    onPrimaryPress,
+    onMorePress,
+  }: {
+    onPrimaryPress: () => void;
+    onMorePress?: () => void;
+  }) => {
     const { Text } = require('react-native');
-    return <Text onPress={onPrimaryPress}>Primary status action</Text>;
+    return (
+      <>
+        <Text onPress={onPrimaryPress}>Primary status action</Text>
+        {onMorePress ? <Text onPress={onMorePress}>Open status sheet</Text> : null}
+      </>
+    );
   },
   JobDetailJobHeader: ({
     title,
+    longDescription,
     customerName,
     serviceAddress,
     onTitlePress,
     onCustomerPress,
   }: {
     title: string;
+    longDescription?: string;
     customerName: string;
     serviceAddress: string;
     onTitlePress?: () => void;
@@ -135,9 +148,13 @@ jest.mock('../components/ds', () => ({
         {onTitlePress ? (
           <Pressable accessibilityRole="button" accessibilityLabel="Edit job title" onPress={onTitlePress}>
             <Text>{title}</Text>
+            {longDescription ? <Text>{longDescription}</Text> : null}
           </Pressable>
         ) : (
-          <Text>{title}</Text>
+          <>
+            <Text>{title}</Text>
+            {longDescription ? <Text>{longDescription}</Text> : null}
+          </>
         )}
         {onCustomerPress ? (
           <Pressable accessibilityRole="button" accessibilityLabel="Edit customer" onPress={onCustomerPress}>
@@ -701,6 +718,7 @@ describe('JobDetailScreen manual session and note flows', () => {
   const baseJob: JobDetailViewModel = {
     id: 'job-1',
     shortDescription: 'Fixture install',
+    longDescription: '',
     customerName: 'Alice',
     serviceAddress: '1 Main St',
     jobType: 'electrical',
@@ -1234,8 +1252,7 @@ describe('JobDetailScreen manual session and note flows', () => {
     });
   });
 
-  it('blocks mark paid when revenue is zero', async () => {
-    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+  it('blocks mark paid when the job is financially incomplete', async () => {
     apiClient.fetchJobDetail.mockResolvedValue({
       ...baseJob,
       workStatus: 'completed',
@@ -1250,15 +1267,10 @@ describe('JobDetailScreen manual session and note flows', () => {
     await waitFor(() => expect(screen.getByText('Primary status action')).toBeTruthy());
     fireEvent.press(screen.getByText('Primary status action'));
 
-    await waitFor(() => {
-      expect(alertSpy).toHaveBeenCalledWith(
-        'Add revenue first',
-        'Enter job revenue before marking this job paid.',
-        expect.any(Array),
-      );
-    });
+    await waitFor(() =>
+      expect(screen.getByText('Confirm minimum info before marking complete')).toBeTruthy(),
+    );
     expect(apiClient.updateJobStatusById).not.toHaveBeenCalled();
-    alertSpy.mockRestore();
   });
 
   it('sets completed job back to in progress when other costs confirmation is undone', async () => {
@@ -1296,6 +1308,7 @@ describe('JobDetailScreen edit mode', () => {
   const baseJob: JobDetailViewModel = {
     id: 'job-1',
     shortDescription: 'Fixture install',
+    longDescription: '',
     customerName: 'Alice',
     serviceAddress: '1 Main St',
     jobType: 'electrical',
@@ -1438,6 +1451,7 @@ describe('JobDetailScreen simplified view (flag on)', () => {
   const incompleteJob: JobDetailViewModel = {
     id: 'job-1',
     shortDescription: 'Untitled Job',
+    longDescription: '',
     customerName: 'Alice',
     serviceAddress: '1 Main St',
     jobType: 'electrical',
@@ -1556,10 +1570,84 @@ describe('JobDetailScreen simplified view (flag on)', () => {
     expect(screen.queryByText('No other costs recorded')).toBeNull();
   });
 
-  it('TEST-V05 opens edit from title, customer and earnings taps', async () => {
+  it('does not show No sessions recorded while a live session is in progress', async () => {
+    apiClient.fetchJobDetail.mockResolvedValue({
+      ...incompleteJob,
+      displaySessions: [],
+      inProgressSession: {
+        id: 'sess-live-1',
+        startedAt: '2026-04-18T09:00:00.000Z',
+        endedAt: null,
+        dateLabel: 'Apr 18, 2026',
+        timeRangeLabel: '9:00 AM',
+        durationLabel: '0.2h',
+        clockTimesExplicit: true,
+        clockStartExplicit: true,
+        clockEndExplicit: false,
+        calendarDateExplicit: true,
+        attachments: [],
+      },
+    });
     const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
-    await waitFor(() => expect(screen.getByLabelText('Edit job title')).toBeTruthy());
-    fireEvent.press(screen.getByLabelText('Edit job title'));
+    await waitFor(() => expect(screen.getByText('Live session in progress')).toBeTruthy());
+    expect(screen.queryByText('No sessions recorded')).toBeNull();
+  });
+
+  it('blocks Paid from the status sheet until financial completeness is met', async () => {
+    const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
+    await waitFor(() => expect(screen.getByText('Open status sheet')).toBeTruthy());
+    fireEvent.press(screen.getByText('Open status sheet'));
+    fireEvent.press(screen.getByText('Pick unit paid'));
+
+    await waitFor(() =>
+      expect(screen.getByText('Confirm minimum info before marking complete')).toBeTruthy(),
+    );
+    expect(apiClient.updateJobStatusById).not.toHaveBeenCalled();
+  });
+
+  it('allows Paid from the status sheet when the job is financially complete', async () => {
+    apiClient.fetchJobDetail.mockResolvedValue({
+      ...incompleteJob,
+      earnings: {
+        ...incompleteJob.earnings,
+        revenueCents: 40000,
+        netEarningsCents: 40000,
+      },
+      displaySessions: [
+        {
+          id: 'sess-1',
+          startedAt: '2026-04-17T14:00:00.000Z',
+          endedAt: '2026-04-17T16:00:00.000Z',
+          dateLabel: 'Apr 17, 2026',
+          timeRangeLabel: '9:00 AM – 11:00 AM',
+          durationLabel: '2.0h',
+          clockTimesExplicit: true,
+          clockStartExplicit: true,
+          clockEndExplicit: true,
+          calendarDateExplicit: true,
+          attachments: [],
+        },
+      ],
+      noMaterialsConfirmed: true,
+      noOtherCostsConfirmed: true,
+    });
+    const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
+    await waitFor(() => expect(screen.getByText('Open status sheet')).toBeTruthy());
+    fireEvent.press(screen.getByText('Open status sheet'));
+    fireEvent.press(screen.getByText('Pick unit paid'));
+    await waitFor(() =>
+      expect(apiClient.updateJobStatusById).toHaveBeenCalledWith({}, 'job-1', 'paid'),
+    );
+  });
+
+  it('TEST-V05 opens edit from title, customer and earnings taps', async () => {
+    apiClient.fetchJobDetail.mockResolvedValue({
+      ...incompleteJob,
+      longDescription: 'Replace the valve and recaulk.',
+    });
+    const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
+    await waitFor(() => expect(screen.getByText('Replace the valve and recaulk.')).toBeTruthy());
+    fireEvent.press(screen.getByText('Replace the valve and recaulk.'));
     await waitFor(() =>
       expect(screen.getByTestId('edit-focus-target')).toHaveTextContent('"title"'),
     );

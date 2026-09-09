@@ -4,6 +4,7 @@ import type {
   JobId,
   JobPaymentState,
 } from '@fieldsolo/shared-types';
+import { JOB_SHORT_DESCRIPTION_MAX_LENGTH } from '@fieldsolo/shared-types';
 
 import type { FieldSoloSupabaseClient } from './client';
 
@@ -76,6 +77,7 @@ export async function fetchJobById(
 
 export type UpdateJobInput = {
   shortDescription: string;
+  longDescription: string;
   customerName: string;
   serviceAddress: string;
   revenueCents: number | null;
@@ -866,7 +868,9 @@ export async function createBlankJobForLiveSessionStart(
     throw new Error('No authenticated user available to create a job.');
   }
 
-  const shortDescription = input.shortDescription.trim();
+  const shortDescription = input.shortDescription
+    .trim()
+    .slice(0, JOB_SHORT_DESCRIPTION_MAX_LENGTH);
   if (!shortDescription) {
     throw new Error('Short description is required.');
   }
@@ -908,7 +912,9 @@ export async function deleteJobById(
 }
 
 function normalizeEditableJobInput(input: UpdateJobInput): UpdateJobInput {
-  const shortDescription = input.shortDescription.trim();
+  const shortDescription = input.shortDescription
+    .trim()
+    .slice(0, JOB_SHORT_DESCRIPTION_MAX_LENGTH);
   if (!shortDescription) {
     throw new Error('Short description is required.');
   }
@@ -922,6 +928,7 @@ function normalizeEditableJobInput(input: UpdateJobInput): UpdateJobInput {
 
   return {
     shortDescription,
+    longDescription: input.longDescription.trim(),
     customerName: input.customerName.trim(),
     serviceAddress: input.serviceAddress.trim(),
     revenueCents: input.revenueCents,
@@ -1040,6 +1047,7 @@ export async function updateJobById(
   const normalized = normalizeEditableJobInput(input);
   const patch = {
     short_description: normalized.shortDescription,
+    long_description: normalized.longDescription.length > 0 ? normalized.longDescription : null,
     customer_name: normalized.customerName,
     service_address: normalized.serviceAddress,
     revenue_cents: normalized.revenueCents,
