@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import type { JobDetailViewModel } from '@fieldsolo/shared-types';
 import type {
   ApplyJobDetailEditPayload,
@@ -60,6 +60,12 @@ export type JobEditDraft = {
   customerName: string;
   serviceAddress: string;
   revenueCents: number | null;
+  /** Job-level “no revenue” confirmation (persisted with revenue_cents = 0). */
+  noRevenueConfirmed: boolean;
+  /** Job-level “no materials used” confirmation (persisted as materials_reviewed_at). */
+  noMaterialsConfirmed: boolean;
+  /** Job-level “no other costs” confirmation (persisted as other_costs_reviewed_at). */
+  noOtherCostsConfirmed: boolean;
   sessions: DraftSessionRow[];
   notes: DraftNoteRow[];
   materials: DraftMaterialRow[];
@@ -183,6 +189,9 @@ export function createJobEditDraft(job: JobDetailViewModel): JobEditDraft {
     customerName: job.customerName,
     serviceAddress: job.serviceAddress,
     revenueCents: job.earnings.revenueCents,
+    noRevenueConfirmed: job.noRevenueConfirmed ?? false,
+    noMaterialsConfirmed: job.noMaterialsConfirmed,
+    noOtherCostsConfirmed: job.noOtherCostsConfirmed,
     sessions,
     notes,
     materials,
@@ -386,6 +395,20 @@ function materialPersistFields(row: DraftMaterialRow): {
   };
 }
 
+/** Draft material counts as usable when it is kept, named, and has a persist total > 0. */
+export function isDraftMaterialUsable(row: DraftMaterialRow): boolean {
+  if (row.removed) return false;
+  if (row.description.trim() === '') return false;
+  return materialPersistFields(row).totalCostCents > 0;
+}
+
+/** Draft other cost counts as usable when it is kept, typed, and has an amount > 0. */
+export function isDraftOtherCostUsable(row: DraftOtherCostRow): boolean {
+  if (row.removed) return false;
+  if (!row.costType) return false;
+  return row.costCents > 0;
+}
+
 /** Builds the apply RPC diff from snapshot + current draft. */
 export function buildApplyJobDetailEditPayload(
   snapshot: JobEditSnapshot,
@@ -501,9 +524,15 @@ export function buildApplyJobDetailEditPayload(
 export function useJobEditDraft(job: JobDetailViewModel | null) {
   const [snapshot, setSnapshot] = useState<JobEditSnapshot | null>(null);
   const [draft, setDraft] = useState<JobEditDraft | null>(null);
+  const snapshotRef = useRef(snapshot);
+  const draftRef = useRef(draft);
+  snapshotRef.current = snapshot;
+  draftRef.current = draft;
 
   const resetFromJob = useCallback((j: JobDetailViewModel) => {
     const next = createJobEditDraft(j);
+    snapshotRef.current = next;
+    draftRef.current = next;
     setSnapshot(next);
     setDraft(next);
   }, []);
@@ -519,156 +548,204 @@ export function useJobEditDraft(job: JobDetailViewModel | null) {
   );
 
   const updateDraft = useCallback((patch: Partial<JobEditDraft>) => {
-    setDraft((prev) => (prev ? { ...prev, ...patch } : prev));
+    setDraft((prev) => {
+      if (!prev) return prev;
+      const next = { ...prev, ...patch };
+      if ((next.revenueCents ?? 0) > 0) {
+        next.noRevenueConfirmed = false;
+      }
+      draftRef.current = next;
+      return next;
+    });
   }, []);
 
   const addSession = useCallback(() => {
     const base = createDefaultSessionDraft();
-    setDraft((prev) =>
-      prev
-        ? {
-            ...prev,
-            sessions: [
-              ...prev.sessions,
-              {
-                id: newId(),
-                isNew: true,
-                removed: false,
-                ...base,
-                date: '',
-                durationHours: 0,
-                explicitStartClock: false,
-                explicitEndClock: false,
-              },
-            ],
-          }
-        : prev,
-    );
+    setDraft((prev) => {
+      if (!prev) return prev;
+      const next = {
+        ...prev,
+        sessions: [
+          ...prev.sessions,
+          {
+            id: newId(),
+            isNew: true,
+            removed: false,
+            ...base,
+            date: '',
+            durationHours: 0,
+            explicitStartClock: false,
+            explicitEndClock: false,
+          },
+        ],
+      };
+      draftRef.current = next;
+      return next;
+    });
   }, []);
 
   const addNote = useCallback(() => {
-    setDraft((prev) =>
-      prev
-        ? {
-            ...prev,
-            notes: [
-              ...prev.notes,
-              { id: newId(), isNew: true, removed: false, body: '', sessionId: null },
-            ],
-          }
-        : prev,
-    );
+    setDraft((prev) => {
+      if (!prev) return prev;
+      const next = {
+        ...prev,
+        notes: [
+          ...prev.notes,
+          { id: newId(), isNew: true, removed: false, body: '', sessionId: null },
+        ],
+      };
+      draftRef.current = next;
+      return next;
+    });
   }, []);
 
   const addMaterial = useCallback(() => {
-    setDraft((prev) =>
-      prev
-        ? {
-            ...prev,
-            materials: [
-              ...prev.materials,
-              {
-                id: newId(),
-                isNew: true,
-                removed: false,
-                description: '',
-                totalCostCents: 0,
-                showBreakdown: false,
-                quantity: 0,
-                quantityExplicit: false,
-                unit: '',
-                unitCostCents: 0,
-                unitCostExplicit: false,
-                sessionId: null,
-              },
-            ],
-          }
-        : prev,
-    );
+    setDraft((prev) => {
+      if (!prev) return prev;
+      const next = {
+        ...prev,
+        materials: [
+          ...prev.materials,
+          {
+            id: newId(),
+            isNew: true,
+            removed: false,
+            description: '',
+            totalCostCents: 0,
+            showBreakdown: false,
+            quantity: 0,
+            quantityExplicit: false,
+            unit: '',
+            unitCostCents: 0,
+            unitCostExplicit: false,
+            sessionId: null,
+          },
+        ],
+      };
+      draftRef.current = next;
+      return next;
+    });
   }, []);
 
   const addOtherCost = useCallback(() => {
-    setDraft((prev) =>
-      prev
-        ? {
-            ...prev,
-            otherCosts: [
-              ...prev.otherCosts,
-              {
-                id: newId(),
-                isNew: true,
-                removed: false,
-                costType: '',
-                costTypeExplicit: false,
-                description: '',
-                costCents: 0,
-                sessionId: null,
-              },
-            ],
-          }
-        : prev,
-    );
+    setDraft((prev) => {
+      if (!prev) return prev;
+      const next = {
+        ...prev,
+        otherCosts: [
+          ...prev.otherCosts,
+          {
+            id: newId(),
+            isNew: true,
+            removed: false,
+            costType: '' as const,
+            costTypeExplicit: false,
+            description: '',
+            costCents: 0,
+            sessionId: null,
+          },
+        ],
+      };
+      draftRef.current = next;
+      return next;
+    });
   }, []);
 
   const removeRow = useCallback(
     (kind: 'sessions' | 'notes' | 'materials' | 'otherCosts', id: string) => {
       setDraft((prev) => {
         if (!prev) return prev;
-        return removeJobEditDraftRow(prev, kind, id);
+        const next = removeJobEditDraftRow(prev, kind, id);
+        draftRef.current = next;
+        return next;
       });
     },
     [],
   );
 
   const updateSession = useCallback((id: string, patch: Partial<DraftSessionRow>) => {
-    setDraft((prev) =>
-      prev
-        ? {
-            ...prev,
-            sessions: prev.sessions.map((r) => (r.id === id ? { ...r, ...patch } : r)),
-          }
-        : prev,
-    );
+    setDraft((prev) => {
+      if (!prev) return prev;
+      const next = {
+        ...prev,
+        sessions: prev.sessions.map((r) => (r.id === id ? { ...r, ...patch } : r)),
+      };
+      draftRef.current = next;
+      return next;
+    });
   }, []);
 
   const updateNote = useCallback((id: string, patch: Partial<DraftNoteRow>) => {
-    setDraft((prev) =>
-      prev
-        ? { ...prev, notes: prev.notes.map((r) => (r.id === id ? { ...r, ...patch } : r)) }
-        : prev,
-    );
+    setDraft((prev) => {
+      if (!prev) return prev;
+      const next = {
+        ...prev,
+        notes: prev.notes.map((r) => (r.id === id ? { ...r, ...patch } : r)),
+      };
+      draftRef.current = next;
+      return next;
+    });
   }, []);
 
   const updateMaterial = useCallback((id: string, patch: Partial<DraftMaterialRow>) => {
-    setDraft((prev) =>
-      prev
-        ? {
-            ...prev,
-            materials: prev.materials.map((r) => (r.id === id ? { ...r, ...patch } : r)),
-          }
-        : prev,
-    );
+    setDraft((prev) => {
+      if (!prev) return prev;
+      const materials = prev.materials.map((r) => (r.id === id ? { ...r, ...patch } : r));
+      const next = {
+        ...prev,
+        materials,
+        ...(materials.some(isDraftMaterialUsable) ? { noMaterialsConfirmed: false } : {}),
+      };
+      draftRef.current = next;
+      return next;
+    });
   }, []);
 
   const updateOtherCost = useCallback((id: string, patch: Partial<DraftOtherCostRow>) => {
-    setDraft((prev) =>
-      prev
-        ? {
-            ...prev,
-            otherCosts: prev.otherCosts.map((r) => (r.id === id ? { ...r, ...patch } : r)),
-          }
-        : prev,
-    );
+    setDraft((prev) => {
+      if (!prev) return prev;
+      const otherCosts = prev.otherCosts.map((r) => (r.id === id ? { ...r, ...patch } : r));
+      const next = {
+        ...prev,
+        otherCosts,
+        ...(otherCosts.some(isDraftOtherCostUsable) ? { noOtherCostsConfirmed: false } : {}),
+      };
+      draftRef.current = next;
+      return next;
+    });
   }, []);
 
+  const getDraftSnapshot = useCallback(
+    () => ({ snapshot: snapshotRef.current, draft: draftRef.current }),
+    [],
+  );
+
   const buildPayload = useCallback(() => {
-    if (!snapshot || !draft) return null;
-    return buildApplyJobDetailEditPayload(snapshot, draft);
-  }, [snapshot, draft]);
+    // Read refs so Done-after-flush never saves a stale pre-commit draft
+    // (shared-header Done schedules save via setTimeout).
+    if (!snapshotRef.current || !draftRef.current) return null;
+    return buildApplyJobDetailEditPayload(snapshotRef.current, draftRef.current);
+  }, []);
 
   const discardDraft = useCallback(() => {
-    if (snapshot) setDraft(snapshot);
-  }, [snapshot]);
+    if (snapshotRef.current) {
+      draftRef.current = snapshotRef.current;
+      setDraft(snapshotRef.current);
+    }
+  }, []);
+
+  /** Edit mode registers blur/flush-aware Done; shared header calls this. */
+  const doneHandlerRef = useRef<(() => void) | null>(null);
+  const setDoneHandler = useCallback((handler: (() => void) | null) => {
+    doneHandlerRef.current = handler;
+  }, []);
+  const requestDone = useCallback((fallback?: () => void) => {
+    if (doneHandlerRef.current) {
+      doneHandlerRef.current();
+      return;
+    }
+    fallback?.();
+  }, []);
 
   return {
     snapshot,
@@ -687,6 +764,9 @@ export function useJobEditDraft(job: JobDetailViewModel | null) {
     updateMaterial,
     updateOtherCost,
     buildPayload,
+    getDraftSnapshot,
     discardDraft,
+    setDoneHandler,
+    requestDone,
   };
 }

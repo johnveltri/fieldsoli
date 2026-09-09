@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { radius, space } from '@fieldsolo/design-system/lib/tokens';
 import type { JobDetailWorkStatus } from '@fieldsolo/shared-types';
 
@@ -13,6 +13,8 @@ export function JobDetailJobHeader({
   lastWorkedLabel,
   workStatus,
   typography,
+  onTitlePress,
+  onCustomerPress,
 }: {
   title: string;
   customerName: string;
@@ -20,34 +22,52 @@ export function JobDetailJobHeader({
   lastWorkedLabel: string;
   workStatus: JobDetailWorkStatus;
   typography: TextStyles;
+  onTitlePress?: () => void;
+  onCustomerPress?: () => void;
 }) {
   const customerLabel = customerName.trim().length > 0 ? customerName.trim() : 'No Customer';
-  const serviceAddressLabel = serviceAddress.trim();
+  const addressLabel =
+    serviceAddress.trim().length > 0
+      ? serviceAddress.trim().replace(/\s*\n\s*/g, ', ')
+      : 'No Address';
+  const subtitleLabel = `${customerLabel} • ${addressLabel} • ${lastWorkedLabel}`;
+
+  const titleStyle = [typography.displayH1, styles.jobTitle];
 
   return (
     <View style={styles.jobCardShell}>
       <View style={styles.jobCardContent}>
-        <View style={styles.jobTitlePillRow}>
-          <View style={styles.jobTitleWrap}>
-            <Text
-              {...screenHeaderA11y(title)}
-              style={[typography.displayH1, styles.jobTitle]}
-            >
-              {title}
-            </Text>
-          </View>
-          <View style={styles.statusPillAlign}>
-            <JobDetailStatusPill kind={workStatus} typography={typography} />
-          </View>
+        <View style={styles.statusRow}>
+          <JobDetailStatusPill kind={workStatus} typography={typography} />
         </View>
-        <Text style={typography.jobDetailSubtitle}>
-          <Text>{customerLabel}</Text>
-          <Text>{` • `}</Text>
-          <Text>{lastWorkedLabel}</Text>
-        </Text>
-        {serviceAddressLabel.length > 0 ? (
-          <Text style={typography.jobDetailSubtitle}>{serviceAddressLabel}</Text>
-        ) : null}
+        {onTitlePress ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Edit job title"
+            onPress={onTitlePress}
+            style={({ pressed }) => [pressed && styles.pressed]}
+          >
+            <Text style={titleStyle}>{title}</Text>
+          </Pressable>
+        ) : (
+          <Text {...screenHeaderA11y(title)} style={titleStyle}>
+            {title}
+          </Text>
+        )}
+        {onCustomerPress ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Edit customer"
+            onPress={onCustomerPress}
+            style={({ pressed }) => [styles.subtitlePressable, pressed && styles.pressed]}
+          >
+            <Text style={typography.jobDetailSubtitle}>{subtitleLabel}</Text>
+          </Pressable>
+        ) : (
+          <View style={styles.subtitlePressable}>
+            <Text style={typography.jobDetailSubtitle}>{subtitleLabel}</Text>
+          </View>
+        )}
       </View>
     </View>
   );
@@ -60,27 +80,22 @@ const styles = StyleSheet.create({
   },
   jobCardContent: {
     paddingTop: space('Spacing/8'),
-    paddingBottom: space('Spacing/12'),
+    paddingBottom: 0,
     gap: space('Spacing/8'),
   },
-  jobTitlePillRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: space('Spacing/8'),
+  statusRow: {
     width: '100%',
-  },
-  jobTitleWrap: {
-    flex: 1,
-    flexShrink: 1,
-    minWidth: 0,
+    alignItems: 'flex-start',
   },
   jobTitle: {
     // Display-H1 is uppercase by default; job titles are sentence case.
     textTransform: 'none',
+    width: '100%',
   },
-  statusPillAlign: {
-    flexShrink: 0,
-    alignItems: 'flex-end',
-    marginTop: space('Spacing/16'),
+  subtitlePressable: {
+    // Extra top hit area; keep bottom tight so the summary card sits closer.
+    paddingTop: space('Spacing/8'),
+    paddingBottom: space('Spacing/4'),
   },
+  pressed: { opacity: 0.75 },
 });

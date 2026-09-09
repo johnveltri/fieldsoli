@@ -10,9 +10,11 @@ const mockClaimFeedbackPromptMilestone = jest.fn<(...args: unknown[]) => Promise
 const mockMarkFeedbackSent = jest.fn<(...args: unknown[]) => Promise<void>>();
 const mockOpenFeedbackEmail = jest.fn<(...args: unknown[]) => Promise<void>>();
 const mockStartLiveSession = jest.fn<(...args: unknown[]) => Promise<{ id: string }>>();
+const mockEndLiveSessionNow = jest.fn<(...args: unknown[]) => Promise<unknown>>();
 const mockRefreshLiveSession = jest.fn<(...args: unknown[]) => Promise<unknown>>();
 const mockUpdateLiveSessionJobShortDescription = jest.fn();
 let mockFullscreenEditFlagState = { enabled: true, ready: true };
+let mockLiveSession: { id: string; jobId: string } | null = null;
 
 jest.mock('../lib/feedback', () => ({
   claimFeedbackPromptMilestone: (...args: unknown[]) => mockClaimFeedbackPromptMilestone(...args),
@@ -39,7 +41,7 @@ jest.mock('../context/JobsListInvalidationContext', () => ({
 
 jest.mock('../context/LiveSessionContext', () => ({
   useLiveSession: () => ({
-    liveSession: null,
+    liveSession: mockLiveSession,
     hydrating: false,
     hasLiveSession: false,
     mode: 'hidden' as const,
@@ -49,7 +51,7 @@ jest.mock('../context/LiveSessionContext', () => ({
     openEditSheet: jest.fn(),
     closeEditSheet: jest.fn(),
     minimizeFromEdit: jest.fn(),
-    endLiveSessionNow: jest.fn(),
+    endLiveSessionNow: mockEndLiveSessionNow,
     updateLiveSessionStartedAt: jest.fn(),
     deleteLiveSessionNow: jest.fn(),
     updateLiveSessionJobShortDescription: mockUpdateLiveSessionJobShortDescription,
@@ -80,6 +82,10 @@ jest.mock('../components/figma-icons/JobDetailScreenIcons', () => ({
   JobDetailIconViewNote: () => null,
 }));
 
+jest.mock('../components/platform/usePlatformGlass', () => ({
+  usePlatformGlass: () => ({ useGlass: false, reduceTransparency: false, reduceMotion: true }),
+}));
+
 jest.mock('../components/ds', () => ({
   nextStatusAfterPrimaryAction: (status: string) => {
     if (status === 'inProgress') return 'completed';
@@ -90,15 +96,74 @@ jest.mock('../components/ds', () => ({
     const { Text } = require('react-native');
     return visible ? <Text accessibilityLabel="Legacy edit">Legacy Edit Job</Text> : null;
   },
-  ConfirmMinimumInfoBottomSheet: () => null,
+  ConfirmMinimumInfoBottomSheet: ({
+    visible,
+    onConfirmPress,
+  }: {
+    visible: boolean;
+    onConfirmPress?: () => void;
+  }) => {
+    const { Text } = require('react-native');
+    return visible ? (
+      <>
+        <Text>Confirm minimum info before marking complete</Text>
+        <Text onPress={() => onConfirmPress?.()}>Confirm Info</Text>
+      </>
+    ) : null;
+  },
   EditOtherCostBottomSheet: () => null,
   JobDetailCtaRow: ({ onPrimaryPress }: { onPrimaryPress: () => void }) => {
     const { Text } = require('react-native');
     return <Text onPress={onPrimaryPress}>Primary status action</Text>;
   },
-  JobDetailJobHeader: () => null,
+  JobDetailJobHeader: ({
+    title,
+    customerName,
+    serviceAddress,
+    onTitlePress,
+    onCustomerPress,
+  }: {
+    title: string;
+    customerName: string;
+    serviceAddress: string;
+    onTitlePress?: () => void;
+    onCustomerPress?: () => void;
+  }) => {
+    const { Pressable, Text, View } = require('react-native');
+    return (
+      <View>
+        {onTitlePress ? (
+          <Pressable accessibilityRole="button" accessibilityLabel="Edit job title" onPress={onTitlePress}>
+            <Text>{title}</Text>
+          </Pressable>
+        ) : (
+          <Text>{title}</Text>
+        )}
+        {onCustomerPress ? (
+          <Pressable accessibilityRole="button" accessibilityLabel="Edit customer" onPress={onCustomerPress}>
+            <Text>{customerName || 'No Customer'}</Text>
+            <Text>{serviceAddress.trim() || 'No Address'}</Text>
+          </Pressable>
+        ) : (
+          <>
+            <Text>{customerName || 'No Customer'}</Text>
+            <Text>{serviceAddress.trim() || 'No Address'}</Text>
+          </>
+        )}
+      </View>
+    );
+  },
   JobDetailMetricTertiary: () => null,
-  JobDetailSummaryCard: () => null,
+  JobDetailSummaryCard: ({ onPress }: { onPress?: () => void }) => {
+    const { Pressable, Text } = require('react-native');
+    return onPress ? (
+      <Pressable accessibilityRole="button" accessibilityLabel="Edit earnings" onPress={onPress}>
+        <Text>Summary</Text>
+      </Pressable>
+    ) : (
+      <Text>Summary</Text>
+    );
+  },
   EditMaterialBottomSheet: ({
     visible,
     title,
@@ -293,6 +358,7 @@ jest.mock('../components/ds', () => ({
   ViewMaterialsBuckets: ({
     buckets,
     onMaterialPress,
+    onCardPress,
   }: {
     buckets: Array<{
       items: Array<{
@@ -303,10 +369,14 @@ jest.mock('../components/ds', () => ({
       }>;
     }>;
     onMaterialPress?: (materialId: string) => void;
+    onCardPress?: () => void;
   }) => {
     const { Text, View } = require('react-native');
     return (
       <View>
+        {onCardPress ? (
+          <Text onPress={onCardPress}>Edit materials</Text>
+        ) : null}
         {buckets
           .flatMap((b) => b.items)
           .map((m) => (
@@ -319,10 +389,22 @@ jest.mock('../components/ds', () => ({
       </View>
     );
   },
-  ViewOtherCostsBuckets: () => null,
+  ViewOtherCostsBuckets: ({
+    onCardPress,
+  }: {
+    onCardPress?: () => void;
+  }) => {
+    const { Text, View } = require('react-native');
+    return onCardPress ? (
+      <View>
+        <Text onPress={onCardPress}>Edit other costs</Text>
+      </View>
+    ) : null;
+  },
   ViewNotesBuckets: ({
     buckets,
     onNotePress,
+    onCardPress,
   }: {
     buckets: Array<{
       notes: Array<{
@@ -332,10 +414,12 @@ jest.mock('../components/ds', () => ({
       }>;
     }>;
     onNotePress?: (noteId: string) => void;
+    onCardPress?: () => void;
   }) => {
     const { Text, View } = require('react-native');
     return (
       <View>
+        {onCardPress ? <Text onPress={onCardPress}>Edit notes</Text> : null}
         {buckets
           .flatMap((b) => b.notes)
           .map((n) => (
@@ -347,38 +431,97 @@ jest.mock('../components/ds', () => ({
       </View>
     );
   },
+  ViewSessionsBuckets: ({
+    sessions,
+    onCardPress,
+    emphasizeCriticalEmpty,
+  }: {
+    sessions: Array<{
+      id: string;
+      dateLabel: string;
+      durationLabel?: string;
+      startedAt?: string;
+      endedAt?: string | null;
+      clockStartExplicit?: boolean;
+      clockEndExplicit?: boolean;
+      clockTimesExplicit?: boolean;
+      timeRangeLabel?: string;
+    }>;
+    onCardPress?: () => void;
+    emphasizeCriticalEmpty?: boolean;
+  }) => {
+    const { Text, View } = require('react-native');
+    const { sessionViewTimeLabel } = require('../lib/jobDetailRowHealth');
+    return (
+      <View>
+        {onCardPress ? <Text onPress={onCardPress}>Edit sessions</Text> : null}
+        {sessions.map((s) => {
+          const timeLabel = sessionViewTimeLabel(s);
+          return (
+            <View key={s.id}>
+              <Text>{s.dateLabel}</Text>
+              {timeLabel ? <Text>{timeLabel}</Text> : null}
+              {emphasizeCriticalEmpty && s.durationLabel ? (
+                <Text>{s.durationLabel}</Text>
+              ) : null}
+            </View>
+          );
+        })}
+      </View>
+    );
+  },
   SessionCard: ({
     session,
     onEditPress,
+    onRowBodyPress,
     onAddNote,
     onAddMaterial,
     onPressAttachment,
+    readOnlyExpand,
+    viewMode,
+    missingLine,
   }: {
     session: {
       id: string;
       dateLabel: string;
+      durationLabel?: string;
       attachments?: Array<{ kind: 'note' | 'material'; id: string; title: string }>;
     };
     onEditPress: () => void;
-    onAddNote: () => void;
-    onAddMaterial: () => void;
-    onPressAttachment: (item: { kind: 'note' | 'material'; id: string }) => void;
+    onRowBodyPress?: () => void;
+    onAddNote?: () => void;
+    onAddMaterial?: () => void;
+    onPressAttachment?: (item: { kind: 'note' | 'material'; id: string }) => void;
+    readOnlyExpand?: boolean;
+    viewMode?: boolean;
+    missingLine?: string | null;
   }) => {
     const { Text, View } = require('react-native');
+    const flatView = viewMode ?? readOnlyExpand;
     return (
       <View>
         <Text>{session.dateLabel}</Text>
-        <Text onPress={onEditPress}>{`Edit session ${session.id}`}</Text>
-        <Text onPress={onAddNote}>{`Add note to session ${session.id}`}</Text>
-        <Text onPress={onAddMaterial}>{`Add material to session ${session.id}`}</Text>
-        {session.attachments?.map((item) => (
-          <Text
-            key={`${item.kind}-${item.id}`}
-            onPress={() => onPressAttachment({ kind: item.kind, id: item.id })}
-          >
-            {`Open ${item.kind} attachment ${item.id}`}
-          </Text>
-        ))}
+        {missingLine ? <Text>{missingLine}</Text> : null}
+        {flatView && onRowBodyPress ? (
+          <Text onPress={onRowBodyPress}>{`Open session ${session.id}`}</Text>
+        ) : (
+          <Text onPress={onEditPress}>{`Edit session ${session.id}`}</Text>
+        )}
+        {!flatView && onAddNote ? (
+          <Text onPress={onAddNote}>{`Add note to session ${session.id}`}</Text>
+        ) : null}
+        {!flatView && onAddMaterial ? (
+          <Text onPress={onAddMaterial}>{`Add material to session ${session.id}`}</Text>
+        ) : null}
+        {!flatView &&
+          session.attachments?.map((item) => (
+            <Text
+              key={`${item.kind}-${item.id}`}
+              onPress={() => onPressAttachment?.({ kind: item.kind, id: item.id })}
+            >
+              {`Open ${item.kind} attachment ${item.id}`}
+            </Text>
+          ))}
       </View>
     );
   },
@@ -394,59 +537,163 @@ jest.mock('./jobDetailEdit/JobDetailEditMode', () => ({
     onDone,
     onDeleteJob,
     saving,
+    hideHeader,
+    focusTarget,
+    editApi,
   }: {
     onBack: () => void;
     onDone: () => void;
     onDeleteJob: () => void;
     saving: boolean;
+    hideHeader?: boolean;
+    focusTarget?: unknown;
+    editApi?: {
+      draft: { noMaterialsConfirmed?: boolean; noOtherCostsConfirmed?: boolean } | null;
+      updateDraft: (patch: Record<string, unknown>) => void;
+    };
   }) => {
-    const { Pressable, Text } = require('react-native');
+    const { Pressable, Text, View } = require('react-native');
+    const materialsConfirmed = !!editApi?.draft?.noMaterialsConfirmed;
+    const otherCostsConfirmed = !!editApi?.draft?.noOtherCostsConfirmed;
     return (
-      <>
-        <Pressable accessibilityRole="button" accessibilityLabel="Back" disabled={saving} onPress={onBack}>
-          <Text>Back</Text>
-        </Pressable>
-        <Pressable accessibilityRole="button" accessibilityLabel="Done" disabled={saving} onPress={onDone}>
-          <Text>Done</Text>
-        </Pressable>
+      <View>
+        {hideHeader ? null : (
+          <>
+            <Pressable accessibilityRole="button" accessibilityLabel="Back" disabled={saving} onPress={onBack}>
+              <Text>Back</Text>
+            </Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel="Done" disabled={saving} onPress={onDone}>
+              <Text>Done</Text>
+            </Pressable>
+          </>
+        )}
+        {focusTarget != null ? (
+          <Text testID="edit-focus-target">{JSON.stringify(focusTarget)}</Text>
+        ) : null}
+        {focusTarget === 'materials' ? (
+          <Pressable
+            accessibilityRole="checkbox"
+            accessibilityLabel={materialsConfirmed ? 'No materials confirmed' : 'Confirm no materials'}
+            accessibilityState={{ checked: materialsConfirmed }}
+            onPress={() =>
+              editApi?.updateDraft({ noMaterialsConfirmed: !materialsConfirmed })
+            }
+          >
+            <Text>{materialsConfirmed ? 'No materials confirmed' : 'Confirm no materials'}</Text>
+          </Pressable>
+        ) : null}
+        {focusTarget === 'otherCosts' ? (
+          <Pressable
+            accessibilityRole="checkbox"
+            accessibilityLabel={
+              otherCostsConfirmed ? 'No other costs confirmed' : 'Confirm no other costs'
+            }
+            accessibilityState={{ checked: otherCostsConfirmed }}
+            onPress={() =>
+              editApi?.updateDraft({ noOtherCostsConfirmed: !otherCostsConfirmed })
+            }
+          >
+            <Text>
+              {otherCostsConfirmed ? 'No other costs confirmed' : 'Confirm no other costs'}
+            </Text>
+          </Pressable>
+        ) : null}
         <Pressable accessibilityRole="button" accessibilityLabel="Delete job" disabled={saving} onPress={onDeleteJob}>
           <Text>Delete job</Text>
         </Pressable>
-      </>
+      </View>
     );
   },
 }));
 
-jest.mock('@fieldsolo/api-client', () => ({
-  applyJobDetailEdit: jest.fn(),
-  countCompletedJobsForCurrentUser: jest.fn(),
-  createManualSession: jest.fn(),
-  createMaterial: jest.fn(),
-  createNote: jest.fn(),
-  deleteMaterial: jest.fn(),
-  deleteNote: jest.fn(),
-  deleteSession: jest.fn(),
-  deleteJobById: jest.fn(),
-  fetchFirstJobIdForCurrentUser: jest.fn(),
-  fetchJobDetail: jest.fn(),
-  updateJobById: jest.fn(),
-  updateJobNoMaterialsConfirmed: jest.fn(),
-  updateJobCostsReviewed: jest.fn(),
-  updateJobOtherCostsReviewed: jest.fn(),
-  createOtherCost: jest.fn(),
-  updateOtherCost: jest.fn(),
-  deleteOtherCost: jest.fn(),
-  isNoMaterialsConfirmedColumnMissingError: jest.fn(() => false),
-  updateJobStatusById: jest.fn(),
-  updateMaterial: jest.fn(),
-  updateNote: jest.fn(),
-  updateSessionTimes: jest.fn(),
-}));
+jest.mock('@fieldsolo/api-client', () => {
+  const actual = jest.requireActual('@fieldsolo/api-client') as Record<string, unknown>;
+  return {
+    ...actual,
+    applyJobDetailEdit: jest.fn(),
+    countCompletedJobsForCurrentUser: jest.fn(),
+    createManualSession: jest.fn(),
+    createMaterial: jest.fn(),
+    createNote: jest.fn(),
+    deleteMaterial: jest.fn(),
+    deleteNote: jest.fn(),
+    deleteSession: jest.fn(),
+    deleteJobById: jest.fn(),
+    fetchFirstJobIdForCurrentUser: jest.fn(),
+    fetchJobDetail: jest.fn(),
+    updateJobById: jest.fn(),
+    updateJobNoMaterialsConfirmed: jest.fn(),
+    updateJobCostsReviewed: jest.fn(),
+    updateJobNoRevenueConfirmed: jest.fn(),
+    updateJobOtherCostsReviewed: jest.fn(),
+    createOtherCost: jest.fn(),
+    updateOtherCost: jest.fn(),
+    deleteOtherCost: jest.fn(),
+    isNoMaterialsConfirmedColumnMissingError: jest.fn(() => false),
+    updateJobStatusById: jest.fn(),
+    updateMaterial: jest.fn(),
+    updateNote: jest.fn(),
+    updateSessionTimes: jest.fn(),
+    endLiveSession: jest.fn(),
+  };
+});
 
 jest.mock('../lib/supabase', () => ({
   isSupabaseConfigured: jest.fn(() => true),
   supabase: {},
 }));
+
+function setupDefaultApiMocks(apiClient: {
+  fetchJobDetail: { mockResolvedValue: (v: unknown) => void };
+  createManualSession: { mockResolvedValue: (v: unknown) => void };
+  updateSessionTimes: { mockResolvedValue: (v: unknown) => void };
+  deleteSession: { mockResolvedValue: (v: unknown) => void };
+  createNote: { mockResolvedValue: (v: unknown) => void };
+  updateNote: { mockResolvedValue: (v: unknown) => void };
+  deleteNote: { mockResolvedValue: (v: unknown) => void };
+  createMaterial: { mockResolvedValue: (v: unknown) => void };
+  updateMaterial: { mockResolvedValue: (v: unknown) => void };
+  deleteMaterial: { mockResolvedValue: (v: unknown) => void };
+  updateJobNoMaterialsConfirmed: { mockResolvedValue: (v: unknown) => void };
+  updateJobCostsReviewed: { mockResolvedValue: (v: unknown) => void };
+  updateJobNoRevenueConfirmed: { mockResolvedValue: (v: unknown) => void };
+  updateJobOtherCostsReviewed: { mockResolvedValue: (v: unknown) => void };
+  createOtherCost: { mockResolvedValue: (v: unknown) => void };
+  updateOtherCost: { mockResolvedValue: (v: unknown) => void };
+  deleteOtherCost: { mockResolvedValue: (v: unknown) => void };
+  updateJobStatusById: { mockResolvedValue: (v: unknown) => void };
+  countCompletedJobsForCurrentUser: { mockResolvedValue: (v: unknown) => void };
+  applyJobDetailEdit: { mockResolvedValue: (v: unknown) => void };
+  endLiveSession: { mockResolvedValue: (v: unknown) => void };
+}) {
+  apiClient.createManualSession.mockResolvedValue('sess-new-1');
+  apiClient.updateSessionTimes.mockResolvedValue(undefined);
+  apiClient.deleteSession.mockResolvedValue(undefined);
+  apiClient.createNote.mockResolvedValue('note-new-1');
+  apiClient.updateNote.mockResolvedValue(undefined);
+  apiClient.deleteNote.mockResolvedValue(undefined);
+  apiClient.createMaterial.mockResolvedValue('mat-new-1');
+  apiClient.updateMaterial.mockResolvedValue(undefined);
+  apiClient.deleteMaterial.mockResolvedValue(undefined);
+  apiClient.updateJobNoMaterialsConfirmed.mockResolvedValue(undefined);
+  apiClient.updateJobCostsReviewed.mockResolvedValue(undefined);
+  apiClient.updateJobNoRevenueConfirmed.mockResolvedValue(undefined);
+  apiClient.updateJobOtherCostsReviewed.mockResolvedValue(undefined);
+  apiClient.createOtherCost.mockResolvedValue('oc-new-1');
+  apiClient.updateOtherCost.mockResolvedValue(undefined);
+  apiClient.deleteOtherCost.mockResolvedValue(undefined);
+  apiClient.updateJobStatusById.mockResolvedValue(undefined);
+  apiClient.countCompletedJobsForCurrentUser.mockResolvedValue(1);
+  apiClient.applyJobDetailEdit.mockResolvedValue(undefined);
+  apiClient.endLiveSession.mockResolvedValue(undefined);
+  mockStartLiveSession.mockResolvedValue({ id: 'sess-live-1' });
+  mockEndLiveSessionNow.mockResolvedValue(null);
+  mockLiveSession = null;
+  mockRefreshLiveSession.mockResolvedValue(null);
+  mockClaimFeedbackPromptMilestone.mockResolvedValue(null);
+  mockMarkFeedbackSent.mockResolvedValue(undefined);
+  mockOpenFeedbackEmail.mockResolvedValue(undefined);
+}
 
 describe('JobDetailScreen manual session and note flows', () => {
   const apiClient = jest.requireMock('@fieldsolo/api-client') as any;
@@ -521,33 +768,14 @@ describe('JobDetailScreen manual session and note flows', () => {
     noMaterialsConfirmed: false,
     otherCostBuckets: [],
     noOtherCostsConfirmed: false,
+    noRevenueConfirmed: false,
   };
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockFullscreenEditFlagState = { enabled: true, ready: true };
+    mockFullscreenEditFlagState = { enabled: false, ready: true };
+    setupDefaultApiMocks(apiClient);
     apiClient.fetchJobDetail.mockResolvedValue(baseJob);
-    apiClient.createManualSession.mockResolvedValue('sess-new-1');
-    apiClient.updateSessionTimes.mockResolvedValue(undefined);
-    apiClient.deleteSession.mockResolvedValue(undefined);
-    apiClient.createNote.mockResolvedValue('note-new-1');
-    apiClient.updateNote.mockResolvedValue(undefined);
-    apiClient.deleteNote.mockResolvedValue(undefined);
-    apiClient.createMaterial.mockResolvedValue('mat-new-1');
-    apiClient.updateMaterial.mockResolvedValue(undefined);
-    apiClient.deleteMaterial.mockResolvedValue(undefined);
-    apiClient.updateJobNoMaterialsConfirmed.mockResolvedValue(undefined);
-    apiClient.updateJobOtherCostsReviewed.mockResolvedValue(undefined);
-    apiClient.createOtherCost.mockResolvedValue('oc-new-1');
-    apiClient.updateOtherCost.mockResolvedValue(undefined);
-    apiClient.deleteOtherCost.mockResolvedValue(undefined);
-    apiClient.updateJobStatusById.mockResolvedValue(undefined);
-    apiClient.countCompletedJobsForCurrentUser.mockResolvedValue(1);
-    mockStartLiveSession.mockResolvedValue({ id: 'sess-live-1' });
-    mockRefreshLiveSession.mockResolvedValue(null);
-    mockClaimFeedbackPromptMilestone.mockResolvedValue(null);
-    mockMarkFeedbackSent.mockResolvedValue(undefined);
-    mockOpenFeedbackEmail.mockResolvedValue(undefined);
   });
 
   it('offers feedback after the first completed job', async () => {
@@ -772,9 +1000,11 @@ describe('JobDetailScreen manual session and note flows', () => {
           startedAt: '2026-04-18T09:00:00.000Z',
           endedAt: null,
           dateLabel: 'Apr 18, 2026',
-          timeRangeLabel: '9:00 AM – …',
+          timeRangeLabel: '9:00 AM',
           durationLabel: '0.2h',
           clockTimesExplicit: true,
+          clockStartExplicit: true,
+          clockEndExplicit: false,
           attachments: [],
         },
       ],
@@ -783,9 +1013,11 @@ describe('JobDetailScreen manual session and note flows', () => {
         startedAt: '2026-04-18T09:00:00.000Z',
         endedAt: null,
         dateLabel: 'Apr 18, 2026',
-        timeRangeLabel: '9:00 AM – …',
+        timeRangeLabel: '9:00 AM',
         durationLabel: '0.2h',
         clockTimesExplicit: true,
+        clockStartExplicit: true,
+        clockEndExplicit: false,
         attachments: [],
       },
     });
@@ -1089,13 +1321,14 @@ describe('JobDetailScreen edit mode', () => {
     noteBuckets: [],
     noMaterialsConfirmed: false,
     noOtherCostsConfirmed: false,
+    noRevenueConfirmed: false,
   };
 
   beforeEach(() => {
     jest.clearAllMocks();
     mockFullscreenEditFlagState = { enabled: true, ready: true };
+    setupDefaultApiMocks(apiClient);
     apiClient.fetchJobDetail.mockResolvedValue(baseJob);
-    apiClient.applyJobDetailEdit.mockResolvedValue(undefined);
   });
 
   it('opens edit mode from the header EDIT pill', async () => {
@@ -1103,7 +1336,7 @@ describe('JobDetailScreen edit mode', () => {
     await waitFor(() => expect(screen.getByLabelText('Edit job')).toBeTruthy());
     fireEvent.press(screen.getByLabelText('Edit job'));
     expect(screen.getByLabelText('Done')).toBeTruthy();
-    expect(screen.getByLabelText('Back')).toBeTruthy();
+    expect(screen.getByLabelText('Close')).toBeTruthy();
   });
 
   it('opens the legacy edit sheet from the header when fullscreen editing is disabled', async () => {
@@ -1169,7 +1402,7 @@ describe('JobDetailScreen edit mode', () => {
     );
   });
 
-  it('locks Done, Back, and Delete job while the apply request is pending', async () => {
+  it('locks Done, Close, and Delete job while the apply request is pending', async () => {
     let resolveApply: (() => void) | undefined;
     apiClient.applyJobDetailEdit.mockImplementationOnce(
       () => new Promise<void>((resolve) => {
@@ -1183,11 +1416,11 @@ describe('JobDetailScreen edit mode', () => {
 
     await waitFor(() => expect(apiClient.applyJobDetailEdit).toHaveBeenCalledTimes(1));
     expect(screen.getByLabelText('Done').props.accessibilityState?.disabled).toBe(true);
-    expect(screen.getByLabelText('Back').props.accessibilityState?.disabled).toBe(true);
+    expect(screen.getByLabelText('Close').props.accessibilityState?.disabled).toBe(true);
     expect(screen.getByLabelText('Delete job').props.accessibilityState?.disabled).toBe(true);
 
     fireEvent.press(screen.getByLabelText('Done'));
-    fireEvent.press(screen.getByLabelText('Back'));
+    fireEvent.press(screen.getByLabelText('Close'));
     fireEvent.press(screen.getByLabelText('Delete job'));
     expect(apiClient.applyJobDetailEdit).toHaveBeenCalledTimes(1);
     expect(apiClient.deleteJobById).not.toHaveBeenCalled();
@@ -1196,5 +1429,432 @@ describe('JobDetailScreen edit mode', () => {
     await act(async () => {
       resolveApply?.();
     });
+  });
+});
+
+describe('JobDetailScreen simplified view (flag on)', () => {
+  const apiClient = jest.requireMock('@fieldsolo/api-client') as any;
+
+  const incompleteJob: JobDetailViewModel = {
+    id: 'job-1',
+    shortDescription: 'Untitled Job',
+    customerName: 'Alice',
+    serviceAddress: '1 Main St',
+    jobType: 'electrical',
+    lastWorkedLabel: 'Last worked Apr 18, 2026',
+    workStatus: 'inProgress',
+    earnings: {
+      revenueCents: 0,
+      materialsCents: 0,
+      otherCostsCents: 0,
+      feesCents: 0,
+      netEarningsCents: 0,
+    },
+    metrics: {
+      timeLabel: '0.0h',
+      netPerHrDisplay: '$0.00/hr',
+      sessionCount: 0,
+    },
+    displaySessions: [
+      {
+        id: 'sess-partial',
+        startedAt: '2026-04-17T14:00:00.000Z',
+        endedAt: '2026-04-17T15:00:00.000Z',
+        dateLabel: 'No Session Date',
+        timeRangeLabel: '',
+        durationLabel: 'No duration',
+        clockTimesExplicit: false,
+        clockStartExplicit: false,
+        clockEndExplicit: false,
+        calendarDateExplicit: false,
+        attachments: [],
+      },
+    ],
+    allSessions: [],
+    inProgressSession: null,
+    materialBuckets: [],
+    otherCostBuckets: [],
+    noteBuckets: [],
+    noMaterialsConfirmed: false,
+    noOtherCostsConfirmed: false,
+    noRevenueConfirmed: false,
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockFullscreenEditFlagState = { enabled: true, ready: true };
+    setupDefaultApiMocks(apiClient);
+    apiClient.fetchJobDetail.mockResolvedValue(incompleteJob);
+  });
+
+  it('TEST-V01 hides section ADD pills', async () => {
+    const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
+    await waitFor(() => expect(screen.getByText('Sessions')).toBeTruthy());
+    expect(screen.queryByLabelText('Add Sessions')).toBeNull();
+    expect(screen.queryByLabelText('Add Materials')).toBeNull();
+  });
+
+  it('TEST-V14 shows Missing line for incomplete jobs', async () => {
+    const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
+    await waitFor(() =>
+      expect(screen.getByText('Missing: revenue, sessions, materials, costs')).toBeTruthy(),
+    );
+    expect(screen.queryByText(/description/)).toBeNull();
+  });
+
+  it('TEST-V15 shows critical session empty placeholders without a duplicate missing line', async () => {
+    const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
+    await waitFor(() => expect(screen.getByText('No Session Date')).toBeTruthy());
+    expect(screen.getByText('No duration')).toBeTruthy();
+    expect(screen.queryByText('No Session Date · No duration')).toBeNull();
+  });
+
+  it('shows start time on View when end clock is missing', async () => {
+    const startAt = '2026-04-17T14:00:00.000Z';
+    apiClient.fetchJobDetail.mockResolvedValue({
+      ...incompleteJob,
+      displaySessions: [
+        {
+          id: 'sess-start-only',
+          startedAt: startAt,
+          endedAt: null,
+          dateLabel: 'Apr 17, 2026',
+          timeRangeLabel: '',
+          durationLabel: 'No duration',
+          clockTimesExplicit: true,
+          clockStartExplicit: true,
+          clockEndExplicit: false,
+          calendarDateExplicit: true,
+          attachments: [],
+        },
+      ],
+    });
+
+    const { formatSessionTimeLabel } = require('@fieldsolo/api-client');
+    const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
+    await waitFor(() => expect(screen.getByText('Apr 17, 2026')).toBeTruthy());
+    expect(screen.getByText(formatSessionTimeLabel(startAt))).toBeTruthy();
+    expect(screen.queryByText(/–/)).toBeNull();
+  });
+
+  it('TEST-V03 hides confirm-none cards on empty materials', async () => {
+    const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
+    await waitFor(() => expect(screen.getByText('No materials recorded')).toBeTruthy());
+    expect(screen.queryByText('CONFIRM NO MATERIALS USED')).toBeNull();
+  });
+
+  it('shows confirmed empty copy on View when none is confirmed', async () => {
+    apiClient.fetchJobDetail.mockResolvedValue({
+      ...incompleteJob,
+      noMaterialsConfirmed: true,
+      noOtherCostsConfirmed: true,
+    });
+    const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
+    await waitFor(() => expect(screen.getByText('No materials confirmed')).toBeTruthy());
+    expect(screen.getByText('No other costs confirmed')).toBeTruthy();
+    expect(screen.queryByText('No materials recorded')).toBeNull();
+    expect(screen.queryByText('No other costs recorded')).toBeNull();
+  });
+
+  it('TEST-V05 opens edit from title, customer and earnings taps', async () => {
+    const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
+    await waitFor(() => expect(screen.getByLabelText('Edit job title')).toBeTruthy());
+    fireEvent.press(screen.getByLabelText('Edit job title'));
+    await waitFor(() =>
+      expect(screen.getByTestId('edit-focus-target')).toHaveTextContent('"title"'),
+    );
+    fireEvent.press(screen.getByLabelText('Close'));
+    await waitFor(() => expect(screen.getByLabelText('Edit customer')).toBeTruthy());
+    expect(screen.getByText('1 Main St')).toBeTruthy();
+    fireEvent.press(screen.getByLabelText('Edit customer'));
+    await waitFor(() =>
+      expect(screen.getByTestId('edit-focus-target')).toHaveTextContent('"customer"'),
+    );
+    fireEvent.press(screen.getByLabelText('Close'));
+    await waitFor(() => expect(screen.getByLabelText('Edit earnings')).toBeTruthy());
+    fireEvent.press(screen.getByLabelText('Edit earnings'));
+    await waitFor(() =>
+      expect(screen.getByTestId('edit-focus-target')).toHaveTextContent('"metrics"'),
+    );
+    fireEvent.press(screen.getByLabelText('Close'));
+    await waitFor(() => expect(screen.getByText('Primary status action')).toBeTruthy());
+    fireEvent.press(screen.getByText('Primary status action'));
+    await waitFor(() =>
+      expect(screen.getByText('Confirm minimum info before marking complete')).toBeTruthy(),
+    );
+    expect(screen.queryByTestId('edit-focus-target')).toBeNull();
+  });
+
+  it('TEST-V16 clears note focusTarget when returning to view before opening another field', async () => {
+    apiClient.fetchJobDetail.mockResolvedValue({
+      ...incompleteJob,
+      noteBuckets: [
+        {
+          id: 'note-unassigned',
+          kind: 'unassigned',
+          notes: [
+            {
+              id: 'note-1',
+              body: 'Existing note body',
+              sessionId: null,
+              excerpt: 'Existing note excerpt',
+              dateLabel: 'Apr 18, 2026',
+            },
+          ],
+        },
+      ],
+    });
+    const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
+    await waitFor(() => expect(screen.getByText('Edit notes')).toBeTruthy());
+    fireEvent.press(screen.getByText('Edit notes'));
+    await waitFor(() =>
+      expect(screen.getByTestId('edit-focus-target')).toHaveTextContent('"notes"'),
+    );
+    fireEvent.press(screen.getByLabelText('Close'));
+    await waitFor(() => expect(screen.queryByTestId('edit-focus-target')).toBeNull());
+    fireEvent.press(screen.getByLabelText('Edit customer'));
+    await waitFor(() =>
+      expect(screen.getByTestId('edit-focus-target')).toHaveTextContent('"customer"'),
+    );
+  });
+
+  it('TEST-V10 passes focusTarget when opening edit from a sessions card', async () => {
+    const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
+    await waitFor(() => expect(screen.getByText('Edit sessions')).toBeTruthy());
+    fireEvent.press(screen.getByText('Edit sessions'));
+    await waitFor(() =>
+      expect(screen.getByTestId('edit-focus-target')).toHaveTextContent('"sessions"'),
+    );
+  });
+
+  it('TEST-V13 keeps Close and swaps EDIT for Done in the shared header', async () => {
+    const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
+    await waitFor(() => expect(screen.getByLabelText('Edit job')).toBeTruthy());
+    expect(screen.getByLabelText('Close')).toBeTruthy();
+    fireEvent.press(screen.getByLabelText('Edit job'));
+    expect(screen.getByLabelText('Done')).toBeTruthy();
+    expect(screen.queryByLabelText('Edit job')).toBeNull();
+    expect(screen.getByLabelText('Close')).toBeTruthy();
+  });
+
+  it('TEST-V02 hides session expand chrome when view mode is on', async () => {
+    const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
+    await waitFor(() => expect(screen.getByText('Edit sessions')).toBeTruthy());
+    expect(screen.queryByText('Add note to session sess-partial')).toBeNull();
+    expect(screen.queryByText('Edit session sess-partial')).toBeNull();
+  });
+
+  it('TEST-V04 does not open item sheets from view taps', async () => {
+    const jobWithMaterial: JobDetailViewModel = {
+      ...incompleteJob,
+      shortDescription: 'Fixture install',
+      earnings: { ...incompleteJob.earnings, revenueCents: 10000 },
+      metrics: { ...incompleteJob.metrics, sessionCount: 1 },
+      materialBuckets: [
+        {
+          id: 'mat-unassigned',
+          kind: 'unassigned',
+          items: [
+            {
+              id: 'mat-1',
+              sessionId: null,
+              name: 'Copper wire',
+              quantity: 2,
+              quantityExplicit: true,
+              unit: 'ea',
+              unitCostCents: 500,
+              unitCostExplicit: true,
+              totalCostCents: 1000,
+              quantityLabel: '2 ea @ $5.00',
+              priceLabel: '$10.00',
+            },
+          ],
+        },
+      ],
+    };
+    apiClient.fetchJobDetail.mockResolvedValue(jobWithMaterial);
+    const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
+    await waitFor(() => expect(screen.getByText('Edit materials')).toBeTruthy());
+    fireEvent.press(screen.getByText('Edit materials'));
+    await waitFor(() =>
+      expect(screen.getByTestId('edit-focus-target')).toHaveTextContent('"materials"'),
+    );
+    expect(screen.queryByText('Save Material')).toBeNull();
+  });
+
+  it('TEST-V07 wizard edit discard cancels mark-complete', async () => {
+    const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
+    await waitFor(() => expect(screen.getByText('Primary status action')).toBeTruthy());
+    fireEvent.press(screen.getByText('Primary status action'));
+    await waitFor(() =>
+      expect(screen.getByText('Confirm minimum info before marking complete')).toBeTruthy(),
+    );
+    fireEvent.press(screen.getByText('Confirm Info'));
+    await waitFor(() =>
+      expect(screen.getByTestId('edit-focus-target')).toHaveTextContent('"revenue"'),
+    );
+    expect(screen.getByLabelText('Next')).toBeTruthy();
+    fireEvent.press(screen.getByLabelText('Close'));
+    await waitFor(() => expect(screen.getByLabelText('Edit job')).toBeTruthy());
+    expect(apiClient.updateJobStatusById).not.toHaveBeenCalledWith({}, 'job-1', 'completed');
+  });
+
+  it('wizard commit pill says Next with multiple gaps and Done on the last gap', async () => {
+    apiClient.fetchJobDetail.mockResolvedValue({
+      ...incompleteJob,
+      shortDescription: 'Named job',
+      earnings: { ...incompleteJob.earnings, revenueCents: 10000 },
+      metrics: { ...incompleteJob.metrics, sessionCount: 1 },
+      displaySessions: [
+        {
+          id: 'sess-usable',
+          startedAt: '2026-04-17T14:00:00.000Z',
+          endedAt: '2026-04-17T15:00:00.000Z',
+          dateLabel: 'Apr 17, 2026',
+          timeRangeLabel: '9:00 AM – 10:00 AM',
+          durationLabel: '1.0h',
+          clockTimesExplicit: true,
+          clockStartExplicit: true,
+          clockEndExplicit: true,
+          calendarDateExplicit: true,
+          attachments: [],
+        },
+      ],
+    });
+    const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
+    await waitFor(() => expect(screen.getByText('Primary status action')).toBeTruthy());
+    fireEvent.press(screen.getByText('Primary status action'));
+    await waitFor(() => expect(screen.getByText('Confirm Info')).toBeTruthy());
+    fireEvent.press(screen.getByText('Confirm Info'));
+    await waitFor(() =>
+      expect(screen.getByTestId('edit-focus-target')).toHaveTextContent('"materials"'),
+    );
+    expect(screen.getByLabelText('Next')).toBeTruthy();
+    expect(screen.queryByLabelText('Done')).toBeNull();
+    fireEvent.press(screen.getByLabelText('Close'));
+    await waitFor(() => expect(screen.getByLabelText('Edit job')).toBeTruthy());
+
+    apiClient.fetchJobDetail.mockResolvedValue({
+      ...incompleteJob,
+      shortDescription: 'Named job',
+      earnings: { ...incompleteJob.earnings, revenueCents: 10000 },
+      metrics: { ...incompleteJob.metrics, sessionCount: 1 },
+      displaySessions: [
+        {
+          id: 'sess-usable',
+          startedAt: '2026-04-17T14:00:00.000Z',
+          endedAt: '2026-04-17T15:00:00.000Z',
+          dateLabel: 'Apr 17, 2026',
+          timeRangeLabel: '9:00 AM – 10:00 AM',
+          durationLabel: '1.0h',
+          clockTimesExplicit: true,
+          clockStartExplicit: true,
+          clockEndExplicit: true,
+          calendarDateExplicit: true,
+          attachments: [],
+        },
+      ],
+      noMaterialsConfirmed: true,
+      noOtherCostsConfirmed: false,
+    });
+    const lastGapScreen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
+    await waitFor(() => expect(lastGapScreen.getByText('Primary status action')).toBeTruthy());
+    fireEvent.press(lastGapScreen.getByText('Primary status action'));
+    await waitFor(() => expect(lastGapScreen.getByText('Confirm Info')).toBeTruthy());
+    fireEvent.press(lastGapScreen.getByText('Confirm Info'));
+    await waitFor(() =>
+      expect(lastGapScreen.getByTestId('edit-focus-target')).toHaveTextContent('"otherCosts"'),
+    );
+    expect(lastGapScreen.getByLabelText('Done')).toBeTruthy();
+    expect(lastGapScreen.queryByLabelText('Next')).toBeNull();
+  });
+
+  it('TEST-V08 materials confirm-none checkbox in Edit advances completeness gap', async () => {
+    const materialsGapJob: JobDetailViewModel = {
+      ...incompleteJob,
+      shortDescription: 'Fixture install',
+      earnings: { ...incompleteJob.earnings, revenueCents: 10000 },
+      metrics: { ...incompleteJob.metrics, sessionCount: 1 },
+      displaySessions: [
+        {
+          id: 'sess-usable',
+          startedAt: '2026-04-17T14:00:00.000Z',
+          endedAt: '2026-04-17T15:00:00.000Z',
+          dateLabel: 'Apr 17, 2026',
+          timeRangeLabel: '9:00 AM – 10:00 AM',
+          durationLabel: '1.0h',
+          clockTimesExplicit: true,
+          clockStartExplicit: true,
+          clockEndExplicit: true,
+          calendarDateExplicit: true,
+          attachments: [],
+        },
+      ],
+      noOtherCostsConfirmed: true,
+    };
+    apiClient.fetchJobDetail.mockImplementation(async () => ({ ...materialsGapJob }));
+    const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
+    await waitFor(() => expect(screen.getByText('Primary status action')).toBeTruthy());
+    fireEvent.press(screen.getByText('Primary status action'));
+    await waitFor(() => expect(screen.getByText('Confirm Info')).toBeTruthy());
+    fireEvent.press(screen.getByText('Confirm Info'));
+    await waitFor(() =>
+      expect(screen.getByTestId('edit-focus-target')).toHaveTextContent('"materials"'),
+    );
+    fireEvent.press(screen.getByLabelText('Confirm no materials'));
+    fireEvent.press(screen.getByLabelText('Done'));
+    await waitFor(() =>
+      expect(apiClient.updateJobCostsReviewed).toHaveBeenCalledWith({}, 'job-1', true),
+    );
+  });
+
+  it('ends the live session before opening the mark-complete gate', async () => {
+    mockLiveSession = { id: 'sess-live-1', jobId: 'job-1' };
+    mockEndLiveSessionNow.mockResolvedValue({ id: 'sess-live-1', jobId: 'job-1' });
+    apiClient.fetchJobDetail.mockResolvedValue({
+      ...incompleteJob,
+      inProgressSession: {
+        id: 'sess-live-1',
+        startedAt: '2026-04-18T09:00:00.000Z',
+        endedAt: null,
+        dateLabel: 'Apr 18, 2026',
+        timeRangeLabel: '9:00 AM',
+        durationLabel: '0.2h',
+        clockTimesExplicit: true,
+        clockStartExplicit: true,
+        clockEndExplicit: false,
+        calendarDateExplicit: true,
+        attachments: [],
+      },
+    });
+    const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
+    await waitFor(() => expect(screen.getByText('Primary status action')).toBeTruthy());
+    fireEvent.press(screen.getByText('Primary status action'));
+    await waitFor(() => {
+      expect(mockEndLiveSessionNow).toHaveBeenCalled();
+    });
+    expect(apiClient.endLiveSession).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(screen.getByText('Confirm minimum info before marking complete')).toBeTruthy(),
+    );
+    expect(apiClient.updateJobStatusById).not.toHaveBeenCalledWith({}, 'job-1', 'completed');
+  });
+
+  it('TEST-V09 flag off keeps ADD pills and confirm cards', async () => {
+    mockFullscreenEditFlagState = { enabled: false, ready: true };
+    const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
+    await waitFor(() => expect(screen.getByLabelText('Add Materials')).toBeTruthy());
+    expect(screen.getByText('CONFIRM NO MATERIALS USED')).toBeTruthy();
+  });
+
+  it('TEST-V11 shows empty and gate copy strings', async () => {
+    const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
+    await waitFor(() => expect(screen.getByText('No materials recorded')).toBeTruthy());
+    expect(screen.getByText('No other costs recorded')).toBeTruthy();
+    expect(screen.getByText('No notes recorded')).toBeTruthy();
+    fireEvent.press(screen.getByText('Primary status action'));
+    await waitFor(() =>
+      expect(screen.getByText('Confirm minimum info before marking complete')).toBeTruthy(),
+    );
   });
 });

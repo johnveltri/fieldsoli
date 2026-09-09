@@ -133,6 +133,9 @@ function job(overrides: Record<string, unknown>) {
     isFinanciallyComplete: true,
     hasMaterials: true,
     noMaterialsConfirmed: false,
+    hasOtherCosts: false,
+    noOtherCostsConfirmed: false,
+    noRevenueConfirmed: false,
     hasSessions: true,
     ...overrides,
   };
@@ -220,7 +223,7 @@ describe('HomeScreen quick session', () => {
 
     expect(
       await screen.findByText(
-        'No earnings counted this week. Finish missing job details so completed work can show here.',
+        'No earnings from this week',
       ),
     ).toBeTruthy();
   });

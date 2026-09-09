@@ -15,6 +15,7 @@ import {
   listRecentJobsForCurrentUser,
   updateJobById,
   updateJobCostsReviewed,
+  updateJobNoRevenueConfirmed,
   bumpJobToInProgressIfNotStarted,
   updateJobStatusById,
 } from './jobs';
@@ -548,6 +549,51 @@ describe('jobs api client', () => {
     expect(patch).toEqual({ materials_reviewed_at: expect.any(String) });
   });
 
+  it('updateJobNoRevenueConfirmed stamps confirmation and zeros revenue', async () => {
+    let patch: unknown;
+    const client = makeClient({
+      authUserId: 'user-1',
+      buildersByTable: {
+        jobs: [
+          makeBuilder({
+            onUpdate: (value) => {
+              patch = value;
+            },
+            maybeSingleResult: { data: { id: 'job-1' }, error: null },
+          }),
+        ],
+      },
+    });
+
+    await updateJobNoRevenueConfirmed(client as never, 'job-1', true);
+
+    expect(patch).toEqual({
+      no_revenue_confirmed_at: expect.any(String),
+      revenue_cents: 0,
+    });
+  });
+
+  it('updateJobNoRevenueConfirmed clears confirmation without wiping revenue', async () => {
+    let patch: unknown;
+    const client = makeClient({
+      authUserId: 'user-1',
+      buildersByTable: {
+        jobs: [
+          makeBuilder({
+            onUpdate: (value) => {
+              patch = value;
+            },
+            maybeSingleResult: { data: { id: 'job-1' }, error: null },
+          }),
+        ],
+      },
+    });
+
+    await updateJobNoRevenueConfirmed(client as never, 'job-1', false);
+
+    expect(patch).toEqual({ no_revenue_confirmed_at: null });
+  });
+
   it('updateJobById rejects blank titles and invalid revenue', async () => {
     const client = makeClient({
       authUserId: 'user-1',
@@ -642,12 +688,16 @@ describe('jobs api client', () => {
                   id: 'mat-shared',
                   job_id: 'job-1',
                   session_id: 'sess-ended',
+                  description: 'Shared material',
+                  cost_type: 'material',
                   total_cost_cents: 4000,
                 },
                 {
                   id: 'mat-job-only',
                   job_id: 'job-1',
                   session_id: null,
+                  description: 'Job material',
+                  cost_type: 'material',
                   total_cost_cents: 1000,
                 },
               ],
@@ -661,6 +711,8 @@ describe('jobs api client', () => {
                   id: 'mat-shared',
                   job_id: 'job-1',
                   session_id: 'sess-ended',
+                  description: 'Shared material',
+                  cost_type: 'material',
                   total_cost_cents: 4000,
                 },
               ],
@@ -688,6 +740,7 @@ describe('jobs api client', () => {
     expect(rows[0].createdAt).toBe('2026-04-10T08:00:00.000Z');
     expect(rows[0].lastWorkedLabel).toContain('Last worked');
     expect(rows[0].lastWorkedLabel).toContain('Apr 16, 2026');
+    expect(rows[0].noRevenueConfirmed).toBe(false);
   });
 
   it('listJobsForCurrentUserPage sets hasMore when the page is full', async () => {
@@ -811,6 +864,8 @@ describe('jobs api client', () => {
             id: 'mat-active',
             job_id: 'job-1',
             session_id: null,
+            description: 'Active material',
+            cost_type: 'material',
             total_cost_cents: 2500,
           },
         ],
@@ -888,6 +943,199 @@ describe('jobs api client', () => {
     ]);
   });
 
+  it('listJobsForCurrentUser ignores incomplete materials for hasMaterials', async () => {
+    const client = makeClient({
+      authUserId: 'user-1',
+      buildersByTable: {
+        jobs: [
+          makeBuilder({
+            awaitResult: {
+              data: [
+                {
+                  id: 'job-1',
+                  short_description: 'Panel install',
+                  customer_name: 'A',
+                  updated_at: '2026-04-17T10:00:00.000Z',
+                  created_at: '2026-04-10T08:00:00.000Z',
+                  last_worked_at: '2026-04-16T12:00:00.000Z',
+                  job_type: 'electrical',
+                  job_work_status: 'in_progress',
+                  job_payment_state: null,
+                  revenue_cents: 10000,
+                  collected_cents: 0,
+                  is_job_record_complete: false,
+                  materials_reviewed_at: null,
+                  other_costs_reviewed_at: null,
+                },
+              ],
+              error: null,
+            },
+          }),
+        ],
+        sessions: [
+          makeBuilder({
+            awaitResult: {
+              data: [
+                {
+                  id: 'sess-1',
+                  job_id: 'job-1',
+                  session_status: 'ended',
+                  started_at: '2026-04-16T10:00:00.000Z',
+                  ended_at: '2026-04-16T11:00:00.000Z',
+                },
+              ],
+              error: null,
+            },
+          }),
+        ],
+        job_costs: [
+          makeBuilder({
+            awaitResult: {
+              data: [
+                {
+                  id: 'mat-incomplete',
+                  job_id: 'job-1',
+                  session_id: null,
+                  description: '',
+                  cost_type: 'material',
+                  total_cost_cents: 0,
+                },
+              ],
+              error: null,
+            },
+          }),
+          makeBuilder({ awaitResult: { data: [], error: null } }),
+        ],
+      },
+    });
+
+    const rows = await listJobsForCurrentUser(client as never);
+    expect(rows[0]?.hasMaterials).toBe(false);
+  });
+
+  it('listJobsForCurrentUser maps noRevenueConfirmed and counts in_progress sessions', async () => {
+    const jobsBuilder = makeBuilder({
+      awaitResult: {
+        data: [
+          {
+            id: 'job-1',
+            short_description: 'Untitled Job',
+            customer_name: null,
+            updated_at: '2026-04-17T10:00:00.000Z',
+            created_at: '2026-04-10T08:00:00.000Z',
+            last_worked_at: '2026-04-16T12:00:00.000Z',
+            job_type: 'electrical',
+            job_work_status: 'in_progress',
+            job_payment_state: null,
+            revenue_cents: 0,
+            collected_cents: 0,
+            is_job_record_complete: false,
+            no_revenue_confirmed_at: '2026-04-17T09:00:00.000Z',
+          },
+        ],
+        error: null,
+      },
+    });
+    const sessionsBuilder = makeBuilder({
+      awaitResult: {
+        data: [
+          {
+            id: 'sess-live',
+            job_id: 'job-1',
+            session_status: 'in_progress',
+            started_at: '2026-04-17T09:00:00.000Z',
+            ended_at: null,
+          },
+        ],
+        error: null,
+      },
+    });
+    const client = makeClient({
+      authUserId: 'user-1',
+      buildersByTable: {
+        jobs: [jobsBuilder],
+        sessions: [sessionsBuilder],
+        job_costs: [
+          makeBuilder({ awaitResult: { data: [], error: null } }),
+          makeBuilder({ awaitResult: { data: [], error: null } }),
+        ],
+      },
+    });
+
+    const rows = await listJobsForCurrentUser(client as never);
+    expect(rows[0]?.noRevenueConfirmed).toBe(true);
+    expect(rows[0]?.hasSessions).toBe(true);
+    expect(jobsBuilder.select).toHaveBeenCalledWith(
+      expect.stringContaining('no_revenue_confirmed_at'),
+    );
+    expect(sessionsBuilder.select).toHaveBeenCalledWith(
+      'id, job_id, session_status, started_at, ended_at, calendar_date_explicit',
+    );
+  });
+
+  it('listJobsForCurrentUser ignores unusable ended-only sessions for hasSessions', async () => {
+    const client = makeClient({
+      authUserId: 'user-1',
+      buildersByTable: {
+        jobs: [
+          makeBuilder({
+            awaitResult: {
+              data: [
+                {
+                  id: 'job-1',
+                  short_description: 'Panel install',
+                  customer_name: 'A',
+                  updated_at: '2026-04-17T10:00:00.000Z',
+                  created_at: '2026-04-10T08:00:00.000Z',
+                  last_worked_at: null,
+                  job_type: 'electrical',
+                  job_work_status: 'in_progress',
+                  job_payment_state: null,
+                  revenue_cents: 10000,
+                  collected_cents: 0,
+                  is_job_record_complete: false,
+                },
+              ],
+              error: null,
+            },
+          }),
+        ],
+        sessions: [
+          makeBuilder({
+            awaitResult: {
+              data: [
+                {
+                  id: 'sess-undated',
+                  job_id: 'job-1',
+                  session_status: 'ended',
+                  started_at: '2026-04-16T10:00:00.000Z',
+                  ended_at: '2026-04-16T11:00:00.000Z',
+                  calendar_date_explicit: false,
+                },
+                {
+                  id: 'sess-zero',
+                  job_id: 'job-1',
+                  session_status: 'ended',
+                  started_at: '2026-04-16T10:00:00.000Z',
+                  ended_at: '2026-04-16T10:00:00.000Z',
+                },
+              ],
+              error: null,
+            },
+          }),
+        ],
+        job_costs: [
+          makeBuilder({ awaitResult: { data: [], error: null } }),
+          makeBuilder({ awaitResult: { data: [], error: null } }),
+        ],
+      },
+    });
+
+    const rows = await listJobsForCurrentUser(client as never);
+    expect(rows[0]?.hasSessions).toBe(false);
+    expect(rows[0]?.noRevenueConfirmed).toBe(false);
+  });
+
   it('list and detail stay aligned for shared job fields and earnings', async () => {
     const jobsBuilder = makeBuilder({
       awaitResult: {
@@ -933,6 +1181,8 @@ describe('jobs api client', () => {
             id: 'mat-sync',
             job_id: 'job-sync',
             session_id: 'sess-sync',
+            description: 'Pipe fittings',
+            cost_type: 'material',
             total_cost_cents: 7000,
           },
         ],
@@ -947,6 +1197,8 @@ describe('jobs api client', () => {
             id: 'mat-sync',
             job_id: 'job-sync',
             session_id: 'sess-sync',
+            description: 'Pipe fittings',
+            cost_type: 'material',
             total_cost_cents: 7000,
           },
         ],
@@ -1126,6 +1378,7 @@ describe('jobs api client', () => {
     expect(detail).not.toBeNull();
     expect(detail?.displaySessions.map((s) => s.id)).toEqual(['sess-ended']);
     expect(detail?.noMaterialsConfirmed).toBe(false);
+    expect(detail?.noRevenueConfirmed).toBe(false);
   });
 
   it('fetchJobDetail maps note id/body/sessionId and filters soft-deleted notes', async () => {

@@ -1,40 +1,280 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import {
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  type NativeSyntheticEvent,
+  type TextLayoutEventData,
+} from 'react-native';
 import type {
   JobDetailMaterialBucket,
+  JobDetailNote,
   JobDetailNoteBucket,
   JobDetailOtherCostBucket,
+  JobDetailSession,
 } from '@fieldsolo/shared-types';
 import { color, radius, space } from '@fieldsolo/design-system/lib/tokens';
 
+import {
+  isMaterialDescriptionEmpty,
+  isMaterialTotalEmpty,
+  isOtherCostAmountEmpty,
+  isOtherCostTypeEmpty,
+  isSessionDateEmpty,
+  isSessionDurationEmpty,
+  shouldShowMaterialQuantity,
+  sessionViewTimeLabel,
+} from '../../lib/jobDetailRowHealth';
 import { bg, border, fg } from '../../theme/nativeTokens';
 import type { TextStyles } from '../../theme/nativeTokens';
-import { JobDetailIconViewNote } from '../figma-icons/JobDetailScreenIcons';
+import { JobDetailIconViewNote, JobDetailIconViewSessionChevron } from '../figma-icons/JobDetailScreenIcons';
+import { EditSwipeableRow } from './edit-mode/EditSwipeableRow';
 
-/** Session bucket header — e.g. "MAR 25, 2026 SESSION"; UNASSIGNED renders verbatim. */
+const COLLAPSED_NOTE_LINES = 4;
+const criticalEmptyColor = () => color('Semantic/Status/Error/Text');
+
+type NoteFooterOptions = { expanded: boolean; onToggle: () => void };
+
+function ViewRowShell({
+  typography,
+  accessibilityLabel,
+  onDelete,
+  onPress,
+  style,
+  children,
+}: {
+  typography: TextStyles;
+  accessibilityLabel: string;
+  onDelete?: () => void;
+  onPress?: () => void;
+  style?: object | (object | false | null | undefined)[];
+  children: ReactNode;
+}) {
+  const body = onPress ? (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      onPress={onPress}
+      style={({ pressed }) => [style, pressed && styles.pressed]}
+    >
+      {children}
+    </Pressable>
+  ) : (
+    <View style={style}>{children}</View>
+  );
+
+  if (!onDelete) return body;
+
+  return (
+    <EditSwipeableRow
+      typography={typography}
+      accessibilityLabel={accessibilityLabel}
+      onDelete={onDelete}
+    >
+      {body}
+    </EditSwipeableRow>
+  );
+}
+
+function noteExceedsCollapsedLines(note: JobDetailNote, measuredLines: number | null): boolean {
+  if (note.excerpt.trim() !== note.body.trim()) return true;
+  if (note.body.split(/\r?\n/).length > COLLAPSED_NOTE_LINES) return true;
+  return measuredLines != null && measuredLines > COLLAPSED_NOTE_LINES;
+}
+
+function ReadOnlyExpandNoteRow({
+  note,
+  expanded,
+  typography,
+  rowChrome,
+  noteIconSlot,
+  onToggle,
+  renderNoteFooter,
+}: {
+  note: JobDetailNote;
+  expanded: boolean;
+  typography: TextStyles;
+  rowChrome: object[];
+  noteIconSlot: ReactNode;
+  onToggle: () => void;
+  renderNoteFooter: (n: JobDetailNote, options?: NoteFooterOptions) => ReactNode;
+}) {
+  const [measuredLines, setMeasuredLines] = useState<number | null>(null);
+
+  useEffect(() => {
+    setMeasuredLines(null);
+  }, [note.body]);
+
+  const onMeasureLayout = useCallback((event: NativeSyntheticEvent<TextLayoutEventData>) => {
+    setMeasuredLines(event.nativeEvent.lines.length);
+  }, []);
+
+  const needsExpand = noteExceedsCollapsedLines(note, measuredLines);
+
+  return (
+    <View style={rowChrome}>
+      {noteIconSlot}
+      <View style={styles.noteContent}>
+        <View pointerEvents="none" collapsable={false} style={styles.noteMeasureWrap}>
+          <Text
+            accessible={false}
+            style={[typography.body, { color: fg.primary }]}
+            onTextLayout={onMeasureLayout}
+          >
+            {note.body}
+          </Text>
+        </View>
+        <Text
+          style={[typography.body, { color: fg.primary }]}
+          numberOfLines={expanded ? undefined : COLLAPSED_NOTE_LINES}
+          ellipsizeMode="tail"
+        >
+          {note.body}
+        </Text>
+        {renderNoteFooter(note, needsExpand ? { expanded, onToggle } : undefined)}
+      </View>
+    </View>
+  );
+}
+
+/**
+ * Single bordered card listing sessions as rows (Phase 2 View).
+ * Row tap opens scoped Sessions Edit; swipe reveals Delete.
+ */
+export function ViewSessionsBuckets({
+  sessions,
+  typography,
+  onCardPress,
+  onDeleteSession,
+  emphasizeCriticalEmpty = false,
+}: {
+  sessions: JobDetailSession[];
+  typography: TextStyles;
+  onCardPress?: () => void;
+  onDeleteSession?: (sessionId: string) => void;
+  /** Color critical empty placeholders (date / duration) as error text. */
+  emphasizeCriticalEmpty?: boolean;
+}) {
+  if (sessions.length === 0) return null;
+
+  return (
+    <View style={styles.viewCardOuter}>
+      <View style={styles.viewCardBorder}>
+        {sessions.map((session, si) => {
+          const dateEmpty = emphasizeCriticalEmpty && isSessionDateEmpty(session);
+          const durationEmpty = emphasizeCriticalEmpty && isSessionDurationEmpty(session);
+          const timeLabel = sessionViewTimeLabel(session);
+          return (
+            <ViewRowShell
+              key={session.id}
+              typography={typography}
+              accessibilityLabel={`Session ${session.dateLabel}`}
+              onPress={onCardPress}
+              onDelete={onDeleteSession ? () => onDeleteSession(session.id) : undefined}
+              style={[
+                styles.materialRow,
+                si > 0 && { borderTopWidth: 1, borderTopColor: color('Foundation/Border/Subtle') },
+              ]}
+            >
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text
+                  style={[
+                    typography.body,
+                    { color: dateEmpty ? criticalEmptyColor() : fg.primary },
+                  ]}
+                >
+                  {session.dateLabel}
+                </Text>
+                {timeLabel ? (
+                  <Text
+                    style={[
+                      typography.bodySmall,
+                      { color: fg.secondary, marginTop: space('Spacing/4') },
+                    ]}
+                  >
+                    {timeLabel}
+                  </Text>
+                ) : null}
+              </View>
+              <Text
+                style={[
+                  typography.metric,
+                  {
+                    textTransform: 'none',
+                    color: durationEmpty ? criticalEmptyColor() : fg.primary,
+                  },
+                ]}
+              >
+                {session.durationLabel}
+              </Text>
+            </ViewRowShell>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+/** Session bucket header — e.g. "MAR 25, 2026 SESSION"; job-scoped buckets use "JOB". */
 export function bucketSessionHeaderTitle(sessionDateLabel: string | undefined): string {
   const d = sessionDateLabel?.trim() ?? '';
   return `${d} SESSION`.replace(/\s+/g, ' ').trim().toUpperCase();
 }
 
+const JOB_BUCKET_HEADER = 'JOB';
+
+function BucketHeader({
+  bucket,
+  typography,
+  isFirst,
+}: {
+  bucket: { kind: 'unassigned' | 'session'; sessionDateLabel?: string };
+  typography: TextStyles;
+  isFirst: boolean;
+}) {
+  return (
+    <View style={[styles.bucketHeader, isFirst && styles.bucketHeaderFirst]}>
+      {bucket.kind === 'unassigned' ? (
+        <Text style={[typography.labelHeadingSecondary, styles.bucketHeaderText]}>
+          {JOB_BUCKET_HEADER}
+        </Text>
+      ) : (
+        <Text style={[typography.labelHeadingSecondary, styles.bucketHeaderText]}>
+          {bucketSessionHeaderTitle(bucket.sessionDateLabel)}
+        </Text>
+      )}
+    </View>
+  );
+}
+
 /**
- * Single bordered card listing material buckets (unassigned vs per-session).
- * Shared by Job Detail and the Inbox so both render the same UNASSIGNED card.
+ * Single bordered card listing material buckets (job-scoped vs per-session).
+ * Shared by Job Detail and the Inbox.
  */
 export function ViewMaterialsBuckets({
   buckets,
   typography,
   onMaterialPress,
+  onCardPress,
+  onDeleteMaterial,
   hideBucketHeaders = false,
+  emphasizeCriticalEmpty = false,
 }: {
   buckets: JobDetailMaterialBucket[];
   typography: TextStyles;
   /** Tap a row → open the Edit Material sheet / Add to Job sheet for this material. */
   onMaterialPress?: (materialId: string) => void;
+  /** Phase 2 View: row tap → scoped Materials Edit (overrides row presses). */
+  onCardPress?: () => void;
+  onDeleteMaterial?: (materialId: string) => void;
   /**
-   * Hide the per-bucket UNASSIGNED / session headers. The Inbox uses this so
+   * Hide the per-bucket Job / session headers. The Inbox uses this so
    * its own recency section headers (TODAY / PAST WEEK …) are the grouping.
    */
   hideBucketHeaders?: boolean;
+  /** Color critical empty placeholders (description / total) as error text. */
+  emphasizeCriticalEmpty?: boolean;
 }) {
   if (buckets.length === 0) {
     return null;
@@ -49,39 +289,65 @@ export function ViewMaterialsBuckets({
             style={bi > 0 ? { borderTopWidth: 1, borderTopColor: color('Foundation/Border/Subtle') } : undefined}
           >
             {hideBucketHeaders ? null : (
-              <View style={[styles.bucketHeader, bi === 0 && styles.bucketHeaderFirst]}>
-                {bucket.kind === 'unassigned' ? (
-                  <Text style={[typography.labelHeadingSecondary, styles.bucketHeaderText]}>UNASSIGNED</Text>
-                ) : (
-                  <Text style={[typography.labelHeadingSecondary, styles.bucketHeaderText]}>
-                    {bucketSessionHeaderTitle(bucket.sessionDateLabel)}
-                  </Text>
-                )}
-              </View>
+              <BucketHeader bucket={bucket} typography={typography} isFirst={bi === 0} />
             )}
-            {bucket.items.map((item, ii) => (
-              <Pressable
-                key={`${bucket.id}-${item.id}`}
-                accessibilityRole="button"
-                accessibilityLabel="Edit material"
-                onPress={onMaterialPress ? () => onMaterialPress(item.id) : undefined}
-                style={({ pressed }) => [
-                  styles.materialRow,
-                  ii > 0 && { borderTopWidth: 1, borderTopColor: color('Foundation/Border/Subtle') },
-                  pressed && onMaterialPress ? styles.pressed : null,
-                ]}
-              >
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={[typography.body, { color: fg.primary }]}>{item.name}</Text>
-                  <Text style={[typography.bodySmall, { color: fg.secondary, marginTop: space('Spacing/4') }]}>
-                    {item.quantityLabel}
+            {bucket.items.map((item, ii) => {
+              const rowStyle = [
+                styles.materialRow,
+                ii > 0 && { borderTopWidth: 1, borderTopColor: color('Foundation/Border/Subtle') },
+              ];
+              const rowPress = onCardPress
+                ? onCardPress
+                : onMaterialPress
+                  ? () => onMaterialPress(item.id)
+                  : undefined;
+              const descriptionEmpty =
+                emphasizeCriticalEmpty && isMaterialDescriptionEmpty(item);
+              const totalEmpty = emphasizeCriticalEmpty && isMaterialTotalEmpty(item);
+              const showQuantity = shouldShowMaterialQuantity(item);
+              return (
+                <ViewRowShell
+                  key={`${bucket.id}-${item.id}`}
+                  typography={typography}
+                  accessibilityLabel="Edit material"
+                  onPress={rowPress}
+                  onDelete={onDeleteMaterial ? () => onDeleteMaterial(item.id) : undefined}
+                  style={rowStyle}
+                >
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text
+                      style={[
+                        typography.body,
+                        { color: descriptionEmpty ? criticalEmptyColor() : fg.primary },
+                      ]}
+                    >
+                      {item.name}
+                    </Text>
+                    {showQuantity ? (
+                      <Text
+                        style={[
+                          typography.bodySmall,
+                          { color: fg.secondary, marginTop: space('Spacing/4') },
+                        ]}
+                      >
+                        {item.quantityLabel}
+                      </Text>
+                    ) : null}
+                  </View>
+                  <Text
+                    style={[
+                      typography.metric,
+                      {
+                        textTransform: 'none',
+                        color: totalEmpty ? criticalEmptyColor() : fg.primary,
+                      },
+                    ]}
+                  >
+                    {totalEmpty ? 'No total' : item.priceLabel}
                   </Text>
-                </View>
-                <Text style={[typography.metric, { textTransform: 'none', color: fg.primary }]}>
-                  {item.priceLabel}
-                </Text>
-              </Pressable>
-            ))}
+                </ViewRowShell>
+              );
+            })}
           </View>
         ))}
       </View>
@@ -94,92 +360,25 @@ export function ViewOtherCostsBuckets({
   buckets,
   typography,
   onOtherCostPress,
+  onCardPress,
+  onDeleteOtherCost,
+  hideBucketHeaders = false,
+  emphasizeCriticalEmpty = false,
 }: {
   buckets: JobDetailOtherCostBucket[];
   typography: TextStyles;
   onOtherCostPress?: (otherCostId: string) => void;
-}) {
-  if (buckets.length === 0) {
-    return null;
-  }
-
-  return (
-    <View style={styles.viewCardOuter}>
-      <View style={styles.viewCardBorder}>
-        {buckets.map((bucket, bi) => (
-          <View
-            key={bucket.id}
-            style={bi > 0 ? { borderTopWidth: 1, borderTopColor: color('Foundation/Border/Subtle') } : undefined}
-          >
-            <View style={[styles.bucketHeader, bi === 0 && styles.bucketHeaderFirst]}>
-              {bucket.kind === 'unassigned' ? (
-                <Text style={[typography.labelHeadingSecondary, styles.bucketHeaderText]}>UNASSIGNED</Text>
-              ) : (
-                <Text style={[typography.labelHeadingSecondary, styles.bucketHeaderText]}>
-                  {bucketSessionHeaderTitle(bucket.sessionDateLabel)}
-                </Text>
-              )}
-            </View>
-            {bucket.items.map((item, ii) => (
-              <Pressable
-                key={`${bucket.id}-${item.id}`}
-                accessibilityRole="button"
-                accessibilityLabel="Edit other cost"
-                onPress={onOtherCostPress ? () => onOtherCostPress(item.id) : undefined}
-                style={({ pressed }) => [
-                  styles.materialRow,
-                  ii > 0 && { borderTopWidth: 1, borderTopColor: color('Foundation/Border/Subtle') },
-                  pressed && onOtherCostPress ? styles.pressed : null,
-                ]}
-              >
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={[typography.body, { color: fg.primary }]}>{item.typeLabel}</Text>
-                  {item.description ? (
-                    <Text style={[typography.bodySmall, { color: fg.secondary, marginTop: space('Spacing/4') }]}>
-                      {item.description}
-                    </Text>
-                  ) : null}
-                </View>
-                <Text style={[typography.metric, { textTransform: 'none', color: fg.primary }]}>
-                  {item.priceLabel}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-        ))}
-      </View>
-    </View>
-  );
-}
-
-/**
- * Single bordered card listing note buckets (unassigned vs per-session).
- * Shared by Job Detail and the Inbox so both render the same UNASSIGNED card.
- */
-export function ViewNotesBuckets({
-  buckets,
-  typography,
-  onNotePress,
-  hideBucketHeaders = false,
-  showNoteIcon = true,
-}: {
-  buckets: JobDetailNoteBucket[];
-  typography: TextStyles;
-  /** Tap a row → open the Edit Note sheet / Add to Job sheet for this note. */
-  onNotePress?: (noteId: string) => void;
-  /**
-   * Hide the per-bucket UNASSIGNED / session headers. The Inbox uses this so
-   * its own recency section headers (TODAY / PAST WEEK …) are the grouping.
-   */
+  /** Phase 2 View: row tap → scoped Other Costs Edit (overrides row presses). */
+  onCardPress?: () => void;
+  onDeleteOtherCost?: (otherCostId: string) => void;
   hideBucketHeaders?: boolean;
-  /** Leading document icon on each note row. Job Detail hides these. */
-  showNoteIcon?: boolean;
+  /** Color critical empty placeholders (type / amount) as error text. */
+  emphasizeCriticalEmpty?: boolean;
 }) {
   if (buckets.length === 0) {
     return null;
   }
 
-  const noteIcon = color('Semantic/Activity/Note');
   return (
     <View style={styles.viewCardOuter}>
       <View style={styles.viewCardBorder}>
@@ -189,41 +388,214 @@ export function ViewNotesBuckets({
             style={bi > 0 ? { borderTopWidth: 1, borderTopColor: color('Foundation/Border/Subtle') } : undefined}
           >
             {hideBucketHeaders ? null : (
-              <View style={[styles.bucketHeader, bi === 0 && styles.bucketHeaderFirst]}>
-                {bucket.kind === 'unassigned' ? (
-                  <Text style={[typography.labelHeadingSecondary, styles.bucketHeaderText]}>UNASSIGNED</Text>
-                ) : (
-                  <Text style={[typography.labelHeadingSecondary, styles.bucketHeaderText]}>
-                    {bucketSessionHeaderTitle(bucket.sessionDateLabel)}
-                  </Text>
-                )}
-              </View>
+              <BucketHeader bucket={bucket} typography={typography} isFirst={bi === 0} />
             )}
-            {bucket.notes.map((n, ni) => (
-              <Pressable
-                key={`${bucket.id}-n-${n.id}`}
-                accessibilityRole="button"
-                accessibilityLabel="Edit note"
-                onPress={onNotePress ? () => onNotePress(n.id) : undefined}
-                style={({ pressed }) => [
-                  showNoteIcon ? styles.noteRow : styles.noteRowPlain,
-                  ni > 0 && { borderTopWidth: 1, borderTopColor: color('Foundation/Border/Subtle') },
-                  pressed && onNotePress ? styles.pressed : null,
-                ]}
-              >
-                {showNoteIcon ? (
-                  <View style={{ marginTop: space('Spacing/2') }}>
-                    <JobDetailIconViewNote color={noteIcon} />
+            {bucket.items.map((item, ii) => {
+              const rowStyle = [
+                styles.materialRow,
+                ii > 0 && { borderTopWidth: 1, borderTopColor: color('Foundation/Border/Subtle') },
+              ];
+              const rowPress = onCardPress
+                ? onCardPress
+                : onOtherCostPress
+                  ? () => onOtherCostPress(item.id)
+                  : undefined;
+              const typeEmpty = emphasizeCriticalEmpty && isOtherCostTypeEmpty(item);
+              const amountEmpty = emphasizeCriticalEmpty && isOtherCostAmountEmpty(item);
+              return (
+                <ViewRowShell
+                  key={`${bucket.id}-${item.id}`}
+                  typography={typography}
+                  accessibilityLabel="Edit other cost"
+                  onPress={rowPress}
+                  onDelete={onDeleteOtherCost ? () => onDeleteOtherCost(item.id) : undefined}
+                  style={rowStyle}
+                >
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text
+                      style={[
+                        typography.body,
+                        { color: typeEmpty ? criticalEmptyColor() : fg.primary },
+                      ]}
+                    >
+                      {item.typeLabel}
+                    </Text>
+                    {item.description ? (
+                      <Text
+                        style={[
+                          typography.bodySmall,
+                          { color: fg.secondary, marginTop: space('Spacing/4') },
+                        ]}
+                      >
+                        {item.description}
+                      </Text>
+                    ) : null}
                   </View>
-                ) : null}
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={[typography.body, { color: fg.primary }]}>{n.excerpt}</Text>
-                  <Text style={[typography.bodySmall, { color: fg.secondary, marginTop: space('Spacing/8') }]}>
-                    {n.dateLabel}
+                  <Text
+                    style={[
+                      typography.metric,
+                      {
+                        textTransform: 'none',
+                        color: amountEmpty ? criticalEmptyColor() : fg.primary,
+                      },
+                    ]}
+                  >
+                    {amountEmpty ? 'No amount' : item.priceLabel}
                   </Text>
-                </View>
-              </Pressable>
-            ))}
+                </ViewRowShell>
+              );
+            })}
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+/**
+ * Single bordered card listing note buckets (job-scoped vs per-session).
+ * Shared by Job Detail and the Inbox.
+ */
+export function ViewNotesBuckets({
+  buckets,
+  typography,
+  onNotePress,
+  onNoteEditPress,
+  onCardPress,
+  onDeleteNote,
+  hideBucketHeaders = false,
+  showNoteIcon = true,
+  readOnlyExpand = false,
+}: {
+  buckets: JobDetailNoteBucket[];
+  typography: TextStyles;
+  /** Tap a row → open the Edit Note sheet / Add to Job sheet for this note. */
+  onNotePress?: (noteId: string) => void;
+  /** Phase 2 View: expanded truncated note Edit control (legacy per-row). */
+  onNoteEditPress?: (noteId: string) => void;
+  /** Phase 2 View: row tap → scoped Notes Edit (Show More still expands in place). */
+  onCardPress?: () => void;
+  onDeleteNote?: (noteId: string) => void;
+  hideBucketHeaders?: boolean;
+  showNoteIcon?: boolean;
+  /** When true, truncated notes expand in place on View. */
+  readOnlyExpand?: boolean;
+}) {
+  const [expandedNoteIds, setExpandedNoteIds] = useState<Set<string>>(() => new Set());
+
+  if (buckets.length === 0) {
+    return null;
+  }
+
+  const noteIcon = color('Semantic/Activity/Note');
+
+  const toggleNoteExpanded = (noteId: string) => {
+    setExpandedNoteIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(noteId)) next.delete(noteId);
+      else next.add(noteId);
+      return next;
+    });
+  };
+
+  const renderNoteFooter = (
+    n: JobDetailNote,
+    options?: { expanded: boolean; onToggle: () => void },
+  ) => (
+    <View style={styles.noteFooterRow}>
+      <Text style={[typography.bodySmall, styles.noteFooterDate, { color: fg.secondary }]}>
+        {n.dateLabel}
+      </Text>
+      {options ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={options.expanded ? 'Show less' : 'Show more'}
+          accessibilityState={{ expanded: options.expanded }}
+          onPress={options.onToggle}
+          hitSlop={8}
+          style={({ pressed }) => [styles.showMoreControl, pressed && styles.pressed]}
+        >
+          <View
+            style={[
+              styles.showMoreIconWrap,
+              options.expanded ? styles.chevronExpanded : undefined,
+            ]}
+          >
+            <JobDetailIconViewSessionChevron color={fg.secondary} />
+          </View>
+          <Text style={[typography.bodySmall, { color: fg.secondary }]}>
+            {options.expanded ? 'Show Less' : 'Show More'}
+          </Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+
+  const renderNoteRow = (n: JobDetailNote, ni: number, bucketId: string) => {
+    const expanded = expandedNoteIds.has(n.id);
+    const rowChrome = [
+      showNoteIcon ? styles.noteRow : styles.noteRowPlain,
+      ni > 0 && { borderTopWidth: 1, borderTopColor: color('Foundation/Border/Subtle') },
+    ];
+    const noteIconSlot = showNoteIcon ? (
+      <View style={{ marginTop: space('Spacing/2') }}>
+        <JobDetailIconViewNote color={noteIcon} />
+      </View>
+    ) : null;
+
+    const rowPress = onCardPress
+      ? onCardPress
+      : onNotePress
+        ? () => onNotePress(n.id)
+        : onNoteEditPress
+          ? () => onNoteEditPress(n.id)
+          : undefined;
+
+    const inner = readOnlyExpand ? (
+      <ReadOnlyExpandNoteRow
+        note={n}
+        expanded={expanded}
+        typography={typography}
+        rowChrome={rowChrome}
+        noteIconSlot={noteIconSlot}
+        onToggle={() => toggleNoteExpanded(n.id)}
+        renderNoteFooter={renderNoteFooter}
+      />
+    ) : (
+      <View style={rowChrome}>
+        {noteIconSlot}
+        <View style={styles.noteContent}>
+          <Text style={[typography.body, { color: fg.primary }]}>{n.excerpt}</Text>
+          {renderNoteFooter(n)}
+        </View>
+      </View>
+    );
+
+    return (
+      <ViewRowShell
+        key={`${bucketId}-n-${n.id}`}
+        typography={typography}
+        accessibilityLabel="Edit note"
+        onPress={rowPress}
+        onDelete={onDeleteNote ? () => onDeleteNote(n.id) : undefined}
+      >
+        {inner}
+      </ViewRowShell>
+    );
+  };
+
+  return (
+    <View style={styles.viewCardOuter}>
+      <View style={styles.viewCardBorder}>
+        {buckets.map((bucket, bi) => (
+          <View
+            key={bucket.id}
+            style={bi > 0 ? { borderTopWidth: 1, borderTopColor: color('Foundation/Border/Subtle') } : undefined}
+          >
+            {hideBucketHeaders ? null : (
+              <BucketHeader bucket={bucket} typography={typography} isFirst={bi === 0} />
+            )}
+            {bucket.notes.map((n, ni) => renderNoteRow(n, ni, bucket.id))}
           </View>
         ))}
       </View>
@@ -276,6 +648,44 @@ const styles = StyleSheet.create({
   noteRowPlain: {
     paddingHorizontal: space('Spacing/16'),
     paddingVertical: space('Spacing/16'),
+  },
+  noteContent: {
+    flex: 1,
+    minWidth: 0,
+    overflow: 'hidden',
+  },
+  noteMeasureWrap: {
+    position: 'absolute',
+    opacity: 0,
+    left: 0,
+    right: 0,
+  },
+  noteFooterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: space('Spacing/8'),
+    gap: space('Spacing/8'),
+  },
+  noteFooterDate: {
+    flex: 1,
+    minWidth: 0,
+  },
+  showMoreControl: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space('Spacing/2'),
+    flexShrink: 0,
+  },
+  showMoreIconWrap: {
+    width: 12,
+    height: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    transform: [{ scale: 0.65 }],
+  },
+  chevronExpanded: {
+    transform: [{ scale: 0.65 }, { rotate: '180deg' }],
   },
   pressed: { opacity: 0.75 },
 });

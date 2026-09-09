@@ -71,6 +71,7 @@ export {
   ViewMaterialsBuckets,
   ViewNotesBuckets,
   ViewOtherCostsBuckets,
+  ViewSessionsBuckets,
   bucketSessionHeaderTitle,
 } from './ViewActivityBuckets';
 export {

@@ -30,8 +30,20 @@ export type JobDetailSessionAttachment =
       id: string;
       /** ISO 8601 — from `materials.updated_at` (fallback: `created_at`). */
       updatedAt: string;
+      /** Material description only. */
+      name: string;
       /** Primary line, e.g. `Copper wire (2 ea @ $2.00)`. */
       title: string;
+      /** Right column — `total_cost` as USD. */
+      priceLabel: string;
+    }
+  | {
+      kind: 'otherCost';
+      id: string;
+      /** ISO 8601 — from `materials.updated_at` (fallback: `created_at`). */
+      updatedAt: string;
+      /** Cost category label, e.g. `Travel / Parking`. */
+      typeLabel: string;
       /** Right column — `total_cost` as USD. */
       priceLabel: string;
     };
@@ -169,6 +181,11 @@ export type JobDetailViewModel = {
   materialBuckets: JobDetailMaterialBucket[];
   otherCostBuckets: JobDetailOtherCostBucket[];
   noteBuckets: JobDetailNoteBucket[];
+  /**
+   * User confirmed there is no revenue for this job; satisfies the revenue
+   * completeness leg until positive revenue is entered.
+   */
+  noRevenueConfirmed: boolean;
   /**
    * User confirmed there were no materials for this job; satisfies the materials
    * leg of financial completeness until a material row is added.

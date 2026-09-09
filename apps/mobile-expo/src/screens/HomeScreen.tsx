@@ -384,7 +384,7 @@ export function HomeScreen({
                 helperText={
                   weeklyNetCents === 0
                     ? needsAttentionSummaries.some((s) => s.kind === 'incomplete')
-                      ? 'No earnings counted this week. Finish missing job details so completed work can show here.'
+                      ? 'No earnings from this week'
                       : 'No earnings from this week. Complete a job to track earnings here.'
                     : undefined
                 }

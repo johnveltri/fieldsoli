@@ -43,6 +43,7 @@ export {
   tryBumpJobToInProgressIfNotStarted,
   updateJobCostsReviewed,
   updateJobMaterialsReviewed,
+  updateJobNoRevenueConfirmed,
   updateJobOtherCostsReviewed,
   updateJobStatusById,
   type ListJobsForCurrentUserItem,

@@ -37,6 +37,7 @@ type JobRow = {
   last_worked_at: string | null;
   materials_reviewed_at: string | null;
   other_costs_reviewed_at: string | null;
+  no_revenue_confirmed_at: string | null;
 };
 
 type SessionRow = {
@@ -79,7 +80,7 @@ type MaterialRow = {
 };
 
 const JOB_DETAIL_JOB_SELECT_BASE =
-  'id, short_description, customer_name, service_address, job_type, job_work_status, job_payment_state, revenue_cents, collected_cents, updated_at, last_worked_at, materials_reviewed_at, other_costs_reviewed_at';
+  'id, short_description, customer_name, service_address, job_type, job_work_status, job_payment_state, revenue_cents, collected_cents, updated_at, last_worked_at, materials_reviewed_at, other_costs_reviewed_at, no_revenue_confirmed_at';
 
 const OTHER_COST_TYPE_LABELS: Record<string, string> = {
   helper_labor: 'Helper Labor',
@@ -152,10 +153,21 @@ function mapSession(row: SessionRow, attachments: JobDetailSessionAttachment[] =
     minute: '2-digit',
   });
   const startStr = timeFmt.format(start);
-  const endStr = end ? timeFmt.format(end) : '…';
+  const endStr = end ? timeFmt.format(end) : '';
   const hours = sessionDurationHours(row.started_at, row.ended_at);
   const durationLabel =
     hours > 0.01 ? `${hours.toFixed(1)}h` : JOB_DETAIL_EMPTY_LABELS.sessionDuration;
+
+  let timeRangeLabel = '';
+  if (clockStartExplicit && clockEndExplicit && endStr) {
+    // Full range only when there is a real duration; otherwise drop the dangling end.
+    timeRangeLabel = hours > 0.01 ? `${startStr} – ${endStr}` : startStr;
+  } else if (clockStartExplicit) {
+    // Start only (no explicit end) — omit "– end" / "– …".
+    timeRangeLabel = startStr;
+  } else if (clockEndExplicit && endStr) {
+    timeRangeLabel = endStr;
+  }
 
   return {
     id: row.id,
@@ -168,7 +180,7 @@ function mapSession(row: SessionRow, attachments: JobDetailSessionAttachment[] =
     dateLabel: calendarDateExplicit
       ? formatDateLabel(row.started_at)
       : JOB_DETAIL_EMPTY_LABELS.sessionDate,
-    timeRangeLabel: clockTimesExplicit ? `${startStr} – ${endStr}` : '',
+    timeRangeLabel,
     durationLabel,
     attachments,
   };
@@ -194,6 +206,7 @@ function materialAttachmentTitle(line: JobDetailMaterialLine): string {
 function mergeSessionAttachments(
   sessionNotes: NoteRow[],
   sessionMats: MaterialRow[],
+  sessionOtherCosts: MaterialRow[] = [],
 ): JobDetailSessionAttachment[] {
   const noteItems: JobDetailSessionAttachment[] = sessionNotes.map((n) => ({
     kind: 'note' as const,
@@ -207,11 +220,22 @@ function mergeSessionAttachments(
       kind: 'material' as const,
       id: m.id,
       updatedAt: m.updated_at || m.created_at,
+      name: line.name,
       title: materialAttachmentTitle(line),
       priceLabel: line.priceLabel,
     };
   });
-  const merged = [...noteItems, ...matItems];
+  const otherCostItems: JobDetailSessionAttachment[] = sessionOtherCosts.map((c) => {
+    const line = otherCostLine(c);
+    return {
+      kind: 'otherCost' as const,
+      id: c.id,
+      updatedAt: c.updated_at || c.created_at,
+      typeLabel: line.typeLabel,
+      priceLabel: line.priceLabel,
+    };
+  });
+  const merged = [...noteItems, ...matItems, ...otherCostItems];
   merged.sort(
     (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
   );
@@ -466,7 +490,11 @@ export async function fetchJobDetail(
   for (const s of activeSessions) {
     const sessionNotes = notesBySession.get(s.id) ?? [];
     const sessionMats = matsBySession.get(s.id) ?? [];
-    attachmentBySessionId.set(s.id, mergeSessionAttachments(sessionNotes, sessionMats));
+    const sessionOtherCosts = ocBySession.get(s.id) ?? [];
+    attachmentBySessionId.set(
+      s.id,
+      mergeSessionAttachments(sessionNotes, sessionMats, sessionOtherCosts),
+    );
   }
 
   const mapNote = (n: NoteRow) => ({
@@ -533,5 +561,6 @@ export async function fetchJobDetail(
     noteBuckets,
     noMaterialsConfirmed: j.materials_reviewed_at != null,
     noOtherCostsConfirmed: j.other_costs_reviewed_at != null,
+    noRevenueConfirmed: j.no_revenue_confirmed_at != null,
   };
 }

@@ -76,9 +76,13 @@ type EditKeyboardScrollContextValue = {
   ) => void;
   /** Queue dock scroll for keyboardDidShow only (tall notes with dockRef). */
   requestEntityDockScroll: (scroll: () => void, waitForKeyboard?: boolean) => void;
+  /** Clears dock hold, pending scrolls, and native keyboard-scroll suppression. */
+  resetKeyboardScrollState: () => void;
 };
 
 const EditKeyboardScrollContext = createContext<EditKeyboardScrollContextValue | null>(null);
+
+export { EditKeyboardScrollContext };
 
 type ScrollEntityBlock = (
   waitForKeyboard?: boolean,
@@ -156,12 +160,15 @@ export function EditKeyboardScrollProvider({
   scrollViewRef,
   scrollContentRef,
   scrollYRef,
+  active = true,
   children,
   offset = EDIT_KEYBOARD_SCROLL_OFFSET,
 }: {
   scrollViewRef: RefObject<ScrollView | null>;
   scrollContentRef: RefObject<View | null>;
   scrollYRef: RefObject<number>;
+  /** When false, dismisses the keyboard and clears dock / pending scroll state. */
+  active?: boolean;
   children: ReactNode;
   offset?: number;
 }) {
@@ -179,6 +186,19 @@ export function EditKeyboardScrollProvider({
       entityDockScrollYRef.current = null;
     }
   }, []);
+
+  const resetKeyboardScrollState = useCallback(() => {
+    suppressNativeKeyboardScrollRef.current = false;
+    entityDockScrollYRef.current = null;
+    pendingEntityScrollRef.current = null;
+    pendingEntityDidShowScrollRef.current = null;
+  }, []);
+
+  useEffect(() => {
+    if (active) return;
+    Keyboard.dismiss();
+    resetKeyboardScrollState();
+  }, [active, resetKeyboardScrollState]);
 
   const guardEntityDockScroll = useCallback(
     (contentOffsetY: number) => {
@@ -307,11 +327,13 @@ export function EditKeyboardScrollProvider({
       guardEntityDockScroll,
       requestEntityBlockScroll,
       requestEntityDockScroll,
+      resetKeyboardScrollState,
     }),
     [
       guardEntityDockScroll,
       requestEntityBlockScroll,
       requestEntityDockScroll,
+      resetKeyboardScrollState,
       scrollCaretLeadIntoView,
       scrollContentRef,
       scrollInputIntoView,
@@ -458,15 +480,27 @@ export function EditTitleField({
   const scroll = useContext(EditKeyboardScrollContext);
 
   return (
-    <TextInput
-      placeholderTextColor={fg.secondary}
-      style={[typography.titleH3, styles.titleInput]}
-      onFocus={(event) => {
-        scroll?.scrollInputIntoView(event.nativeEvent.target);
-        onFocus?.(event);
-      }}
-      {...props}
-    />
+    // Outer inset + inner clip: iOS TextInput intrinsic width follows the full
+    // string and paints through padding into the sheet edge unless clipped in a
+    // width-bounded view that is already inset from the pill.
+    <View style={styles.titleFieldWrap}>
+      <View style={styles.titleFieldClip}>
+        <TextInput
+          placeholderTextColor={fg.secondary}
+          style={[typography.titleH3, styles.titleInput]}
+          // iOS defaults to word-wrapping when paragraph styles (e.g. lineHeight) are
+          // set, so long titles stop early with empty trailing space until focused.
+          // Clip matches the focused single-line edge (partial word visible).
+          lineBreakModeIOS="clip"
+          numberOfLines={1}
+          onFocus={(event) => {
+            scroll?.scrollInputIntoView(event.nativeEvent.target);
+            onFocus?.(event);
+          }}
+          {...props}
+        />
+      </View>
+    </View>
   );
 }
 
@@ -813,6 +847,56 @@ export function EditAddRow({
   );
 }
 
+/** Checkbox row for confirming no materials / no other costs (Edit cards). */
+export function EditConfirmNoneRow({
+  typography,
+  confirmed,
+  confirmLabel,
+  confirmedLabel,
+  onToggle,
+  showTopBorder = true,
+  disabled = false,
+}: {
+  typography: TextStyles;
+  confirmed: boolean;
+  confirmLabel: string;
+  confirmedLabel: string;
+  onToggle: () => void;
+  showTopBorder?: boolean;
+  disabled?: boolean;
+}) {
+  const label = confirmed ? confirmedLabel : confirmLabel;
+  return (
+    <Pressable
+      accessibilityRole="checkbox"
+      accessibilityState={{ checked: confirmed, disabled }}
+      accessibilityLabel={label}
+      disabled={disabled}
+      onPress={onToggle}
+      style={[styles.iconRow, styles.addRow, showTopBorder && editSheetRowSeparator]}
+    >
+      <View style={styles.iconSlot}>
+        <View style={styles.iconFrame}>
+          <View style={[styles.confirmCheckbox, confirmed && styles.confirmCheckboxChecked]}>
+            {confirmed ? <Text style={styles.confirmCheckboxMark}>✓</Text> : null}
+          </View>
+        </View>
+      </View>
+      <View style={styles.iconContent}>
+        <Text
+          style={[
+            typography.body,
+            editRowText,
+            { color: confirmed ? fg.primary : fg.secondary },
+          ]}
+        >
+          {label}
+        </Text>
+      </View>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
   sheet: {
     backgroundColor: bg.surfaceWhite,
@@ -820,11 +904,21 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     marginTop: space('Spacing/12'),
   },
-  titleInput: {
-    color: fg.primary,
+  titleFieldWrap: {
     paddingHorizontal: space('Spacing/16'),
     paddingVertical: space('Spacing/12'),
     minHeight: 52,
+    justifyContent: 'center',
+  },
+  titleFieldClip: {
+    width: '100%',
+    overflow: 'hidden',
+  },
+  titleInput: {
+    color: fg.primary,
+    padding: 0,
+    margin: 0,
+    width: '100%',
   },
   iconRow: {
     flexDirection: 'row',
@@ -874,6 +968,26 @@ const styles = StyleSheet.create({
   },
   addRow: {
     alignItems: 'center',
+  },
+  confirmCheckbox: {
+    width: 20,
+    height: 20,
+    borderWidth: 1,
+    borderColor: border.subtle,
+    borderRadius: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: bg.surfaceWhite,
+  },
+  confirmCheckboxChecked: {
+    backgroundColor: fg.primary,
+    borderColor: fg.primary,
+  },
+  confirmCheckboxMark: {
+    color: bg.surfaceWhite,
+    fontSize: 12,
+    lineHeight: 14,
+    fontWeight: '700',
   },
   fieldInputRight: {
     textAlign: 'right',
