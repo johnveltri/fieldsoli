@@ -167,7 +167,7 @@ describe('HomeScreen quick session', () => {
     consoleErrorSpy.mockRestore();
   });
 
-  it('renders the FieldSoli home header', () => {
+  it('renders the Dashboard home header', () => {
     const screen = render(
       <HomeScreen
         onOpenProfile={() => undefined}
@@ -177,10 +177,10 @@ describe('HomeScreen quick session', () => {
       />,
     );
 
-    expect(screen.getByText(/FIELD\s*SOLI/)).toBeTruthy();
-    const title = screen.getByText(/FIELD\s*SOLI/);
+    expect(screen.getByText(/DASH\s*BOARD/)).toBeTruthy();
+    const title = screen.getByText(/DASH\s*BOARD/);
     expect(title.props.accessibilityRole).toBe('header');
-    expect(title.props.accessibilityLabel).toBe('FieldSoli');
+    expect(title.props.accessibilityLabel).toBe('Dashboard');
   });
 
   it('explains zero weekly earnings for an account with jobs', async () => {

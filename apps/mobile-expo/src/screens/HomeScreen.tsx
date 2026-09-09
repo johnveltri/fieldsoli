@@ -96,7 +96,7 @@ export function HomeScreen({
   const insets = useSafeAreaInsets();
   const { columnStyle } = useContentColumn();
   const { fontScale } = useWindowDimensions();
-  const brandTitle = fontScale > 1.6 ? 'FIELD\nSOLI' : 'FIELDSOLI';
+  const brandTitle = fontScale > 1.6 ? 'DASH\nBOARD' : 'DASHBOARD';
   const scrollY = useMemo(() => new Animated.Value(0), []);
   const { version } = useJobsListInvalidation();
 
@@ -289,7 +289,7 @@ export function HomeScreen({
                   }
                 >
                   <Text
-                    {...screenHeaderA11y('FieldSoli')}
+                    {...screenHeaderA11y('Dashboard')}
                     style={[
                       platformHeaderDisplayTitleStyle(brandTitleStyle, {
                         allowWrap: brandLineCount > 1,
