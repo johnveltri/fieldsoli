@@ -667,6 +667,7 @@ function EditMultilineField({
           styles.multilineVisibleText,
           !hasValue && styles.multilinePlaceholder,
           style,
+          { opacity: 0 },
         ]}
       >
         {shown}
@@ -677,12 +678,13 @@ function EditMultilineField({
         value={value}
         placeholder={placeholder}
         multiline
-        caretHidden
-        scrollEnabled={false}
+        caretHidden={false}
+        accessibilityHint="Native multiline diagnostic"
+        scrollEnabled={true}
         blurOnSubmit={false}
         submitBehavior="newline"
         textAlignVertical="top"
-        style={[typography.body, styles.multilineOverlayInput, style, { color: 'transparent' }]}
+        style={[typography.body, styles.multilineOverlayInput, style, { color: fg.primary }]}
         onPressIn={(event) => {
           caretScreenYRef.current = event.nativeEvent.pageY;
         }}
