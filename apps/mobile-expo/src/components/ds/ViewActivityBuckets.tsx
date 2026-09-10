@@ -80,8 +80,18 @@ function ViewRowShell({
   );
 }
 
+function countWrappedLines(lines: TextLayoutEventData['lines']): number {
+  if (lines.length === 0) return 0;
+  // Trailing newline yields an empty final line — ignore it for the collapse budget.
+  const last = lines[lines.length - 1];
+  if (last.text === '') return lines.length - 1;
+  return lines.length;
+}
+
 function noteExceedsCollapsedLines(note: JobDetailNote, measuredLines: number | null): boolean {
-  if (note.excerpt.trim() !== note.body.trim()) return true;
+  // Do not use `excerpt` here — that is a 120-char list preview, not a 4-line
+  // visual collapse. A long body can still fit in ≤4 wraps and must not show
+  // Show More with nothing left to reveal.
   if (note.body.split(/\r?\n/).length > COLLAPSED_NOTE_LINES) return true;
   return measuredLines != null && measuredLines > COLLAPSED_NOTE_LINES;
 }
@@ -103,6 +113,7 @@ function ReadOnlyExpandNoteRow({
   onToggle: () => void;
   renderNoteFooter: (n: JobDetailNote, options?: NoteFooterOptions) => ReactNode;
 }) {
+  const [contentWidth, setContentWidth] = useState(0);
   const [measuredLines, setMeasuredLines] = useState<number | null>(null);
 
   useEffect(() => {
@@ -110,7 +121,7 @@ function ReadOnlyExpandNoteRow({
   }, [note.body]);
 
   const onMeasureLayout = useCallback((event: NativeSyntheticEvent<TextLayoutEventData>) => {
-    setMeasuredLines(event.nativeEvent.lines.length);
+    setMeasuredLines(countWrappedLines(event.nativeEvent.lines));
   }, []);
 
   const needsExpand = noteExceedsCollapsedLines(note, measuredLines);
@@ -118,16 +129,28 @@ function ReadOnlyExpandNoteRow({
   return (
     <View style={rowChrome}>
       {noteIconSlot}
-      <View style={styles.noteContent}>
-        <View pointerEvents="none" collapsable={false} style={styles.noteMeasureWrap}>
+      <View
+        style={styles.noteContent}
+        onLayout={(event) => {
+          const next = Math.round(event.nativeEvent.layout.width);
+          if (next > 0) setContentWidth((prev) => (prev === next ? prev : next));
+        }}
+      >
+        {contentWidth > 0 ? (
           <Text
+            pointerEvents="none"
             accessible={false}
-            style={[typography.body, { color: fg.primary }]}
+            importantForAccessibility="no-hide-descendants"
+            style={[
+              typography.body,
+              styles.noteMeasureText,
+              { color: fg.primary, width: contentWidth },
+            ]}
             onTextLayout={onMeasureLayout}
           >
             {note.body}
           </Text>
-        </View>
+        ) : null}
         <Text
           style={[typography.body, { color: fg.primary }]}
           numberOfLines={expanded ? undefined : COLLAPSED_NOTE_LINES}
@@ -678,11 +701,11 @@ const styles = StyleSheet.create({
     minWidth: 0,
     overflow: 'hidden',
   },
-  noteMeasureWrap: {
+  noteMeasureText: {
     position: 'absolute',
     opacity: 0,
     left: 0,
-    right: 0,
+    top: 0,
   },
   noteFooterRow: {
     flexDirection: 'row',

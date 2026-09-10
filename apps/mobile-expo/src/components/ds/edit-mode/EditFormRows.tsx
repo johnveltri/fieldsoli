@@ -637,9 +637,10 @@ export function EditFieldInput({
 }
 
 /**
- * iOS UITextView does not paint wrapped glyphs in these rows. Show the string
- * with `Text` (same as view-mode notes) and keep a transparent input on top
- * for typing.
+ * iOS UITextView paints wrapped glyphs in these rows when scrolling is enabled,
+ * but the edit page should own scrolling. A hidden `Text` sizer plus content
+ * size keeps the input frame as tall as the text so the native view has
+ * nothing to scroll inside.
  */
 function EditMultilineField({
   typography,
@@ -653,15 +654,22 @@ function EditMultilineField({
   const scroll = useContext(EditKeyboardScrollContext);
   const scrollEntityBlock = useContext(EditEntityBlockContext);
   const caretScreenYRef = useRef<number | null>(null);
+  const [sizerHeight, setSizerHeight] = useState(EDIT_BODY_LINE_HEIGHT);
+  const [contentHeight, setContentHeight] = useState(EDIT_BODY_LINE_HEIGHT);
   const hasValue = typeof value === 'string' && value.length > 0;
   const shown = hasValue ? value : placeholder && placeholder.length > 0 ? placeholder : ' ';
+  const boxHeight = Math.max(EDIT_BODY_LINE_HEIGHT, sizerHeight, contentHeight);
 
   return (
-    <View style={styles.fieldInputMultilineWrap}>
+    <View style={[styles.fieldInputMultilineWrap, { minHeight: boxHeight }]}>
       <Text
         pointerEvents="none"
         accessible={false}
         importantForAccessibility="no-hide-descendants"
+        onLayout={(event) => {
+          const next = Math.round(event.nativeEvent.layout.height);
+          if (next > 0) setSizerHeight((prev) => (prev === next ? prev : next));
+        }}
         style={[
           typography.body,
           styles.multilineVisibleText,
@@ -673,20 +681,27 @@ function EditMultilineField({
         {shown}
       </Text>
       <TextInput
-        placeholderTextColor="transparent"
+        placeholderTextColor={fg.secondary}
         {...props}
         value={value}
         placeholder={placeholder}
         multiline
-        caretHidden={false}
-        accessibilityHint="Native multiline diagnostic"
-        scrollEnabled={true}
+        scrollEnabled
         blurOnSubmit={false}
         submitBehavior="newline"
         textAlignVertical="top"
-        style={[typography.body, styles.multilineOverlayInput, style, { color: fg.primary }]}
+        style={[
+          typography.body,
+          styles.multilineOverlayInput,
+          style,
+          { height: boxHeight, color: fg.primary },
+        ]}
         onPressIn={(event) => {
           caretScreenYRef.current = event.nativeEvent.pageY;
+        }}
+        onContentSizeChange={(event) => {
+          const next = Math.ceil(event.nativeEvent.contentSize.height);
+          if (next > 0) setContentHeight((prev) => (prev === next ? prev : next));
         }}
         onFocus={(event) => {
           const nativeTarget = event.nativeEvent.target;
@@ -1072,7 +1087,6 @@ const styles = StyleSheet.create({
     left: 0,
     top: 0,
     right: 0,
-    bottom: 0,
     padding: 0,
     margin: 0,
     includeFontPadding: false,
