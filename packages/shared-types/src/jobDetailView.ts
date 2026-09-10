@@ -3,6 +3,9 @@
  * Maps from Supabase via `@fieldsolo/api-client` `fetchJobDetail`.
  */
 
+/** Max length for `jobs.short_description` / job title on Edit and writers. */
+export const JOB_SHORT_DESCRIPTION_MAX_LENGTH = 60;
+
 /** Mirrors design-system `StatusPill` kinds for the job header pill (includes derived `paid`). */
 export type JobDetailWorkStatus =
   | 'paid'
@@ -30,8 +33,20 @@ export type JobDetailSessionAttachment =
       id: string;
       /** ISO 8601 — from `materials.updated_at` (fallback: `created_at`). */
       updatedAt: string;
+      /** Material description only. */
+      name: string;
       /** Primary line, e.g. `Copper wire (2 ea @ $2.00)`. */
       title: string;
+      /** Right column — `total_cost` as USD. */
+      priceLabel: string;
+    }
+  | {
+      kind: 'otherCost';
+      id: string;
+      /** ISO 8601 — from `materials.updated_at` (fallback: `created_at`). */
+      updatedAt: string;
+      /** Cost category label, e.g. `Travel / Parking`. */
+      typeLabel: string;
       /** Right column — `total_cost` as USD. */
       priceLabel: string;
     };
@@ -141,6 +156,8 @@ export type JobDetailOtherCostBucket = {
 export type JobDetailViewModel = {
   id: string;
   shortDescription: string;
+  /** Optional longer description under the title. Empty string when unset. */
+  longDescription: string;
   customerName: string;
   serviceAddress: string;
   jobType: string;
@@ -169,6 +186,11 @@ export type JobDetailViewModel = {
   materialBuckets: JobDetailMaterialBucket[];
   otherCostBuckets: JobDetailOtherCostBucket[];
   noteBuckets: JobDetailNoteBucket[];
+  /**
+   * User confirmed there is no revenue for this job; satisfies the revenue
+   * completeness leg until positive revenue is entered.
+   */
+  noRevenueConfirmed: boolean;
   /**
    * User confirmed there were no materials for this job; satisfies the materials
    * leg of financial completeness until a material row is added.

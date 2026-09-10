@@ -5,9 +5,13 @@ import type { OtherCostTypeDb } from './otherCosts';
 
 export type ApplyJobDetailEditJobPatch = {
   shortDescription: string;
+  longDescription: string;
   customerName: string;
   serviceAddress: string;
   revenueCents: number | null;
+  noRevenueConfirmed: boolean;
+  noMaterialsConfirmed: boolean;
+  noOtherCostsConfirmed: boolean;
 };
 
 export type ApplyJobDetailEditSessionRow = {
@@ -108,9 +112,13 @@ function toRpcPayload(payload: ApplyJobDetailEditPayload): Record<string, unknow
   return {
     job: {
       shortDescription: payload.job.shortDescription,
+      longDescription: payload.job.longDescription,
       customerName: payload.job.customerName,
       serviceAddress: payload.job.serviceAddress,
       revenueCents: payload.job.revenueCents,
+      noRevenueConfirmed: payload.job.noRevenueConfirmed,
+      noMaterialsConfirmed: payload.job.noMaterialsConfirmed,
+      noOtherCostsConfirmed: payload.job.noOtherCostsConfirmed,
     },
     sessions: payload.sessions,
     notes: payload.notes,
@@ -125,7 +133,7 @@ export async function applyJobDetailEdit(
   jobId: JobId,
   payload: ApplyJobDetailEditPayload,
 ): Promise<void> {
-  const { data, error } = await client.rpc('apply_job_detail_edit', {
+  const { data, error } = await client.rpc('apply_job_detail_edit_atomic', {
     p_job_id: jobId,
     p_payload: toRpcPayload(payload) as import('./database.types').Json,
   });

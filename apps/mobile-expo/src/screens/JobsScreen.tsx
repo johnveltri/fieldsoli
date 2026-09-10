@@ -24,7 +24,7 @@ import {
   type ListJobsForCurrentUserTab,
 } from '@fieldsolo/api-client';
 import { color, colorWithAlpha, radius } from '@fieldsolo/design-system/lib/tokens';
-import { jobCostsIncompleteForListPill } from '../lib/jobFinancialCompleteness';
+import { incompletePillsForListJob } from '../lib/jobFinancialCompleteness';
 
 import { CanvasTiledBackground } from '../components/CanvasTiledBackground';
 import { PlatformHeaderAction, platformHeaderActionIconColor } from '../components/platform/PlatformHeaderAction';
@@ -103,13 +103,7 @@ type JobsScreenProps = {
 type Typography = ReturnType<typeof createTextStyles>;
 
 function incompletePillsFor(job: ListJobsForCurrentUserItem): string[] {
-  const pills: string[] = [];
-  const desc = job.shortDescription.trim();
-  if (desc === '' || desc === 'Untitled Job') pills.push('description');
-  if (job.revenueCents == null || job.revenueCents === 0) pills.push('revenue');
-  if (jobCostsIncompleteForListPill(job)) pills.push('costs');
-  if (!job.hasSessions) pills.push('sessions');
-  return pills;
+  return incompletePillsForListJob(job);
 }
 
 type JobsFlatRow =

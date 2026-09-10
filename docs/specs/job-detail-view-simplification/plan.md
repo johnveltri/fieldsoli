@@ -11,7 +11,7 @@
 
 - View header is Close + **EDIT** pill; Edit mode header is X + **Done** in [`JobDetailEditMode.tsx`](../../../apps/mobile-expo/src/screens/jobDetailEdit/JobDetailEditMode.tsx) (`styles.topHeader`). Placement should be unified; bodies still swap without a shared fade.
 - Open Jobs incomplete copy: `Missing: ${pills.join(', ')}` in [`JobCard.tsx`](../../../apps/mobile-expo/src/components/ds/JobCard.tsx); pills from [`incompletePillsFor`](../../../apps/mobile-expo/src/screens/JobsScreen.tsx). Job View header has no equivalent.
-- `SessionCard` expand currently includes EDIT + add tiles + attachments — mutate chrome to remove; keep attachments as read. Collapsed session must not grow a note/material count line.
+- `SessionCard` in View mode (`viewMode`): flat row with date, start–end time, duration, missing line; tap → Edit. No chevron, no expand panel, no attachment list. Legacy flag-off expand (EDIT + add tiles + attachments) unchanged.
 - `JobDetailJobHeader` already renders `serviceAddress` when non-blank; keep it on the customer card and make the card tappable → Edit.
 - Live `LiveSessionCaptureCard` and overlay stay as today this build. Phase 3 replaces capture tiles/EDIT pill with add-rows + start time, and adds the View start tile.
 - Inbox tap only assigns ([`InboxScreen.tsx`](../../../apps/mobile-expo/src/screens/InboxScreen.tsx)) — **out of this build**.
@@ -22,7 +22,7 @@
 | Area | Files | Rules |
 |---|---|---|
 | Shared chrome + fade | `JobDetailScreen.tsx` | REQ-V11 |
-| View lists / expand-read | `SessionCard.tsx`, notes buckets, `JobDetailScreen.tsx` | REQ-V01–V05, V13 |
+| View lists / note expand-read | `SessionCard.tsx`, `ViewActivityBuckets.tsx`, `JobDetailScreen.tsx` | REQ-V01–V05, V13 |
 | Customer card | `JobDetailJobHeader.tsx`, `JobDetailScreen.tsx` | REQ-V05 (name + address; tap → Edit) |
 | Job Missing line | `JobDetailJobHeader` or View slot | REQ-V12 |
 | Wizard | `JobDetailScreen.tsx` | REQ-V07–V08 |
@@ -35,7 +35,7 @@ Do not change `LiveSessionBottomSheet.tsx` / `LiveSessionCaptureCard.tsx` in thi
 
 1. Shared header host + crossfade (TEST-V13)
 2. Job `Missing:` line (TEST-V14)
-3. Flatten mutate chrome; read expand; row missing; taps → Edit (TEST-V01–V05, V10, V15)
+3. Flatten session rows; note read expand; row missing; taps → Edit (TEST-V01–V05, V10, V15)
 4. Wizard re-home (TEST-V07–V08)
 5. Flag-off regression (TEST-V09)
 6. Manual fade + Dynamic Type (TEST-V12, V13)

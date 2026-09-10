@@ -4,8 +4,10 @@ import type {
   JobId,
   JobPaymentState,
 } from '@fieldsolo/shared-types';
+import { JOB_SHORT_DESCRIPTION_MAX_LENGTH } from '@fieldsolo/shared-types';
 
 import type { FieldSoloSupabaseClient } from './client';
+import { formatSessionDurationLabel } from './sessionDurationDraft';
 
 type JobsRow = {
   id: string;
@@ -76,6 +78,7 @@ export async function fetchJobById(
 
 export type UpdateJobInput = {
   shortDescription: string;
+  longDescription: string;
   customerName: string;
   serviceAddress: string;
   revenueCents: number | null;
@@ -102,15 +105,17 @@ export type ListJobsForCurrentUserItem = {
   netEarningsCents: number | null;
   collectedCents: number | null;
   isFinanciallyComplete: boolean;
-  /** True when the job has at least one active (non-deleted) material line attributed to it (job_id or session). */
+  /** True when the job has at least one usable (description + total) material line. */
   hasMaterials: boolean;
   /** True when the user confirmed “no materials used” on the job (no material rows). */
   noMaterialsConfirmed: boolean;
-  /** True when the job has at least one active non-material cost line. */
+  /** True when the job has at least one usable (type + amount) non-material cost line. */
   hasOtherCosts: boolean;
   /** True when the user confirmed “no other costs” on the job. */
   noOtherCostsConfirmed: boolean;
-  /** True when the job has at least one non-deleted session. */
+  /** True when the user confirmed “no revenue” on the job. */
+  noRevenueConfirmed: boolean;
+  /** True when the job has a live in-progress session or a usable ended session. */
   hasSessions: boolean;
 };
 
@@ -129,6 +134,7 @@ type ListJobsRow = {
   is_job_record_complete: boolean;
   materials_reviewed_at: string | null;
   other_costs_reviewed_at: string | null;
+  no_revenue_confirmed_at: string | null;
 };
 
 type ListJobSessionRow = {
@@ -137,6 +143,7 @@ type ListJobSessionRow = {
   session_status: 'in_progress' | 'ended' | 'deleted';
   started_at: string;
   ended_at: string | null;
+  calendar_date_explicit?: boolean | null;
 };
 
 type ListJobMaterialRow = {
@@ -144,8 +151,38 @@ type ListJobMaterialRow = {
   job_id: string | null;
   session_id: string | null;
   total_cost_cents: number;
-  cost_type: string;
+  cost_type: string | null;
+  description: string | null;
+  cost_type_explicit: boolean | null;
 };
+
+const JOB_COST_LIST_SELECT =
+  'id, job_id, session_id, total_cost_cents, cost_type, description, cost_type_explicit';
+
+function isListMaterialCost(costType: string | null): boolean {
+  return costType == null || costType === 'material';
+}
+
+/** Matches mobile `isMaterialUsableForCompleteness` (description + total). */
+function isListMaterialUsableForCompleteness(row: ListJobMaterialRow): boolean {
+  if (!isListMaterialCost(row.cost_type)) return false;
+  return (row.description?.trim() ?? '') !== '' && row.total_cost_cents > 0;
+}
+
+/** Matches mobile `isOtherCostUsableForCompleteness` (explicit type + amount). */
+function isListOtherCostUsableForCompleteness(row: ListJobMaterialRow): boolean {
+  if (isListMaterialCost(row.cost_type)) return false;
+  return row.cost_type_explicit !== false && row.total_cost_cents > 0;
+}
+
+/** Matches DB/View session completeness: live in-progress, or dated ended with duration. */
+function isListSessionUsableForCompleteness(row: ListJobSessionRow): boolean {
+  if (row.session_status === 'in_progress') return true;
+  if (row.session_status !== 'ended') return false;
+  if (row.calendar_date_explicit === false) return false;
+  if (!row.ended_at) return false;
+  return new Date(row.ended_at).getTime() > new Date(row.started_at).getTime();
+}
 
 function formatDateLabel(iso: string): string {
   return new Intl.DateTimeFormat('en-US', {
@@ -175,7 +212,7 @@ export type ListJobsForCurrentUserTab = 'all' | 'open' | 'paid';
 
 /** Current list contract; migration drift is treated as an error. */
 const JOB_LIST_SELECT_FULL =
-  'id, short_description, customer_name, updated_at, created_at, last_worked_at, job_type, job_work_status, job_payment_state, revenue_cents, collected_cents, is_job_record_complete, materials_reviewed_at, other_costs_reviewed_at';
+  'id, short_description, customer_name, updated_at, created_at, last_worked_at, job_type, job_work_status, job_payment_state, revenue_cents, collected_cents, is_job_record_complete, materials_reviewed_at, other_costs_reviewed_at, no_revenue_confirmed_at';
 
 /**
  * One page of jobs ordered by `list_recency_at` desc (`coalesce(last_worked_at, created_at)`), then `id` desc.
@@ -252,7 +289,7 @@ async function enrichJobsRowsWithSessionRollups(
   const jobIds = rows.map((row) => row.id);
   const { data: sessionsData, error: sessionsError } = await client
     .from('sessions')
-    .select('id, job_id, session_status, started_at, ended_at')
+    .select('id, job_id, session_status, started_at, ended_at, calendar_date_explicit')
     .in('job_id', jobIds);
   if (sessionsError) throw sessionsError;
 
@@ -264,7 +301,9 @@ async function enrichJobsRowsWithSessionRollups(
   const totalHoursByJobId = new Map<string, number>();
   for (const s of sessions) {
     sessionJobIdBySessionId.set(s.id, s.job_id);
-    sessionCountByJobId.set(s.job_id, (sessionCountByJobId.get(s.job_id) ?? 0) + 1);
+    if (isListSessionUsableForCompleteness(s)) {
+      sessionCountByJobId.set(s.job_id, (sessionCountByJobId.get(s.job_id) ?? 0) + 1);
+    }
     if (s.session_status === 'ended' || s.session_status === 'in_progress') {
       const a = new Date(s.started_at).getTime();
       const b = s.ended_at ? new Date(s.ended_at).getTime() : Date.now();
@@ -277,13 +316,13 @@ async function enrichJobsRowsWithSessionRollups(
   const [materialsByJobRes, materialsBySessionRes] = await Promise.all([
     client
       .from('job_costs')
-      .select('id, job_id, session_id, total_cost_cents, cost_type')
+      .select(JOB_COST_LIST_SELECT)
       .in('job_id', jobIds)
       .is('deleted_at', null),
     sessionIds.length > 0
       ? client
           .from('job_costs')
-          .select('id, job_id, session_id, total_cost_cents, cost_type')
+          .select(JOB_COST_LIST_SELECT)
           .in('session_id', sessionIds)
           .is('deleted_at', null)
       : Promise.resolve({ data: [] as ListJobMaterialRow[], error: null }),
@@ -312,13 +351,15 @@ async function enrichJobsRowsWithSessionRollups(
       materialJobId,
       (totalCostsSpendByJobId.get(materialJobId) ?? 0) + m.total_cost_cents,
     );
-    if (m.cost_type == null || m.cost_type === 'material') {
-      jobsWithMaterialLines.add(materialJobId);
+    if (isListMaterialCost(m.cost_type)) {
+      if (isListMaterialUsableForCompleteness(m)) {
+        jobsWithMaterialLines.add(materialJobId);
+      }
       materialsSpendByJobId.set(
         materialJobId,
         (materialsSpendByJobId.get(materialJobId) ?? 0) + m.total_cost_cents,
       );
-    } else {
+    } else if (isListOtherCostUsableForCompleteness(m)) {
       jobsWithOtherCostLines.add(materialJobId);
     }
   }
@@ -342,7 +383,7 @@ async function enrichJobsRowsWithSessionRollups(
       createdAt: row.created_at,
       lastWorkedAt,
       lastWorkedLabel: lastWorkedLabelFromColumn(lastWorkedAt),
-      timeLabel: `${totalHours.toFixed(1)}h`,
+      timeLabel: formatSessionDurationLabel(totalHours),
       jobType: row.job_type,
       workStatus: mapWorkStatus(row),
       jobPaymentState: row.job_payment_state,
@@ -355,6 +396,7 @@ async function enrichJobsRowsWithSessionRollups(
       noMaterialsConfirmed: row.materials_reviewed_at != null,
       hasOtherCosts: jobsWithOtherCostLines.has(row.id),
       noOtherCostsConfirmed: row.other_costs_reviewed_at != null,
+      noRevenueConfirmed: row.no_revenue_confirmed_at != null,
       hasSessions,
     };
   });
@@ -827,7 +869,9 @@ export async function createBlankJobForLiveSessionStart(
     throw new Error('No authenticated user available to create a job.');
   }
 
-  const shortDescription = input.shortDescription.trim();
+  const shortDescription = input.shortDescription
+    .trim()
+    .slice(0, JOB_SHORT_DESCRIPTION_MAX_LENGTH);
   if (!shortDescription) {
     throw new Error('Short description is required.');
   }
@@ -869,7 +913,9 @@ export async function deleteJobById(
 }
 
 function normalizeEditableJobInput(input: UpdateJobInput): UpdateJobInput {
-  const shortDescription = input.shortDescription.trim();
+  const shortDescription = input.shortDescription
+    .trim()
+    .slice(0, JOB_SHORT_DESCRIPTION_MAX_LENGTH);
   if (!shortDescription) {
     throw new Error('Short description is required.');
   }
@@ -883,6 +929,7 @@ function normalizeEditableJobInput(input: UpdateJobInput): UpdateJobInput {
 
   return {
     shortDescription,
+    longDescription: input.longDescription.trim(),
     customerName: input.customerName.trim(),
     serviceAddress: input.serviceAddress.trim(),
     revenueCents: input.revenueCents,
@@ -938,6 +985,28 @@ export async function updateJobOtherCostsReviewed(
   }
 }
 
+export async function updateJobNoRevenueConfirmed(
+  client: FieldSoloSupabaseClient,
+  id: JobId,
+  confirmed: boolean,
+): Promise<void> {
+  const patch = confirmed
+    ? { no_revenue_confirmed_at: new Date().toISOString(), revenue_cents: 0 }
+    : { no_revenue_confirmed_at: null };
+  const { data, error } = await client
+    .from('jobs')
+    .update(patch)
+    .eq('id', id)
+    .is('deleted_at', null)
+    .select('id')
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) {
+    throw new Error('Update affected no rows (check RLS: job must be owned by you).');
+  }
+}
+
 /**
  * If the job is still `not_started`, set it to `in_progress` (e.g. after the first session is created).
  * No-op when no row matches (already in progress, completed, etc.).
@@ -979,6 +1048,7 @@ export async function updateJobById(
   const normalized = normalizeEditableJobInput(input);
   const patch = {
     short_description: normalized.shortDescription,
+    long_description: normalized.longDescription.length > 0 ? normalized.longDescription : null,
     customer_name: normalized.customerName,
     service_address: normalized.serviceAddress,
     revenue_cents: normalized.revenueCents,

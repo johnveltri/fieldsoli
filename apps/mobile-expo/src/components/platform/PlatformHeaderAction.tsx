@@ -25,6 +25,7 @@ export type PlatformHeaderActionVariant = 'primary' | 'surface';
 type PlatformHeaderActionProps = {
   accessibilityLabel: string;
   onPress: () => void;
+  disabled?: boolean;
   children: ReactNode;
   /** Applied to the outer 44×44 hit target (e.g. inbox badge positioning). */
   style?: StyleProp<ViewStyle>;
@@ -67,6 +68,7 @@ function withIconColor(children: ReactNode, color: string): ReactNode {
 export function PlatformHeaderAction({
   accessibilityLabel,
   onPress,
+  disabled = false,
   children,
   style,
   useFloatingChrome = true,
@@ -83,9 +85,16 @@ export function PlatformHeaderAction({
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel}
+        accessibilityState={{ disabled }}
+        disabled={disabled}
         onPress={onPress}
         hitSlop={6}
-        style={({ pressed }) => [styles.bareHit, style, pressed && styles.pressedIos]}
+        style={({ pressed }) => [
+          styles.bareHit,
+          style,
+          pressed && !disabled && styles.pressedIos,
+          disabled && styles.disabled,
+        ]}
       >
         {withIconColor(children, iconColor)}
       </Pressable>
@@ -96,6 +105,8 @@ export function PlatformHeaderAction({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
+      accessibilityState={{ disabled }}
+      disabled={disabled}
       onPress={onPress}
       hitSlop={6}
       android_ripple={{
@@ -106,7 +117,8 @@ export function PlatformHeaderAction({
       style={({ pressed }) => [
         styles.pressableOuter,
         style,
-        pressed && Platform.OS === 'ios' && styles.pressedIos,
+        pressed && !disabled && Platform.OS === 'ios' && styles.pressedIos,
+        disabled && styles.disabled,
       ]}
     >
       <PlatformFloatingSurface
@@ -146,5 +158,8 @@ const styles = StyleSheet.create({
   },
   pressedIos: {
     opacity: 0.75,
+  },
+  disabled: {
+    opacity: 0.5,
   },
 });

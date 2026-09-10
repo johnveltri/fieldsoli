@@ -20,6 +20,7 @@ import {
   Animated,
   Alert,
   Easing,
+  Keyboard,
   Platform,
   Pressable,
   StyleSheet,
@@ -53,6 +54,7 @@ import {
   ViewMaterialsBuckets,
   ViewNotesBuckets,
   ViewOtherCostsBuckets,
+  ViewSessionsBuckets,
   type ChooseSessionBottomSheetSession,
   type DropdownBottomSheetOption,
   type EditMaterialBottomSheetValues,
@@ -62,6 +64,7 @@ import {
 } from '../components/ds';
 import { CanvasTiledBackground } from '../components/CanvasTiledBackground';
 import { PlatformHeaderAction } from '../components/platform/PlatformHeaderAction';
+import { usePlatformGlass } from '../components/platform/usePlatformGlass';
 import {
   JobDetailIconCtaMore,
   JobDetailIconSectionAdd,
@@ -80,6 +83,7 @@ import {
   deleteNote,
   deleteSession,
   deleteJobById,
+  endLiveSession,
   fetchFirstJobIdForCurrentUser,
   fetchJobDetail,
   updateJobById,
@@ -135,6 +139,10 @@ import { useContentColumn } from '../theme/useContentColumn';
 import type { EditJobBottomSheetValues } from '../components/ds/EditJobBottomSheet';
 import { useJobDetailFullscreenEditFlag } from '../lib/featureFlags';
 import { JobDetailEditMode } from './jobDetailEdit/JobDetailEditMode';
+import type {
+  JobDetailEditFocusTarget,
+  JobEditOpenedSource,
+} from './jobDetailEdit/jobDetailFocusTarget';
 import { useJobEditDraft } from './jobDetailEdit/useJobEditDraft';
 
 type MarkCompleteWizardCloseOptions = {
@@ -143,6 +151,8 @@ type MarkCompleteWizardCloseOptions = {
 };
 import {
   financialCompletenessGaps,
+  incompletePillsForJobDetail,
+  isCompletedOrPaidWorkStatus,
   isJobFinanciallyComplete,
   shouldDemoteCompletedOrPaidForIncompleteFinancials,
   type FinancialCompletenessGap,
@@ -378,6 +388,9 @@ export function JobDetailScreen({
   const { enabled: fullscreenEditEnabled, ready: fullscreenEditReady } =
     useJobDetailFullscreenEditFlag(sessionUserId);
   const useFullscreenEdit = fullscreenEditReady && fullscreenEditEnabled;
+  const { reduceMotion } = usePlatformGlass();
+  const [editFocusTarget, setEditFocusTarget] = useState<JobDetailEditFocusTarget | null>(null);
+  const modeProgress = useRef(new Animated.Value(0)).current;
   const [statusSheetMounted, setStatusSheetMounted] = useState(false);
   const [statusSheetVisible, setStatusSheetVisible] = useState(false);
   const [statusActionPending, setStatusActionPending] = useState(false);
@@ -450,6 +463,8 @@ export function JobDetailScreen({
   const [otherCostSheetMounted, setOtherCostSheetMounted] = useState(false);
 
   const completeWizardActiveRef = useRef(false);
+  const pendingStatusAfterWizardRef = useRef<'completed' | 'paid'>('completed');
+  const [markCompleteWizardActive, setMarkCompleteWizardActive] = useState(false);
   const advanceMarkCompleteWizardRef = useRef<(refreshedJob: JobDetailViewModel) => void>(() => {});
   const [minimumInfoGateMounted, setMinimumInfoGateMounted] = useState(false);
   const [minimumInfoGateVisible, setMinimumInfoGateVisible] = useState(false);
@@ -460,15 +475,21 @@ export function JobDetailScreen({
   const [otherCostWizardMode, setOtherCostWizardMode] = useState(false);
   const [otherCostWizardError, setOtherCostWizardError] = useState<string | undefined>();
 
+  const setCompleteWizardActive = useCallback((active: boolean) => {
+    completeWizardActiveRef.current = active;
+    setMarkCompleteWizardActive(active);
+  }, []);
+
   const cancelMarkCompleteWizard = useCallback(() => {
-    completeWizardActiveRef.current = false;
+    setCompleteWizardActive(false);
+    pendingStatusAfterWizardRef.current = 'completed';
     setMaterialWizardMode(false);
     setMaterialWizardError(undefined);
     setOtherCostWizardMode(false);
     setOtherCostWizardError(undefined);
     setEditJobRevenueError(undefined);
     setSessionWizardBanner(undefined);
-  }, []);
+  }, [setCompleteWizardActive]);
 
   const financialCompletenessCtx = useMemo(
     () => (job ? jobFinancialContext(job) : null),
@@ -493,7 +514,20 @@ export function JobDetailScreen({
   useEffect(() => {
     autoEditOpenedRef.current = false;
     setDetailMode('view');
-  }, [loadKey, jobId]);
+    setEditFocusTarget(null);
+    modeProgress.setValue(0);
+  }, [loadKey, jobId, modeProgress]);
+
+  useEffect(() => {
+    Animated.timing(modeProgress, {
+      toValue: detailMode === 'edit' ? 1 : 0,
+      duration: reduceMotion ? 0 : 500,
+      easing: Easing.out(Easing.cubic),
+      // JS driver: native-driver opacity on the body wrappers prevented Yoga
+      // from laying out ScrollView children (blank body on device).
+      useNativeDriver: false,
+    }).start();
+  }, [detailMode, modeProgress, reduceMotion]);
 
   useEffect(() => {
     if (
@@ -591,11 +625,41 @@ export function JobDetailScreen({
     dismissY.setValue(0);
     dismissOpacity.setValue(1);
   }, [dismissOpacity, dismissY, loadKey, jobId]);
-  const openEditMode = useCallback(() => {
-    if (!job) return;
-    editApi.resetFromJob(job);
-    setDetailMode('edit');
-  }, [editApi, job]);
+  const captureJobEditOpened = useCallback(
+    (source: JobEditOpenedSource) => {
+      if (!job) return;
+      analytics.capture('job_edit_opened', {
+        source,
+        job_id: job.id,
+        existing_completeness: jobDetailIsFinanciallyComplete(job)
+          ? 'complete'
+          : 'incomplete',
+        job_status: job.workStatus,
+      });
+    },
+    [job],
+  );
+
+  const openEditFromView = useCallback(
+    (focusTarget: JobDetailEditFocusTarget, source: JobEditOpenedSource) => {
+      if (!job || !useFullscreenEdit) return;
+      captureJobEditOpened(source);
+      editApi.resetFromJob(job);
+      setEditFocusTarget(focusTarget);
+      setDetailMode('edit');
+    },
+    [captureJobEditOpened, editApi, job, useFullscreenEdit],
+  );
+
+  const openEditMode = useCallback(
+    (focusTarget: JobDetailEditFocusTarget | null = null) => {
+      if (!job) return;
+      editApi.resetFromJob(job);
+      setEditFocusTarget(focusTarget);
+      setDetailMode('edit');
+    },
+    [editApi, job],
+  );
 
   const openEditJobSheet = useCallback(() => {
     setEditSheetMounted(true);
@@ -603,22 +667,13 @@ export function JobDetailScreen({
   }, []);
 
   const onEdit = useCallback(() => {
-    if (job) {
-      analytics.capture('job_edit_opened', {
-        source: 'job_detail',
-        job_id: job.id,
-        existing_completeness: jobDetailIsFinanciallyComplete(job)
-          ? 'complete'
-          : 'incomplete',
-        job_status: job.workStatus,
-      });
-    }
+    captureJobEditOpened('header');
     if (useFullscreenEdit) {
-      openEditMode();
+      openEditMode(null);
       return;
     }
     openEditJobSheet();
-  }, [job, openEditJobSheet, openEditMode, useFullscreenEdit]);
+  }, [captureJobEditOpened, openEditJobSheet, openEditMode, useFullscreenEdit]);
   const onCloseEditSheet = useCallback(
     (options?: MarkCompleteWizardCloseOptions) => {
       if (completeWizardActiveRef.current && !options?.keepWizardActive) {
@@ -640,6 +695,7 @@ export function JobDetailScreen({
         });
     return {
       shortDescription: j.shortDescription,
+      longDescription: j.longDescription ?? '',
       customerName: j.customerName,
       serviceAddress: j.serviceAddress,
       revenue,
@@ -658,6 +714,7 @@ export function JobDetailScreen({
         const before = toEditValues(job);
         await updateJobById(supabase, job.id, {
           shortDescription: values.shortDescription,
+          longDescription: values.longDescription,
           customerName: values.customerName.trim(),
           serviceAddress: values.serviceAddress.trim(),
           revenueCents,
@@ -916,10 +973,11 @@ export function JobDetailScreen({
     return job.displaySessions.find((s) => s.id === editingSessionId) ?? null;
   }, [editingSessionId, job]);
 
-  const refetchJob = useCallback(async () => {
-    if (!job) return;
+  const refetchJob = useCallback(async (): Promise<JobDetailViewModel | undefined> => {
+    if (!job) return undefined;
     const refreshed = await fetchJobDetail(supabase, job.id);
     if (refreshed) setJob(refreshed);
+    return refreshed ?? undefined;
   }, [job]);
 
   const financialCompleteSnapshotRef = useRef<boolean | null>(null);
@@ -941,6 +999,178 @@ export function JobDetailScreen({
     }
     return String(e);
   }, []);
+
+  /**
+   * End an in-progress live session for this job before the completeness gate
+   * or status write. Returns the job to check (refreshed when a session ended),
+   * or undefined when end failed and the complete attempt must abort.
+   */
+  const endLiveSessionBeforeMarkComplete = useCallback(async (): Promise<
+    JobDetailViewModel | undefined
+  > => {
+    if (!job) return undefined;
+    const liveForThisJob = liveSessionCtx.liveSession?.jobId === job.id;
+    if (!liveForThisJob && !job.inProgressSession) {
+      return job;
+    }
+    try {
+      if (liveForThisJob) {
+        await liveSessionCtx.endLiveSessionNow();
+      } else if (job.inProgressSession) {
+        await endLiveSession(supabase, job.inProgressSession.id);
+      }
+      const refreshed = await refetchJob();
+      invalidateJobsList();
+      return refreshed ?? job;
+    } catch (e) {
+      Alert.alert(
+        'Could not end session',
+        formatErrorMessage(e) || 'Could not end the live session.',
+      );
+      return undefined;
+    }
+  }, [formatErrorMessage, invalidateJobsList, job, liveSessionCtx, refetchJob]);
+
+  const onDeleteSessionFromView = useCallback(
+    (sessionId: string) => {
+      if (!job) return;
+      Alert.alert('Delete this session?', 'This cannot be undone.', [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            void (async () => {
+              try {
+                await deleteSession(supabase, sessionId);
+                await refetchJob();
+                invalidateJobsList();
+                analytics.capture('session_deleted', {
+                  session_id: sessionId,
+                  job_id: job.id,
+                  source: 'job_detail_view',
+                });
+              } catch (e) {
+                analytics.capture('session_delete_failed', {
+                  session_id: sessionId,
+                  job_id: job.id,
+                  source: 'job_detail_view',
+                  ...errorProperties(e),
+                });
+                Alert.alert('Delete failed', formatErrorMessage(e) || 'Could not delete session.');
+              }
+            })();
+          },
+        },
+      ]);
+    },
+    [formatErrorMessage, invalidateJobsList, job, refetchJob],
+  );
+
+  const onDeleteMaterialFromView = useCallback(
+    (materialId: string) => {
+      if (!job) return;
+      Alert.alert('Delete this material?', 'This cannot be undone.', [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            void (async () => {
+              try {
+                await deleteMaterial(supabase, materialId);
+                await refetchJob();
+                invalidateJobsList();
+                analytics.capture('material_deleted', {
+                  material_id: materialId,
+                  job_id: job.id,
+                  source: 'job_detail_view',
+                });
+              } catch (e) {
+                analytics.capture('material_delete_failed', {
+                  material_id: materialId,
+                  job_id: job.id,
+                  source: 'job_detail_view',
+                  ...errorProperties(e),
+                });
+                Alert.alert('Delete failed', formatErrorMessage(e) || 'Could not delete material.');
+              }
+            })();
+          },
+        },
+      ]);
+    },
+    [formatErrorMessage, invalidateJobsList, job, refetchJob],
+  );
+
+  const onDeleteOtherCostFromView = useCallback(
+    (otherCostId: string) => {
+      if (!job) return;
+      Alert.alert('Delete this other cost?', 'This cannot be undone.', [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            void (async () => {
+              try {
+                await deleteOtherCost(supabase, otherCostId);
+                await refetchJob();
+                invalidateJobsList();
+                analytics.capture('other_cost_deleted', {
+                  other_cost_id: otherCostId,
+                  job_id: job.id,
+                  source: 'job_detail_view',
+                });
+              } catch (e) {
+                analytics.capture('other_cost_delete_failed', {
+                  other_cost_id: otherCostId,
+                  job_id: job.id,
+                  source: 'job_detail_view',
+                  ...errorProperties(e),
+                });
+                Alert.alert('Delete failed', formatErrorMessage(e) || 'Could not delete other cost.');
+              }
+            })();
+          },
+        },
+      ]);
+    },
+    [formatErrorMessage, invalidateJobsList, job, refetchJob],
+  );
+
+  const onDeleteNoteFromView = useCallback(
+    (noteId: string) => {
+      if (!job) return;
+      Alert.alert('Delete this note?', 'This cannot be undone.', [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            void (async () => {
+              try {
+                await deleteNote(supabase, noteId);
+                await refetchJob();
+                analytics.capture('note_deleted', {
+                  note_id: noteId,
+                  source: 'job_detail_view',
+                });
+              } catch (e) {
+                analytics.capture('note_delete_failed', {
+                  note_id: noteId,
+                  source: 'job_detail_view',
+                  ...errorProperties(e),
+                });
+                Alert.alert('Delete failed', formatErrorMessage(e) || 'Could not delete note.');
+              }
+            })();
+          },
+        },
+      ]);
+    },
+    [formatErrorMessage, job, refetchJob],
+  );
 
   useEffect(() => {
     if (!job || jobLoading || !supabaseReady) return;
@@ -1073,30 +1303,35 @@ export function JobDetailScreen({
     }
   }, [sessionUserId]);
 
+  const prepareCompletenessGatedStatus = useCallback(
+    async (next: 'completed' | 'paid'): Promise<'proceed' | 'stopped'> => {
+      setStatusActionPending(true);
+      const prepared = await endLiveSessionBeforeMarkComplete();
+      if (!prepared) {
+        setStatusActionPending(false);
+        return 'stopped';
+      }
+      if (!isJobFinanciallyComplete(jobFinancialContext(prepared))) {
+        setStatusActionPending(false);
+        pendingStatusAfterWizardRef.current = next;
+        setMinimumInfoGateMounted(true);
+        setMinimumInfoGateVisible(true);
+        return 'stopped';
+      }
+      return 'proceed';
+    },
+    [endLiveSessionBeforeMarkComplete],
+  );
+
   const onPrimaryStatusCta = useCallback(async () => {
     if (!job || statusActionPending) return;
     const next = nextStatusAfterPrimaryAction(job.workStatus);
-    if (next === 'paid' && (job.earnings.revenueCents ?? 0) <= 0) {
-      Alert.alert(
-        'Add revenue first',
-        'Enter job revenue before marking this job paid.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Edit job', onPress: onEdit },
-        ],
-      );
-      return;
+    if (isCompletedOrPaidWorkStatus(next)) {
+      const prepared = await prepareCompletenessGatedStatus(next);
+      if (prepared === 'stopped') return;
+    } else {
+      setStatusActionPending(true);
     }
-    if (
-      next === 'completed' &&
-      financialCompletenessCtx &&
-      !isJobFinanciallyComplete(financialCompletenessCtx)
-    ) {
-      setMinimumInfoGateMounted(true);
-      setMinimumInfoGateVisible(true);
-      return;
-    }
-    setStatusActionPending(true);
     try {
       await updateJobStatusById(supabase, job.id, next);
       await refetchJob();
@@ -1124,24 +1359,29 @@ export function JobDetailScreen({
     } finally {
       setStatusActionPending(false);
     }
-  }, [job, statusActionPending, refetchJob, formatErrorMessage, maybeShowCompletionFeedbackPrompt, onEdit, financialCompletenessCtx]);
+  }, [
+    formatErrorMessage,
+    job,
+    maybeShowCompletionFeedbackPrompt,
+    prepareCompletenessGatedStatus,
+    refetchJob,
+    statusActionPending,
+  ]);
 
   const onSelectJobStatusFromSheet = useCallback(
     async (value: string) => {
       if (!job || statusActionPending) return;
       if (!isJobDetailWorkStatus(value)) return;
       const next = value;
-      if (
-        next === 'completed' &&
-        financialCompletenessCtx &&
-        !isJobFinanciallyComplete(financialCompletenessCtx)
-      ) {
-        closeStatusSheet();
-        setMinimumInfoGateMounted(true);
-        setMinimumInfoGateVisible(true);
-        return;
+      if (isCompletedOrPaidWorkStatus(next)) {
+        const prepared = await prepareCompletenessGatedStatus(next);
+        if (prepared === 'stopped') {
+          closeStatusSheet();
+          return;
+        }
+      } else {
+        setStatusActionPending(true);
       }
-      setStatusActionPending(true);
       try {
         await updateJobStatusById(supabase, job.id, next);
         await refetchJob();
@@ -1153,6 +1393,9 @@ export function JobDetailScreen({
           source: 'status_sheet',
         });
         if (job.workStatus !== 'completed' && next === 'completed') {
+          void maybeShowCompletionFeedbackPrompt();
+        }
+        if (job.workStatus !== 'completed' && job.workStatus !== 'paid' && next === 'paid') {
           void maybeShowCompletionFeedbackPrompt();
         }
       } catch (e) {
@@ -1171,7 +1414,15 @@ export function JobDetailScreen({
         setStatusActionPending(false);
       }
     },
-    [job, statusActionPending, refetchJob, formatErrorMessage, closeStatusSheet, maybeShowCompletionFeedbackPrompt, financialCompletenessCtx],
+    [
+      closeStatusSheet,
+      formatErrorMessage,
+      job,
+      maybeShowCompletionFeedbackPrompt,
+      prepareCompletenessGatedStatus,
+      refetchJob,
+      statusActionPending,
+    ],
   );
 
   const onSaveNewSession = useCallback(
@@ -1815,25 +2066,30 @@ export function JobDetailScreen({
 
   const performMarkJobCompleted = useCallback(async () => {
     if (!job) return;
+    const toStatus = pendingStatusAfterWizardRef.current;
     setStatusActionPending(true);
     try {
       const fromStatus = job.workStatus;
-      await updateJobStatusById(supabase, job.id, 'completed');
+      await updateJobStatusById(supabase, job.id, toStatus);
       await refetchJob();
       analytics.capture('job_status_changed', {
         job_id: job.id,
         from_status: fromStatus,
-        to_status: 'completed',
+        to_status: toStatus,
         source: 'primary_cta',
       });
-      if (fromStatus !== 'completed') {
+      if (
+        fromStatus !== 'completed' &&
+        fromStatus !== 'paid' &&
+        isCompletedOrPaidWorkStatus(toStatus)
+      ) {
         void maybeShowCompletionFeedbackPrompt();
       }
     } catch (e) {
       analytics.capture('job_status_change_failed', {
         job_id: job.id,
         from_status: job.workStatus,
-        attempted_status: 'completed',
+        attempted_status: toStatus,
         source: 'mark_complete_wizard',
         ...errorProperties(e),
       });
@@ -1842,6 +2098,7 @@ export function JobDetailScreen({
         formatErrorMessage(e) || 'Could not update job status.',
       );
     } finally {
+      pendingStatusAfterWizardRef.current = 'completed';
       setStatusActionPending(false);
       setMaterialWizardMode(false);
       setMaterialWizardError(undefined);
@@ -1854,6 +2111,22 @@ export function JobDetailScreen({
 
   const openMarkCompleteGap = useCallback(
     (gap: FinancialCompletenessGap) => {
+      if (useFullscreenEdit && job) {
+        switch (gap) {
+          case 'revenue':
+            openEditFromView('revenue', 'complete_wizard');
+            return;
+          case 'session':
+            openEditFromView('sessions', 'complete_wizard');
+            return;
+          case 'materials':
+            openEditFromView('materials', 'complete_wizard');
+            return;
+          case 'otherCosts':
+            openEditFromView('otherCosts', 'complete_wizard');
+            return;
+        }
+      }
       switch (gap) {
         case 'revenue':
           setEditJobRevenueError('Missing Revenue');
@@ -1891,7 +2164,7 @@ export function JobDetailScreen({
           break;
       }
     },
-    [],
+    [job, openEditFromView, useFullscreenEdit],
   );
 
   const advanceMarkCompleteWizard = useCallback(
@@ -1900,13 +2173,13 @@ export function JobDetailScreen({
       const ctx = jobFinancialContext(refreshedJob);
       const gaps = financialCompletenessGaps(ctx);
       if (gaps.length === 0) {
-        completeWizardActiveRef.current = false;
+        setCompleteWizardActive(false);
         void performMarkJobCompleted();
         return;
       }
       openMarkCompleteGap(gaps[0]);
     },
-    [openMarkCompleteGap, performMarkJobCompleted],
+    [openMarkCompleteGap, performMarkJobCompleted, setCompleteWizardActive],
   );
 
   useEffect(() => {
@@ -1915,12 +2188,13 @@ export function JobDetailScreen({
 
   const onConfirmMinimumInfo = useCallback(() => {
     if (!job) return;
-    completeWizardActiveRef.current = true;
+    setCompleteWizardActive(true);
     setMinimumInfoGateVisible(false);
     advanceMarkCompleteWizard(job);
-  }, [advanceMarkCompleteWizard, job]);
+  }, [advanceMarkCompleteWizard, job, setCompleteWizardActive]);
 
   const closeMinimumInfoGate = useCallback(() => {
+    pendingStatusAfterWizardRef.current = 'completed';
     setMinimumInfoGateVisible(false);
   }, []);
 
@@ -2315,12 +2589,14 @@ export function JobDetailScreen({
   }, [job, onCloseEditSheet, onRequestClose]);
 
   const leaveEditMode = useCallback(() => {
+    Keyboard.dismiss();
     setDetailMode('view');
+    setEditFocusTarget(null);
   }, []);
 
   const onBackFromEdit = useCallback(() => {
     if (editSavingRef.current) return;
-    if (editApi.dirty) {
+    if (editApi.isDirty()) {
       Alert.alert('Discard changes?', undefined, [
         { text: 'Keep editing', style: 'cancel' },
         {
@@ -2328,14 +2604,20 @@ export function JobDetailScreen({
           style: 'destructive',
           onPress: () => {
             editApi.discardDraft();
+            if (completeWizardActiveRef.current) {
+              cancelMarkCompleteWizard();
+            }
             leaveEditMode();
           },
         },
       ]);
       return;
     }
+    if (completeWizardActiveRef.current) {
+      cancelMarkCompleteWizard();
+    }
     leaveEditMode();
-  }, [editApi, leaveEditMode]);
+  }, [cancelMarkCompleteWizard, editApi, leaveEditMode]);
 
   useEffect(() => {
     if (!onAndroidHardwareBackHandlerChange) return;
@@ -2344,11 +2626,11 @@ export function JobDetailScreen({
       return;
     }
     onAndroidHardwareBackHandlerChange(() => {
-      onBackFromEdit();
+      editApi.requestBack(onBackFromEdit);
       return true;
     });
     return () => onAndroidHardwareBackHandlerChange(null);
-  }, [detailMode, onAndroidHardwareBackHandlerChange, onBackFromEdit]);
+  }, [detailMode, editApi, onAndroidHardwareBackHandlerChange, onBackFromEdit]);
 
   const onDoneFromEdit = useCallback(async () => {
     if (!job || editSavingRef.current) return;
@@ -2365,6 +2647,9 @@ export function JobDetailScreen({
       }
       leaveEditMode();
       invalidateJobsList();
+      if (completeWizardActiveRef.current && refreshed) {
+        advanceMarkCompleteWizard(refreshed);
+      }
       analytics.capture('job_saved', {
         job_id: job.id,
         changed_fields: ['job_detail_edit'],
@@ -2383,7 +2668,7 @@ export function JobDetailScreen({
       editSavingRef.current = false;
       setEditSaving(false);
     }
-  }, [editApi, invalidateJobsList, job, leaveEditMode]);
+  }, [advanceMarkCompleteWizard, editApi, invalidateJobsList, job, leaveEditMode]);
 
   const onDeleteJobFromEdit = useCallback(async () => {
     if (!job || editSavingRef.current) return;
@@ -2487,6 +2772,352 @@ export function JobDetailScreen({
   const bottomInset = insets.bottom;
   /** Match tab screens: minimal inset under the status bar (modal — no double padding). */
   const headerTopPad = Math.max(insets.top - space('Spacing/8'), 0);
+  const simplifiedView = useFullscreenEdit;
+  const incompletePills = incompletePillsForJobDetail(job);
+  const viewBodyOpacity = simplifiedView
+    ? modeProgress.interpolate({ inputRange: [0, 1], outputRange: [1, 0] })
+    : 1;
+  const editBodyOpacity = simplifiedView
+    ? modeProgress
+    : 0;
+  const editDoneDisabled = !editApi.validation.canDone || editSaving;
+  const wizardRemainingGaps =
+    markCompleteWizardActive && financialCompletenessCtx
+      ? financialCompletenessGaps(financialCompletenessCtx)
+      : [];
+  const editCommitLabel =
+    markCompleteWizardActive && detailMode === 'edit' && wizardRemainingGaps.length > 1
+      ? 'Next'
+      : 'Done';
+
+  const sharedTopHeader = (
+    <View style={styles.sharedTopHeader}>
+      <PlatformHeaderAction
+        accessibilityLabel="Close"
+        onPress={
+          detailMode === 'edit'
+            ? () => editApi.requestBack(onBackFromEdit)
+            : onClose
+        }
+        disabled={detailMode === 'edit' && editSaving}
+        style={detailMode === 'edit' && editSaving ? styles.controlDisabled : undefined}
+      >
+        <JobDetailIconTopClose color={fg.primary} />
+      </PlatformHeaderAction>
+      {detailMode === 'edit' ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={editCommitLabel}
+          disabled={editDoneDisabled}
+          onPress={() => {
+            editApi.requestDone(() => {
+              void onDoneFromEdit();
+            });
+          }}
+          style={({ pressed }) => [
+            styles.doneButton,
+            editDoneDisabled && styles.doneButtonDisabled,
+            pressed && !editDoneDisabled && styles.pressed,
+          ]}
+        >
+          {editSaving ? (
+            <ActivityIndicator color={bg.canvasWarm} size="small" />
+          ) : (
+            <Text style={[typography.pillCompact, styles.actionButtonLabelOnDark]}>
+              {editCommitLabel}
+            </Text>
+          )}
+        </Pressable>
+      ) : (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Edit job"
+          onPress={onEdit}
+          style={({ pressed }) => [styles.editButton, pressed && styles.pressed, styles.editButtonShared]}
+        >
+          <JobDetailIconTopEdit color={bg.canvasWarm} />
+          <Text style={[typography.pillCompact, styles.actionButtonLabelOnDark]}>EDIT</Text>
+        </Pressable>
+      )}
+    </View>
+  );
+
+  const viewScrollPaddingTop = simplifiedView
+    ? space('Spacing/8')
+    : Math.max(headerTopPad + space('Spacing/4') - space('Spacing/24'), 0) + 48;
+
+  const viewColumn = (
+    <View style={columnStyle}>
+      {simplifiedView ? null : (
+        <View style={[styles.topHeader, styles.topHeaderModal]}>
+          <View style={styles.topHeaderRow}>
+            <View style={styles.closeChromeOffset}>
+              <PlatformHeaderAction accessibilityLabel="Close" onPress={onClose}>
+                <JobDetailIconTopClose color={fg.primary} />
+              </PlatformHeaderAction>
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Edit job"
+              onPress={onEdit}
+              style={({ pressed }) => [styles.editButton, pressed && styles.pressed]}
+            >
+              <JobDetailIconTopEdit color={bg.canvasWarm} />
+              <Text style={[typography.pillCompact, styles.actionButtonLabelOnDark]}>EDIT</Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
+
+      <View style={styles.slot}>
+        <JobDetailJobHeader
+          title={job.shortDescription}
+          longDescription={job.longDescription}
+          customerName={job.customerName}
+          serviceAddress={job.serviceAddress}
+          lastWorkedLabel={job.lastWorkedLabel}
+          workStatus={job.workStatus}
+          typography={typography}
+          onTitlePress={
+            simplifiedView
+              ? () => openEditFromView('title', 'view_row')
+              : undefined
+          }
+          onCustomerPress={
+            simplifiedView
+              ? () => openEditFromView('customer', 'customer')
+              : undefined
+          }
+        />
+        <JobDetailSummaryCard
+          earnings={job.earnings}
+          typography={typography}
+          noRevenueConfirmed={job.noRevenueConfirmed}
+          onPress={simplifiedView ? () => openEditFromView('metrics', 'view_row') : undefined}
+        />
+        <JobDetailCtaRow
+          workStatus={job.workStatus}
+          typography={typography}
+          onPrimaryPress={() => {
+            void onPrimaryStatusCta();
+          }}
+          onMorePress={openStatusSheet}
+          MoreIcon={<JobDetailIconCtaMore color={fg.primary} />}
+          primaryDisabled={statusActionPending}
+          moreDisabled={statusActionPending}
+        />
+        {simplifiedView && incompletePills.length > 0 ? (
+          <Text style={[typography.bodySmall, styles.incompleteReasons]}>
+            {`Missing: ${incompletePills.join(', ')}`}
+          </Text>
+        ) : null}
+        <JobDetailMetricTertiary
+          metrics={job.metrics}
+          netEarningsCents={job.earnings.netEarningsCents}
+          typography={typography}
+        />
+      </View>
+
+      <SectionHeaderFigma
+        title="Sessions"
+        typography={typography}
+        showAdd={!simplifiedView}
+        onAddPress={openSessionChooser}
+      />
+      <View style={styles.sessionList}>
+        {visibleSessions.length === 0 ? (
+          <SectionEmptyStateCard
+            message={
+              job.inProgressSession ? 'Live session in progress' : 'No sessions recorded'
+            }
+            typography={typography}
+            onPress={
+              simplifiedView
+                ? () => openEditFromView('sessions', 'view_empty')
+                : undefined
+            }
+          />
+        ) : simplifiedView ? (
+          <ViewSessionsBuckets
+            sessions={visibleSessions}
+            typography={typography}
+            emphasizeCriticalEmpty
+            onCardPress={() => openEditFromView('sessions', 'view_row')}
+            onDeleteSession={onDeleteSessionFromView}
+          />
+        ) : (
+          visibleSessions.map((s) => (
+            <SessionCard
+              key={s.id}
+              session={s}
+              typography={typography}
+              expanded={expandedSessionId === s.id}
+              onToggle={() =>
+                setExpandedSessionId((prev) => (prev === s.id ? null : s.id))
+              }
+              onEditPress={() => openEditSession(s.id)}
+              onAddNote={() => openAddNoteForSession(s.id)}
+              onAddMaterial={() => openAddMaterialForSession(s.id)}
+              onPressAttachment={({ kind, id }) => {
+                if (kind === 'note') {
+                  openEditNote(id);
+                } else {
+                  openEditMaterial(id);
+                }
+              }}
+            />
+          ))
+        )}
+      </View>
+
+      <SectionHeaderFigma
+        title="Materials"
+        typography={typography}
+        showAdd={!simplifiedView}
+        onAddPress={openAddMaterial}
+      />
+      {job.materialBuckets.length === 0 ? (
+        simplifiedView ? (
+          <SectionEmptyStateCard
+            message={
+              job.noMaterialsConfirmed
+                ? 'No materials confirmed'
+                : 'No materials recorded'
+            }
+            typography={typography}
+            onPress={() => openEditFromView('materials', 'view_empty')}
+          />
+        ) : job.noMaterialsConfirmed ? (
+          <MaterialsConfirmedNoUseCard
+            typography={typography}
+            onUndo={onUndoNoMaterialsUsed}
+            undoDisabled={noMaterialsSaving}
+          />
+        ) : (
+          <MaterialsEmptyStateCard
+            typography={typography}
+            onConfirmNoMaterials={onConfirmNoMaterialsUsed}
+            confirmDisabled={noMaterialsSaving}
+          />
+        )
+      ) : (
+        <ViewMaterialsBuckets
+          buckets={job.materialBuckets}
+          typography={typography}
+          emphasizeCriticalEmpty={simplifiedView}
+          onCardPress={
+            simplifiedView ? () => openEditFromView('materials', 'view_row') : undefined
+          }
+          onDeleteMaterial={simplifiedView ? onDeleteMaterialFromView : undefined}
+          onMaterialPress={
+            simplifiedView
+              ? undefined
+              : (materialId) => {
+                  openEditMaterial(materialId);
+                }
+          }
+        />
+      )}
+
+      <SectionHeaderFigma
+        title="Other Costs"
+        typography={typography}
+        showAdd={!simplifiedView}
+        onAddPress={openAddOtherCost}
+      />
+      {job.otherCostBuckets.length === 0 ? (
+        simplifiedView ? (
+          <SectionEmptyStateCard
+            message={
+              job.noOtherCostsConfirmed
+                ? 'No other costs confirmed'
+                : 'No other costs recorded'
+            }
+            typography={typography}
+            onPress={() => openEditFromView('otherCosts', 'view_empty')}
+          />
+        ) : job.noOtherCostsConfirmed ? (
+          <OtherCostsConfirmedNoUseCard
+            typography={typography}
+            onUndo={onUndoNoOtherCosts}
+          />
+        ) : (
+          <OtherCostsEmptyStateCard
+            typography={typography}
+            onConfirmNoOtherCosts={onConfirmNoOtherCosts}
+          />
+        )
+      ) : (
+        <ViewOtherCostsBuckets
+          buckets={job.otherCostBuckets}
+          typography={typography}
+          emphasizeCriticalEmpty={simplifiedView}
+          onCardPress={
+            simplifiedView ? () => openEditFromView('otherCosts', 'view_row') : undefined
+          }
+          onDeleteOtherCost={simplifiedView ? onDeleteOtherCostFromView : undefined}
+          onOtherCostPress={
+            simplifiedView
+              ? undefined
+              : (otherCostId) => {
+                  openEditOtherCost(otherCostId);
+                }
+          }
+        />
+      )}
+
+      <SectionHeaderFigma
+        title="Notes"
+        typography={typography}
+        showAdd={!simplifiedView}
+        onAddPress={openAddNote}
+      />
+      {job.noteBuckets.length === 0 ? (
+        <SectionEmptyStateCard
+          message="No notes recorded"
+          typography={typography}
+          onPress={
+            simplifiedView ? () => openEditFromView('notes', 'view_empty') : undefined
+          }
+        />
+      ) : (
+        <ViewNotesBuckets
+          buckets={job.noteBuckets}
+          typography={typography}
+          readOnlyExpand={simplifiedView}
+          onCardPress={
+            simplifiedView ? () => openEditFromView('notes', 'view_row') : undefined
+          }
+          onDeleteNote={simplifiedView ? onDeleteNoteFromView : undefined}
+          onNotePress={simplifiedView ? undefined : openEditNote}
+          showNoteIcon={false}
+        />
+      )}
+    </View>
+  );
+
+  const viewScroll = (
+    <GHScrollView
+      waitFor={scrollAtTop ? jobDetailPanRef : undefined}
+      style={[styles.scroll, styles.scrollTransparent]}
+      onScroll={onJobDetailScroll}
+      onContentSizeChange={(_w, h) => setScrollContentHeight(h)}
+      scrollEventThrottle={16}
+      onScrollEndDrag={onScrollEndDragDismiss}
+      bounces={!!onRequestClose}
+      overScrollMode="never"
+      nestedScrollEnabled
+      contentContainerStyle={{
+        width: '100%',
+        paddingTop: viewScrollPaddingTop,
+        paddingBottom: space('Spacing/20') + bottomInset,
+        alignItems: 'stretch',
+      }}
+      keyboardShouldPersistTaps="handled"
+    >
+      {viewColumn}
+    </GHScrollView>
+  );
 
   return (
     <PanGestureHandler
@@ -2515,7 +3146,59 @@ export function JobDetailScreen({
         scrollY={scrollY}
         contentHeight={scrollContentHeight}
       />
-      {detailMode === 'edit' ? (
+      {simplifiedView ? (
+        <View style={styles.fullscreenEditHost} collapsable={false}>
+          <View
+            style={[
+              styles.sharedHeaderWrap,
+              columnStyle,
+              { paddingTop: headerTopPad + space('Spacing/4') },
+            ]}
+          >
+            {sharedTopHeader}
+          </View>
+          <View style={styles.bodyHost} collapsable={false}>
+            <Animated.View
+              style={[
+                detailMode === 'view' ? styles.bodyInFlow : styles.bodyInactive,
+                { opacity: viewBodyOpacity },
+              ]}
+              pointerEvents={detailMode === 'view' ? 'auto' : 'none'}
+              collapsable={false}
+            >
+              {viewScroll}
+            </Animated.View>
+            <Animated.View
+              style={[
+                detailMode === 'edit' ? styles.bodyInFlow : styles.bodyInactive,
+                { opacity: editBodyOpacity },
+              ]}
+              pointerEvents={detailMode === 'edit' ? 'auto' : 'none'}
+              collapsable={false}
+            >
+              <JobDetailEditMode
+                job={job}
+                typography={typography}
+                headerTopPad={headerTopPad}
+                bottomInset={bottomInset}
+                columnStyle={columnStyle}
+                saving={editSaving}
+                hideHeader
+                active={detailMode === 'edit'}
+                focusTarget={editFocusTarget}
+                onBack={onBackFromEdit}
+                onDone={() => {
+                  void onDoneFromEdit();
+                }}
+                onDeleteJob={() => {
+                  void onDeleteJobFromEdit();
+                }}
+                editApi={editApi}
+              />
+            </Animated.View>
+          </View>
+        </View>
+      ) : detailMode === 'edit' ? (
         <JobDetailEditMode
           job={job}
           typography={typography}
@@ -2533,190 +3216,7 @@ export function JobDetailScreen({
           editApi={editApi}
         />
       ) : (
-      <GHScrollView
-        waitFor={scrollAtTop ? jobDetailPanRef : undefined}
-        style={[styles.scroll, styles.scrollTransparent]}
-        onScroll={onJobDetailScroll}
-        onContentSizeChange={(_w, h) => setScrollContentHeight(h)}
-        scrollEventThrottle={16}
-        onScrollEndDrag={onScrollEndDragDismiss}
-        bounces={!!onRequestClose}
-        // Never rubber-band on Android modal — overscroll + pan exit looks like a double slide.
-        overScrollMode="never"
-        nestedScrollEnabled
-        contentContainerStyle={{
-          width: '100%',
-          paddingTop: Math.max(
-            headerTopPad + space('Spacing/4') - space('Spacing/24'),
-            0,
-          ) + 48,
-          paddingBottom: space('Spacing/20') + bottomInset,
-          alignItems: 'stretch',
-        }}
-        keyboardShouldPersistTaps="handled"
-      >
-        <View style={columnStyle}>
-        {/* `TopHeader` variant `X (Close &Edit)` (`231:858`) */}
-        <View style={[styles.topHeader, styles.topHeaderModal]}>
-          <View style={styles.topHeaderRow}>
-            <View style={styles.closeChromeOffset}>
-              <PlatformHeaderAction accessibilityLabel="Close" onPress={onClose}>
-                <JobDetailIconTopClose color={fg.primary} />
-              </PlatformHeaderAction>
-            </View>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Edit job"
-              onPress={onEdit}
-              style={({ pressed }) => [styles.editButton, pressed && styles.pressed]}
-            >
-              <JobDetailIconTopEdit color={bg.canvasWarm} />
-              <Text style={[typography.pillCompact, styles.actionButtonLabelOnDark]}>
-                EDIT
-              </Text>
-            </Pressable>
-          </View>
-        </View>
-
-        {/* Main column: job header, summary, CTAs, metric card. */}
-        <View style={styles.slot}>
-          <JobDetailJobHeader
-            title={job.shortDescription}
-            customerName={job.customerName}
-            serviceAddress={job.serviceAddress}
-            lastWorkedLabel={job.lastWorkedLabel}
-            workStatus={job.workStatus}
-            typography={typography}
-          />
-          <JobDetailSummaryCard
-            earnings={job.earnings}
-            typography={typography}
-          />
-          <JobDetailCtaRow
-            workStatus={job.workStatus}
-            typography={typography}
-            onPrimaryPress={() => {
-              void onPrimaryStatusCta();
-            }}
-            onMorePress={openStatusSheet}
-            MoreIcon={<JobDetailIconCtaMore color={fg.primary} />}
-            primaryDisabled={statusActionPending}
-            moreDisabled={statusActionPending}
-          />
-          <JobDetailMetricTertiary
-            metrics={job.metrics}
-            netEarningsCents={job.earnings.netEarningsCents}
-            typography={typography}
-          />
-        </View>
-
-        {/* Section headers are full-bleed within max width; ADD uses a compact primary button. */}
-        <SectionHeaderFigma
-          title="Sessions"
-          typography={typography}
-          showAdd
-          onAddPress={openSessionChooser}
-        />
-        <View style={styles.sessionList}>
-          {visibleSessions.length === 0 ? (
-            <SectionEmptyStateCard message="No sessions recorded." typography={typography} />
-          ) : (
-            visibleSessions.map((s) => (
-              <SessionCard
-                key={s.id}
-                session={s}
-                typography={typography}
-                expanded={expandedSessionId === s.id}
-                onToggle={() =>
-                  setExpandedSessionId((prev) => (prev === s.id ? null : s.id))
-                }
-                onEditPress={() => openEditSession(s.id)}
-                onAddNote={() => openAddNoteForSession(s.id)}
-                onAddMaterial={() => openAddMaterialForSession(s.id)}
-                onPressAttachment={({ kind, id }) => {
-                  if (kind === 'note') {
-                    openEditNote(id);
-                  } else {
-                    openEditMaterial(id);
-                  }
-                }}
-              />
-            ))
-          )}
-        </View>
-
-        <SectionHeaderFigma
-          title="Materials"
-          typography={typography}
-          showAdd
-          onAddPress={openAddMaterial}
-        />
-        {job.materialBuckets.length === 0 ? (
-          job.noMaterialsConfirmed ? (
-            <MaterialsConfirmedNoUseCard
-              typography={typography}
-              onUndo={onUndoNoMaterialsUsed}
-              undoDisabled={noMaterialsSaving}
-            />
-          ) : (
-            <MaterialsEmptyStateCard
-              typography={typography}
-              onConfirmNoMaterials={onConfirmNoMaterialsUsed}
-              confirmDisabled={noMaterialsSaving}
-            />
-          )
-        ) : (
-          <ViewMaterialsBuckets
-            buckets={job.materialBuckets}
-            typography={typography}
-            onMaterialPress={openEditMaterial}
-          />
-        )}
-
-        <SectionHeaderFigma
-          title="Other Costs"
-          typography={typography}
-          showAdd
-          onAddPress={openAddOtherCost}
-        />
-        {job.otherCostBuckets.length === 0 ? (
-          job.noOtherCostsConfirmed ? (
-            <OtherCostsConfirmedNoUseCard
-              typography={typography}
-              onUndo={onUndoNoOtherCosts}
-            />
-          ) : (
-            <OtherCostsEmptyStateCard
-              typography={typography}
-              onConfirmNoOtherCosts={onConfirmNoOtherCosts}
-            />
-          )
-        ) : (
-          <ViewOtherCostsBuckets
-            buckets={job.otherCostBuckets}
-            typography={typography}
-            onOtherCostPress={openEditOtherCost}
-          />
-        )}
-
-        <SectionHeaderFigma
-          title="Notes"
-          typography={typography}
-          showAdd
-          onAddPress={openAddNote}
-        />
-        {job.noteBuckets.length === 0 ? (
-          <SectionEmptyStateCard message="No notes recorded." typography={typography} />
-        ) : (
-          <ViewNotesBuckets
-            buckets={job.noteBuckets}
-            typography={typography}
-            onNotePress={openEditNote}
-            showNoteIcon={false}
-          />
-        )}
-        </View>
-      </GHScrollView>
+        viewScroll
       )}
 
       {editSheetMounted ? (
@@ -2866,10 +3366,12 @@ export function JobDetailScreen({
             }}
             materialError={materialWizardError}
             noneConfirmLabel={
-              materialWizardMode ? 'CONFIRM NO MATERIALS USED' : undefined
+              materialWizardMode && !useFullscreenEdit
+                ? 'CONFIRM NO MATERIALS USED'
+                : undefined
             }
             onNoneConfirmPress={
-              materialWizardMode
+              materialWizardMode && !useFullscreenEdit
                 ? () => {
                     void onConfirmNoMaterialsFromWizard();
                   }
@@ -2986,10 +3488,14 @@ export function JobDetailScreen({
             canAttachSession={chooserSessions.length > 0}
             otherCostError={otherCostWizardError}
             noneConfirmLabel={
-              otherCostWizardMode ? 'CONFIRM NO OTHER COSTS' : undefined
+              otherCostWizardMode && !useFullscreenEdit
+                ? 'CONFIRM NO OTHER COSTS'
+                : undefined
             }
             onNoneConfirmPress={
-              otherCostWizardMode ? onConfirmNoOtherCostsFromWizard : undefined
+              otherCostWizardMode && !useFullscreenEdit
+                ? onConfirmNoOtherCostsFromWizard
+                : undefined
             }
             onClose={closeOtherCostFlow}
             onClosed={() => {
@@ -3072,15 +3578,30 @@ export function JobDetailScreen({
 function SectionEmptyStateCard({
   message,
   typography,
+  onPress,
 }: {
   message: string;
   typography: TextStyles;
+  onPress?: () => void;
 }) {
+  const inner = (
+    <View style={[styles.viewCardBorder, cardShadowRn, styles.sectionEmptyCardPad]}>
+      <Text style={[typography.body, { color: fg.secondary, textAlign: 'center' }]}>{message}</Text>
+    </View>
+  );
   return (
     <View style={styles.viewCardOuter}>
-      <View style={[styles.viewCardBorder, cardShadowRn, styles.sectionEmptyCardPad]}>
-        <Text style={[typography.body, { color: fg.secondary, textAlign: 'center' }]}>{message}</Text>
-      </View>
+      {onPress ? (
+        <Pressable
+          accessibilityRole="button"
+          onPress={onPress}
+          style={({ pressed }) => [pressed && styles.pressed]}
+        >
+          {inner}
+        </Pressable>
+      ) : (
+        inner
+      )}
     </View>
   );
 }
@@ -3099,7 +3620,7 @@ function MaterialsEmptyStateCard({
     <View style={styles.viewCardOuter}>
       <View style={[styles.viewCardBorder, cardShadowRn, styles.materialsEmptyCardPad]}>
         <Text style={[typography.body, { color: fg.secondary, textAlign: 'center' }]}>
-          No materials recorded.
+          No materials recorded
         </Text>
         <Pressable
           accessibilityRole="button"
@@ -3177,7 +3698,7 @@ function OtherCostsEmptyStateCard({
     <View style={styles.viewCardOuter}>
       <View style={[styles.viewCardBorder, cardShadowRn, styles.materialsEmptyCardPad]}>
         <Text style={[typography.body, { color: fg.secondary, textAlign: 'center' }]}>
-          No other costs recorded.
+          No other costs recorded
         </Text>
         <Pressable
           accessibilityRole="button"
@@ -3282,7 +3803,7 @@ function SectionHeaderFigma({
 
 // `ViewMaterialsBuckets` / `ViewNotesBuckets` and the `bucketSessionHeaderTitle`
 // helper now live in `components/ds/ViewActivityBuckets` so the Inbox can reuse
-// the same UNASSIGNED card + rows.
+// the same Job / session card + rows.
 
 // Bottom chrome is the shell NativeTabs + PrimaryActionOverlay (Slack dock removed).
 
@@ -3352,6 +3873,56 @@ const styles = StyleSheet.create({
     backgroundColor: fg.primary,
     marginTop: space('Spacing/12'),
     ...cardShadowRn,
+  },
+  editButtonShared: {
+    marginTop: 0,
+  },
+  sharedTopHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: space('Spacing/4'),
+    width: '100%',
+  },
+  sharedHeaderWrap: {
+    width: '100%',
+    alignSelf: 'center',
+  },
+  fullscreenEditHost: {
+    flex: 1,
+    zIndex: 1,
+  },
+  bodyHost: {
+    flex: 1,
+    position: 'relative',
+  },
+  bodyInFlow: {
+    flex: 1,
+  },
+  /** Inactive crossfade pane — overlay so it does not stack and split height. */
+  bodyInactive: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  doneButton: {
+    minHeight: 44,
+    minWidth: 44,
+    paddingHorizontal: space('Spacing/16'),
+    paddingVertical: space('Spacing/8'),
+    borderRadius: radius('Radius/12'),
+    backgroundColor: color('Brand/Primary'),
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...cardShadowRn,
+  },
+  doneButtonDisabled: {
+    opacity: 0.45,
+  },
+  controlDisabled: {
+    opacity: 0.45,
+  },
+  incompleteReasons: {
+    color: color('Semantic/Status/Error/Text'),
+    width: '100%',
   },
   actionButtonLabel: {
     color: fg.primary,

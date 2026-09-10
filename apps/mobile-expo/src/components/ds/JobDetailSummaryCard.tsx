@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { color, radius, space } from '@fieldsolo/design-system/lib/tokens';
 import type { JobDetailViewModel } from '@fieldsolo/shared-types';
 
@@ -13,9 +13,13 @@ import type { TextStyles } from '../../theme/nativeTokens';
 export function JobDetailSummaryCard({
   earnings,
   typography,
+  onPress,
+  noRevenueConfirmed,
 }: {
   earnings: JobDetailViewModel['earnings'];
   typography: TextStyles;
+  onPress?: () => void;
+  noRevenueConfirmed?: boolean;
 }) {
   const netTone =
     earnings.netEarningsCents >= 0
@@ -29,13 +33,16 @@ export function JobDetailSummaryCard({
   const materialsDisplay = `-${formatUsdCombined(Math.abs(earnings.materialsCents))}`;
   const otherCostsDisplay = `-${formatUsdCombined(Math.abs(earnings.otherCostsCents))}`;
 
-  return (
-    <View style={styles.cardOuter}>
-      <View style={styles.summaryStack}>
+  const content = (
+    <View style={styles.summaryStack}>
       <View style={styles.summaryRow}>
         <Text style={[typography.body, { color: fg.secondary, flex: 1 }]}>Revenue</Text>
         <Text style={[typography.bodyBold, styles.summaryMoney]}>
-          {earnings.revenueCents == null ? '—' : formatUsdCombined(earnings.revenueCents)}
+          {noRevenueConfirmed
+            ? formatUsdCombined(0)
+            : earnings.revenueCents != null && earnings.revenueCents > 0
+              ? formatUsdCombined(earnings.revenueCents)
+              : '—'}
         </Text>
       </View>
       <View style={styles.summaryRow}>
@@ -65,8 +72,22 @@ export function JobDetailSummaryCard({
         </Text>
       </View>
     </View>
-    </View>
   );
+
+  if (onPress) {
+    return (
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Edit earnings"
+        onPress={onPress}
+        style={({ pressed }) => [styles.cardOuter, pressed && styles.pressed]}
+      >
+        {content}
+      </Pressable>
+    );
+  }
+
+  return <View style={styles.cardOuter}>{content}</View>;
 }
 
 const styles = StyleSheet.create({
@@ -103,4 +124,5 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: border.subtle,
   },
+  pressed: { opacity: 0.75 },
 });

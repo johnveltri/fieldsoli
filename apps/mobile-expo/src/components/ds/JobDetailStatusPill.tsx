@@ -51,8 +51,9 @@ export function JobDetailStatusPill({
 const styles = StyleSheet.create({
   pillOuter: {
     borderRadius: radius('Radius/Full'),
-    paddingHorizontal: space('Spacing/8'),
+    paddingLeft: 0,
+    paddingRight: space('Spacing/8'),
     paddingBottom: space('Spacing/6'),
-    alignItems: 'flex-end',
+    alignItems: 'flex-start',
   },
 });

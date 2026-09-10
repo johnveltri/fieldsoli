@@ -1,4 +1,4 @@
-import { Children, createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, type RefObject } from 'react';
+import { Children, createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import {
   Dimensions,
   Keyboard,
@@ -14,11 +14,11 @@ import { radius, space } from '@fieldsolo/design-system/lib/tokens';
 
 import { bg, border, fg } from '../../../theme/nativeTokens';
 import type { TextStyles } from '../../../theme/nativeTokens';
+import { JOB_SHORT_DESCRIPTION_MAX_LENGTH } from '@fieldsolo/shared-types';
 
 export const EDIT_ICON_SLOT = 28;
 
-/**
- * Body line height from `Typography/Body` (16px @ 140% → 22). Used only for
+/** Body line height from `Typography/Body` (16px @ 140% → 22). Used only for
  * minimum tap-target sizing — never set as a fixed `height` on Text/TextInput
  * (RN pins glyphs to the bottom of a fixed height box and misaligns icons).
  */
@@ -76,9 +76,13 @@ type EditKeyboardScrollContextValue = {
   ) => void;
   /** Queue dock scroll for keyboardDidShow only (tall notes with dockRef). */
   requestEntityDockScroll: (scroll: () => void, waitForKeyboard?: boolean) => void;
+  /** Clears dock hold, pending scrolls, and native keyboard-scroll suppression. */
+  resetKeyboardScrollState: () => void;
 };
 
 const EditKeyboardScrollContext = createContext<EditKeyboardScrollContextValue | null>(null);
+
+export { EditKeyboardScrollContext };
 
 type ScrollEntityBlock = (
   waitForKeyboard?: boolean,
@@ -156,12 +160,15 @@ export function EditKeyboardScrollProvider({
   scrollViewRef,
   scrollContentRef,
   scrollYRef,
+  active = true,
   children,
   offset = EDIT_KEYBOARD_SCROLL_OFFSET,
 }: {
   scrollViewRef: RefObject<ScrollView | null>;
   scrollContentRef: RefObject<View | null>;
   scrollYRef: RefObject<number>;
+  /** When false, dismisses the keyboard and clears dock / pending scroll state. */
+  active?: boolean;
   children: ReactNode;
   offset?: number;
 }) {
@@ -179,6 +186,19 @@ export function EditKeyboardScrollProvider({
       entityDockScrollYRef.current = null;
     }
   }, []);
+
+  const resetKeyboardScrollState = useCallback(() => {
+    suppressNativeKeyboardScrollRef.current = false;
+    entityDockScrollYRef.current = null;
+    pendingEntityScrollRef.current = null;
+    pendingEntityDidShowScrollRef.current = null;
+  }, []);
+
+  useEffect(() => {
+    if (active) return;
+    Keyboard.dismiss();
+    resetKeyboardScrollState();
+  }, [active, resetKeyboardScrollState]);
 
   const guardEntityDockScroll = useCallback(
     (contentOffsetY: number) => {
@@ -307,11 +327,13 @@ export function EditKeyboardScrollProvider({
       guardEntityDockScroll,
       requestEntityBlockScroll,
       requestEntityDockScroll,
+      resetKeyboardScrollState,
     }),
     [
       guardEntityDockScroll,
       requestEntityBlockScroll,
       requestEntityDockScroll,
+      resetKeyboardScrollState,
       scrollCaretLeadIntoView,
       scrollContentRef,
       scrollInputIntoView,
@@ -453,20 +475,59 @@ export function EditSheet({ children }: { children: ReactNode }) {
 export function EditTitleField({
   typography,
   onFocus,
+  maxLength = JOB_SHORT_DESCRIPTION_MAX_LENGTH,
   ...props
 }: React.ComponentProps<typeof TextInput> & { typography: TextStyles }) {
   const scroll = useContext(EditKeyboardScrollContext);
 
   return (
-    <TextInput
-      placeholderTextColor={fg.secondary}
-      style={[typography.titleH3, styles.titleInput]}
-      onFocus={(event) => {
-        scroll?.scrollInputIntoView(event.nativeEvent.target);
-        onFocus?.(event);
-      }}
-      {...props}
-    />
+    // Outer inset + inner clip: iOS TextInput intrinsic width follows the full
+    // string and paints through padding into the sheet edge unless clipped in a
+    // width-bounded view that is already inset from the pill.
+    <View style={styles.titleFieldWrap}>
+      <View style={styles.titleFieldClip}>
+        <TextInput
+          placeholderTextColor={fg.secondary}
+          style={[typography.titleH3, styles.titleInput]}
+          // iOS defaults to word-wrapping when paragraph styles (e.g. lineHeight) are
+          // set, so long titles stop early with empty trailing space until focused.
+          // Clip matches the focused single-line edge (partial word visible).
+          lineBreakModeIOS="clip"
+          numberOfLines={1}
+          maxLength={maxLength}
+          onFocus={(event) => {
+            scroll?.scrollInputIntoView(event.nativeEvent.target);
+            onFocus?.(event);
+          }}
+          {...props}
+        />
+      </View>
+    </View>
+  );
+}
+
+/**
+ * Optional long description under the title — same multiline field as notes.
+ */
+export function EditDescriptionField({
+  typography,
+  style,
+  ...props
+}: React.ComponentProps<typeof TextInput> & { typography: TextStyles }) {
+  const dockRef = useRef<View>(null);
+
+  return (
+    <EditEntityBlockScope dockRef={dockRef}>
+      <View ref={dockRef} collapsable={false} style={styles.descriptionFieldWrap}>
+        <EditFieldInput
+          typography={typography}
+          multiline
+          placeholder="Description"
+          style={[styles.descriptionInput, style]}
+          {...props}
+        />
+      </View>
+    </EditEntityBlockScope>
   );
 }
 
@@ -522,6 +583,7 @@ export function EditFieldInput({
   style,
   opticalNudgeY,
   value,
+  placeholder,
   ...props
 }: React.ComponentProps<typeof TextInput> & {
   typography: TextStyles;
@@ -532,53 +594,132 @@ export function EditFieldInput({
   const scroll = useContext(EditKeyboardScrollContext);
   const scrollEntityBlock = useContext(EditEntityBlockContext);
   const iosNudgeY = opticalNudgeY ?? EDIT_FIELD_INPUT_OPTICAL_NUDGE_Y;
-  const caretScreenYRef = useRef<number | null>(null);
 
-  const input = (
+  if (multiline) {
+    return (
+      <EditMultilineField
+        typography={typography}
+        value={value}
+        placeholder={placeholder}
+        onFocus={onFocus}
+        onBlur={onBlur}
+        style={style}
+        {...props}
+      />
+    );
+  }
+
+  return (
     <TextInput
       placeholderTextColor={fg.secondary}
-      multiline={multiline}
       value={value}
+      placeholder={placeholder}
       style={[
         typography.body,
         styles.fieldInput,
-        !multiline && Platform.OS === 'ios' && { transform: [{ translateY: iosNudgeY }] },
-        multiline && styles.fieldInputMultiline,
+        Platform.OS === 'ios' && { transform: [{ translateY: iosNudgeY }] },
         align === 'right' && styles.fieldInputRight,
         style,
       ]}
-      onPressIn={
-        multiline
-          ? (event) => {
-              caretScreenYRef.current = event.nativeEvent.pageY;
-            }
-          : undefined
-      }
       onFocus={(event) => {
         const nativeTarget = event.nativeEvent.target;
         if (scrollEntityBlock) {
-          scrollEntityBlock(true, nativeTarget, caretScreenYRef.current ?? undefined);
+          scrollEntityBlock(true, nativeTarget);
         } else {
           scroll?.scrollInputIntoView(nativeTarget);
         }
         onFocus?.(event);
       }}
-      onBlur={(event) => {
-        caretScreenYRef.current = null;
-        if (scrollEntityBlock && multiline) {
-          scroll?.setSuppressNativeKeyboardScroll(false);
-        }
-        onBlur?.(event);
-      }}
+      onBlur={onBlur}
       {...props}
-      scrollEnabled={multiline ? (props.scrollEnabled ?? false) : props.scrollEnabled}
-      nestedScrollEnabled={false}
     />
   );
+}
 
-  if (!multiline) return input;
+/**
+ * iOS UITextView paints wrapped glyphs in these rows when scrolling is enabled,
+ * but the edit page should own scrolling. A hidden `Text` sizer plus content
+ * size keeps the input frame as tall as the text so the native view has
+ * nothing to scroll inside.
+ */
+function EditMultilineField({
+  typography,
+  onFocus,
+  onBlur,
+  style,
+  value,
+  placeholder,
+  ...props
+}: Omit<React.ComponentProps<typeof TextInput>, 'multiline'> & { typography: TextStyles }) {
+  const scroll = useContext(EditKeyboardScrollContext);
+  const scrollEntityBlock = useContext(EditEntityBlockContext);
+  const caretScreenYRef = useRef<number | null>(null);
+  const [sizerHeight, setSizerHeight] = useState(EDIT_BODY_LINE_HEIGHT);
+  const [contentHeight, setContentHeight] = useState(EDIT_BODY_LINE_HEIGHT);
+  const hasValue = typeof value === 'string' && value.length > 0;
+  const shown = hasValue ? value : placeholder && placeholder.length > 0 ? placeholder : ' ';
+  const boxHeight = Math.max(EDIT_BODY_LINE_HEIGHT, sizerHeight, contentHeight);
 
-  return <View style={styles.fieldInputMultilineWrap}>{input}</View>;
+  return (
+    <View style={[styles.fieldInputMultilineWrap, { minHeight: boxHeight }]}>
+      <Text
+        pointerEvents="none"
+        accessible={false}
+        importantForAccessibility="no-hide-descendants"
+        onLayout={(event) => {
+          const next = Math.round(event.nativeEvent.layout.height);
+          if (next > 0) setSizerHeight((prev) => (prev === next ? prev : next));
+        }}
+        style={[
+          typography.body,
+          styles.multilineVisibleText,
+          !hasValue && styles.multilinePlaceholder,
+          style,
+          { opacity: 0 },
+        ]}
+      >
+        {shown}
+      </Text>
+      <TextInput
+        placeholderTextColor={fg.secondary}
+        {...props}
+        value={value}
+        placeholder={placeholder}
+        multiline
+        scrollEnabled
+        blurOnSubmit={false}
+        submitBehavior="newline"
+        textAlignVertical="top"
+        style={[
+          typography.body,
+          styles.multilineOverlayInput,
+          style,
+          { height: boxHeight, color: fg.primary },
+        ]}
+        onPressIn={(event) => {
+          caretScreenYRef.current = event.nativeEvent.pageY;
+        }}
+        onContentSizeChange={(event) => {
+          const next = Math.ceil(event.nativeEvent.contentSize.height);
+          if (next > 0) setContentHeight((prev) => (prev === next ? prev : next));
+        }}
+        onFocus={(event) => {
+          const nativeTarget = event.nativeEvent.target;
+          if (scrollEntityBlock) {
+            scrollEntityBlock(true, nativeTarget, caretScreenYRef.current ?? undefined);
+          } else {
+            scroll?.scrollInputIntoView(nativeTarget);
+          }
+          onFocus?.(event);
+        }}
+        onBlur={(event) => {
+          caretScreenYRef.current = null;
+          scroll?.setSuppressNativeKeyboardScroll(false);
+          onBlur?.(event);
+        }}
+      />
+    </View>
+  );
 }
 
 /** Quantity | UOM | unit price — 25 / 25 / 50 on one row. */
@@ -813,6 +954,56 @@ export function EditAddRow({
   );
 }
 
+/** Checkbox row for confirming no materials / no other costs (Edit cards). */
+export function EditConfirmNoneRow({
+  typography,
+  confirmed,
+  confirmLabel,
+  confirmedLabel,
+  onToggle,
+  showTopBorder = true,
+  disabled = false,
+}: {
+  typography: TextStyles;
+  confirmed: boolean;
+  confirmLabel: string;
+  confirmedLabel: string;
+  onToggle: () => void;
+  showTopBorder?: boolean;
+  disabled?: boolean;
+}) {
+  const label = confirmed ? confirmedLabel : confirmLabel;
+  return (
+    <Pressable
+      accessibilityRole="checkbox"
+      accessibilityState={{ checked: confirmed, disabled }}
+      accessibilityLabel={label}
+      disabled={disabled}
+      onPress={onToggle}
+      style={[styles.iconRow, styles.addRow, showTopBorder && editSheetRowSeparator]}
+    >
+      <View style={styles.iconSlot}>
+        <View style={styles.iconFrame}>
+          <View style={[styles.confirmCheckbox, confirmed && styles.confirmCheckboxChecked]}>
+            {confirmed ? <Text style={styles.confirmCheckboxMark}>✓</Text> : null}
+          </View>
+        </View>
+      </View>
+      <View style={styles.iconContent}>
+        <Text
+          style={[
+            typography.body,
+            editRowText,
+            { color: confirmed ? fg.primary : fg.secondary },
+          ]}
+        >
+          {label}
+        </Text>
+      </View>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
   sheet: {
     backgroundColor: bg.surfaceWhite,
@@ -820,11 +1011,30 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     marginTop: space('Spacing/12'),
   },
-  titleInput: {
-    color: fg.primary,
+  titleFieldWrap: {
     paddingHorizontal: space('Spacing/16'),
     paddingVertical: space('Spacing/12'),
     minHeight: 52,
+    justifyContent: 'center',
+  },
+  titleFieldClip: {
+    width: '100%',
+    overflow: 'hidden',
+  },
+  titleInput: {
+    color: fg.primary,
+    padding: 0,
+    margin: 0,
+    width: '100%',
+  },
+  descriptionFieldWrap: {
+    alignSelf: 'stretch',
+    width: '100%',
+    paddingHorizontal: space('Spacing/16'),
+    paddingBottom: space('Spacing/12'),
+  },
+  descriptionInput: {
+    minHeight: EDIT_BODY_LINE_HEIGHT,
   },
   iconRow: {
     flexDirection: 'row',
@@ -858,22 +1068,52 @@ const styles = StyleSheet.create({
     includeFontPadding: false,
     ...(Platform.OS === 'android' ? { textAlignVertical: 'center' as const } : null),
   },
-  fieldInputMultiline: {
-    height: undefined,
-    minHeight: EDIT_BODY_LINE_HEIGHT,
-    textAlignVertical: 'top',
-    alignSelf: 'stretch',
-    maxWidth: '100%',
-    flexShrink: 1,
-  },
   fieldInputMultilineWrap: {
-    alignSelf: 'stretch',
+    position: 'relative',
     width: '100%',
-    maxWidth: '100%',
-    overflow: 'hidden',
+  },
+  multilineVisibleText: {
+    color: fg.primary,
+    padding: 0,
+    margin: 0,
+    width: '100%',
+    includeFontPadding: false,
+  },
+  multilinePlaceholder: {
+    color: fg.secondary,
+  },
+  multilineOverlayInput: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    right: 0,
+    padding: 0,
+    margin: 0,
+    includeFontPadding: false,
+    textAlignVertical: 'top',
   },
   addRow: {
     alignItems: 'center',
+  },
+  confirmCheckbox: {
+    width: 20,
+    height: 20,
+    borderWidth: 1,
+    borderColor: border.subtle,
+    borderRadius: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: bg.surfaceWhite,
+  },
+  confirmCheckboxChecked: {
+    backgroundColor: fg.primary,
+    borderColor: fg.primary,
+  },
+  confirmCheckboxMark: {
+    color: bg.surfaceWhite,
+    fontSize: 12,
+    lineHeight: 14,
+    fontWeight: '700',
   },
   fieldInputRight: {
     textAlign: 'right',

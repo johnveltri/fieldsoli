@@ -1,32 +1,56 @@
 import type { JobDetailViewModel } from '@fieldsolo/shared-types';
 
+import {
+  isMaterialUsableForCompleteness,
+  isOtherCostUsableForCompleteness,
+  isSessionUsableForCompleteness,
+} from './jobDetailRowHealth';
+
 export type JobFinancialCompletenessContext = {
   job: JobDetailViewModel;
 };
 
 export type FinancialCompletenessGap = 'revenue' | 'session' | 'materials' | 'otherCosts';
 
-function hasNamedJob(job: JobDetailViewModel): boolean {
-  const title = job.shortDescription.trim();
-  return title.length > 0 && title !== 'Untitled Job';
+function hasUsableSession(job: JobDetailViewModel): boolean {
+  return job.inProgressSession != null || job.displaySessions.some(isSessionUsableForCompleteness);
+}
+
+function hasUsableMaterial(job: JobDetailViewModel): boolean {
+  return job.materialBuckets.some((bucket) =>
+    bucket.items.some(isMaterialUsableForCompleteness),
+  );
+}
+
+function hasUsableOtherCost(job: JobDetailViewModel): boolean {
+  return job.otherCostBuckets.some((bucket) =>
+    bucket.items.some(isOtherCostUsableForCompleteness),
+  );
 }
 
 function hasMaterialsComplete(job: JobDetailViewModel): boolean {
-  const hasMaterials = job.materialBuckets.some((bucket) => bucket.items.length > 0);
-  return hasMaterials || job.noMaterialsConfirmed;
+  return hasUsableMaterial(job) || job.noMaterialsConfirmed;
 }
 
 function hasOtherCostsComplete(job: JobDetailViewModel): boolean {
-  const hasOtherCosts = job.otherCostBuckets.some((bucket) => bucket.items.length > 0);
-  return hasOtherCosts || job.noOtherCostsConfirmed;
+  return hasUsableOtherCost(job) || job.noOtherCostsConfirmed;
+}
+
+function hasRevenueComplete(job: {
+  revenueCents?: number | null;
+  noRevenueConfirmed: boolean;
+}): boolean {
+  return (job.revenueCents ?? 0) > 0 || job.noRevenueConfirmed;
 }
 
 export function isJobFinanciallyComplete(ctx: JobFinancialCompletenessContext): boolean {
   const { job } = ctx;
   return (
-    hasNamedJob(job) &&
-    (job.earnings.revenueCents ?? 0) > 0 &&
-    job.metrics.sessionCount > 0 &&
+    hasRevenueComplete({
+      revenueCents: job.earnings.revenueCents,
+      noRevenueConfirmed: job.noRevenueConfirmed,
+    }) &&
+    hasUsableSession(job) &&
     hasMaterialsComplete(job) &&
     hasOtherCostsComplete(job)
   );
@@ -38,10 +62,15 @@ export function financialCompletenessGaps(
 ): FinancialCompletenessGap[] {
   const { job } = ctx;
   const gaps: FinancialCompletenessGap[] = [];
-  if (!hasNamedJob(job) || (job.earnings.revenueCents ?? 0) <= 0) {
+  if (
+    !hasRevenueComplete({
+      revenueCents: job.earnings.revenueCents,
+      noRevenueConfirmed: job.noRevenueConfirmed,
+    })
+  ) {
     gaps.push('revenue');
   }
-  if (job.metrics.sessionCount <= 0) {
+  if (!hasUsableSession(job)) {
     gaps.push('session');
   }
   if (!hasMaterialsComplete(job)) {
@@ -53,20 +82,43 @@ export function financialCompletenessGaps(
   return gaps;
 }
 
-export function jobCostsIncompleteForListPill(job: {
+export function incompletePillsForJobDetail(job: JobDetailViewModel): string[] {
+  const pills: string[] = [];
+  if (
+    !hasRevenueComplete({
+      revenueCents: job.earnings.revenueCents,
+      noRevenueConfirmed: job.noRevenueConfirmed,
+    })
+  ) {
+    pills.push('revenue');
+  }
+  if (!hasUsableSession(job)) pills.push('sessions');
+  if (!hasMaterialsComplete(job)) pills.push('materials');
+  if (!hasOtherCostsComplete(job)) pills.push('costs');
+  return pills;
+}
+
+/** List-row adapter for `incompletePillsForJobDetail`. */
+export function incompletePillsForListJob(job: {
+  revenueCents: number | null;
+  noRevenueConfirmed: boolean;
   hasMaterials: boolean;
   noMaterialsConfirmed: boolean;
   hasOtherCosts: boolean;
   noOtherCostsConfirmed: boolean;
-}): boolean {
-  const materialsIncomplete = !job.hasMaterials && !job.noMaterialsConfirmed;
-  const otherIncomplete = !job.hasOtherCosts && !job.noOtherCostsConfirmed;
-  return materialsIncomplete || otherIncomplete;
+  hasSessions: boolean;
+}): string[] {
+  const pills: string[] = [];
+  if (!hasRevenueComplete(job)) pills.push('revenue');
+  if (!job.hasSessions) pills.push('sessions');
+  if (!job.hasMaterials && !job.noMaterialsConfirmed) pills.push('materials');
+  if (!job.hasOtherCosts && !job.noOtherCostsConfirmed) pills.push('costs');
+  return pills;
 }
 
 export function isCompletedOrPaidWorkStatus(
   status: JobDetailViewModel['workStatus'],
-): boolean {
+): status is 'completed' | 'paid' {
   return status === 'completed' || status === 'paid';
 }
 

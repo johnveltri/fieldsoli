@@ -81,16 +81,14 @@ export function JobCard({
       >
         <View style={styles.jobCardRail} />
         <View style={styles.jobCardContent}>
-          <View style={styles.jobHeaderRow}>
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={[typography.titleH3, { color: fg.primary }]}>{job.shortDescription}</Text>
-              <Text style={[typography.bodySmall, { color: fg.secondary, marginTop: space('Spacing/4') }]}>
-                {(job.customerName || 'No customer').trim()} {'\u2022'} {recencySuffix}
-              </Text>
-            </View>
+          <View style={styles.jobHeaderBlock}>
             <View style={styles.statusPillWrap}>
               <JobDetailStatusPill kind={job.workStatus} typography={typography} />
             </View>
+            <Text style={[typography.titleH3, { color: fg.primary }]}>{job.shortDescription}</Text>
+            <Text style={[typography.bodySmall, { color: fg.secondary }]}>
+              {(job.customerName || 'No customer').trim()} {'\u2022'} {recencySuffix}
+            </Text>
           </View>
 
           {incompletePills != null && incompletePills.length > 0 ? (
@@ -171,15 +169,13 @@ const styles = StyleSheet.create({
     paddingVertical: space('Spacing/24'),
     gap: space('Spacing/16'),
   },
-  jobHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    gap: space('Spacing/8'),
+  jobHeaderBlock: {
+    width: '100%',
+    gap: space('Spacing/4'),
   },
   statusPillWrap: {
-    flexShrink: 0,
-    alignItems: 'flex-end',
+    width: '100%',
+    alignItems: 'flex-start',
   },
   incompleteReasons: {
     color: color('Semantic/Status/Error/Text'),

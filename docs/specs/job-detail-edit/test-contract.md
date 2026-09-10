@@ -16,6 +16,7 @@
 | Lost apply response makes retry fail | High | Medium | Execute identical RPC create payload twice |
 | Flag outage strands or exposes the new entry point | High | Medium | Enabled, disabled, HTTP error, and timeout fallback tests |
 | Conflicting Back/Delete during apply | High | Medium | Deferred apply component tests; controls and handlers remain inert |
+| Focused numeric text bypasses dirty Back or survives discard | High | Medium | Back flushes buffers before dirty check; discard resyncs mounted fields |
 
 ## Traceability matrix
 
@@ -27,7 +28,7 @@
 | TEST-04 | REQ-04, STATE-03→04 | Dirty Back shows discard copy | UX-04..06 | Component | Automated | Jest |
 | TEST-05 | REQ-04, STATE-04 | Confirm discard; View/title unchanged vs pre-edit | Apply RPC not called | Component | Automated | Jest |
 | TEST-06 | REQ-05, STATE-05 | Done on dirty draft calls apply RPC once then fetchJobDetail | View shows new title | Component + API mock | Automated | Jest |
-| TEST-07 | REQ-05, DATA apply atomic | RPC aborts mid-payload (forced) | Zero net row changes | DB | Automated | Local Supabase or SQL test |
+| TEST-07 | REQ-05, DATA apply atomic | RPC aborts mid-payload after confirmation updates (forced) | Zero net job, confirmation, or child-row changes | DB | Automated | Local Supabase or SQL test |
 | TEST-08 | REQ-06 | Blank title disables Done; completely empty new rows are omitted; non-empty partial session/material/other-cost rows persist; blank new note is omitted and cleared existing note deletes | Payload and validation match capture-now rules | Unit + component | Automated | Jest |
 | TEST-09 | REQ-07, DATA-05, DATA-06 | Duration-only session persists `clock_times_explicit=false` and synthesized 09:00–end | DB row matches | Unit (synthesis) + DB | Automated | Jest + SQL |
 | TEST-10 | REQ-07, DATA-06 | fetchJobDetail/mapSession: `clockTimesExplicit=false` → no time range in View row | Duration + date only | Unit + component | Automated | Jest |
@@ -41,7 +42,7 @@
 | TEST-18 | REQ-15, DATA auth | Other user job id | RPC unauthorized / not_found; no writes | DB | Automated | SQL as second user or RLS |
 | TEST-19 | UX-01, UX-02, UX-04, UX-12 | Critical copy strings render | Exact text `Done`, `Back`, discard and save-error copy | Component | Automated | Jest |
 | TEST-20 | UX visual, a11y | Keyboard, safe area, Dynamic Type XXXL, swipe vs dismiss | No clipped chrome; Delete job reachable; hardware Back = Edit Back; Done is brand-primary in the EDIT slot | Manual | Manual | iOS + Android device/simulator |
-| TEST-21 | REQ-07, DATA-05, DATA-13 | Save/refetch/reopen undated or zero-duration session | No crash; missing fields remain missing; job status, last-worked, and completeness unchanged | Unit + API + DB | Automated | Jest + SQL |
+| TEST-21 | REQ-07, DATA-05, DATA-13 | Save/refetch/reopen undated or zero-duration session; map zero, 1-second, 36-second, and 37-second durations | No crash; missing fields remain missing; zero duration does not count; every positive duration counts and short positive values render `<0.1h` | Unit + API + DB | Automated | Jest + SQL |
 | TEST-22 | REQ-08, DATA-09, DATA-10 | Save/reopen total + quantity only; total + unit price only; complete pair | Partial values and explicitness round-trip; only complete pair recomputes total | Unit + API + DB | Automated | Jest + SQL |
 | TEST-23 | REQ-16, STATE-05 | Hold apply promise pending, then tap Back/hardware Back/Delete/repeated Done | No second mutation, navigation, or dialog until apply settles | Component | Automated | Jest |
 | TEST-24 | REQ-14 | FAB Quick Note and Quick Material | Capture form opens directly; save writes an Inbox item with no job/session | Component + API mock | Automated | Jest |
@@ -49,10 +50,11 @@
 | TEST-26 | REQ-18, DATA idempotency | Execute identical apply create payload twice | Both calls return ok; one child row per client ID; other-user collision rejected | DB | Automated | SQL |
 | TEST-27 | REQ-10 | Delete a session with visible attached note/material/other cost | Each child immediately becomes unassigned; Done succeeds | Unit + DB | Automated | Jest + SQL |
 | TEST-28 | REQ-06, DATA-04 | Edit only a child on a job with null revenue | `revenue_cents` remains null after Done | API + DB | Automated | Jest + SQL |
+| TEST-29 | REQ-04, STATE-03→04 | Change a focused numeric field, then Back and discard while crossfade keeps Edit mounted | Dirty discard path runs; reopened buffer matches persisted snapshot | Component | Automated | Jest |
 
 ## Test layers and boundaries
 
-- Unit: duration ↔ timestamps, undated handling, material total/explicitness, child unassignment, dirty diff builder, `mapSession` clock hide, flag timeout.
+- Unit: duration ↔ timestamps, undated handling, material total/explicitness, child unassignment, dirty diff builder, shared Back-handler delegation, `mapSession` clock hide, flag timeout.
 - Component: JobDetailScreen / Edit mode open and flag fallback, discard, saving lock, Done mock, delete confirm, FAB Inbox capture, copy.
 - Database/RLS: migration, apply RPC atomicity/idempotency, in_progress, ownership, partial derived-state exclusion, material explicitness.
 - Integration: api-client wrapper maps payload and errors (mock or local).

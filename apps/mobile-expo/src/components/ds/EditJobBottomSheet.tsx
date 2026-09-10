@@ -16,9 +16,11 @@ import Svg, { Path } from 'react-native-svg';
 import { BottomSheetShell } from './BottomSheetShell';
 import { SheetPrimaryDeleteActions } from './SheetPrimaryDeleteActions';
 import { screenHeaderA11y } from '../../lib/accessibility';
+import { JOB_SHORT_DESCRIPTION_MAX_LENGTH } from '@fieldsolo/shared-types';
 
 export type EditJobBottomSheetValues = {
   shortDescription: string;
+  longDescription: string;
   customerName: string;
   serviceAddress: string;
   revenue: string;
@@ -47,6 +49,7 @@ function revenueTextIsZero(text: string): boolean {
 
 const DEFAULT_VALUES: EditJobBottomSheetValues = {
   shortDescription: 'Bathroom Remodel Phase 1',
+  longDescription: '',
   customerName: 'Andrew G',
   serviceAddress: '123 Main Street, Perrysburg, OH 43551',
   revenue: '5,678.87',
@@ -91,6 +94,7 @@ export function EditJobBottomSheet({
 }: EditJobBottomSheetProps) {
   const v = { ...DEFAULT_VALUES, ...values };
   const [shortDescription, setShortDescription] = useState(v.shortDescription);
+  const [longDescription, setLongDescription] = useState(v.longDescription);
   const [customerName, setCustomerName] = useState(v.customerName);
   const [serviceAddress, setServiceAddress] = useState(v.serviceAddress);
   const [revenue, setRevenue] = useState(v.revenue);
@@ -101,10 +105,11 @@ export function EditJobBottomSheet({
 
   useEffect(() => {
     setShortDescription(v.shortDescription);
+    setLongDescription(v.longDescription);
     setCustomerName(v.customerName);
     setServiceAddress(v.serviceAddress);
     setRevenue(v.revenue);
-  }, [v.customerName, v.shortDescription, v.revenue, v.serviceAddress, visible]);
+  }, [v.customerName, v.shortDescription, v.longDescription, v.revenue, v.serviceAddress, visible]);
 
   return (
     <BottomSheetShell
@@ -133,18 +138,42 @@ export function EditJobBottomSheet({
         </Text>
 
         <View style={styles.fields}>
-          <InputShell>
+          <View style={styles.titleShell}>
             <TextInput
               ref={shortDescriptionRef}
               value={shortDescription}
-              onChangeText={setShortDescription}
+              onChangeText={(t) =>
+                setShortDescription(t.slice(0, JOB_SHORT_DESCRIPTION_MAX_LENGTH))
+              }
               placeholder="Short description"
               placeholderTextColor={fg.secondary}
               editable
               showSoftInputOnFocus
-              style={[typography.titleH3, styles.inputText]}
+              maxLength={JOB_SHORT_DESCRIPTION_MAX_LENGTH}
+              multiline
+              blurOnSubmit={false}
+              submitBehavior="newline"
+              textAlignVertical="top"
+              scrollEnabled={false}
+              style={[typography.titleH3, styles.inputText, styles.titleInput]}
             />
-          </InputShell>
+          </View>
+          <View style={styles.descriptionShell}>
+            <TextInput
+              value={longDescription}
+              onChangeText={setLongDescription}
+              placeholder="Description"
+              placeholderTextColor={fg.secondary}
+              editable
+              showSoftInputOnFocus
+              multiline
+              blurOnSubmit={false}
+              submitBehavior="newline"
+              textAlignVertical="top"
+              scrollEnabled={false}
+              style={[typography.body, styles.inputText, styles.descriptionInput]}
+            />
+          </View>
           <InputShell>
             <TextInput
               ref={customerNameRef}
@@ -203,6 +232,7 @@ export function EditJobBottomSheet({
           onPrimaryPress={() =>
             onSavePress?.({
               shortDescription,
+              longDescription,
               customerName,
               serviceAddress,
               revenue,
@@ -242,10 +272,50 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
     justifyContent: 'center',
   },
+  titleShell: {
+    minHeight: 44,
+    borderWidth: 1,
+    borderColor: border.subtle,
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 13,
+    paddingVertical: 9,
+    justifyContent: 'flex-start',
+    overflow: 'hidden',
+  },
+  descriptionShell: {
+    minHeight: 66,
+    borderWidth: 1,
+    borderColor: border.subtle,
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 13,
+    paddingVertical: 9,
+    justifyContent: 'flex-start',
+    overflow: 'hidden',
+  },
   inputText: {
     color: fg.primary,
     padding: 0,
     width: '100%',
+  },
+  titleInput: {
+    width: '100%',
+    maxWidth: '100%',
+    alignSelf: 'stretch',
+    flexShrink: 1,
+    minHeight: 25,
+    height: undefined,
+    textAlignVertical: 'top',
+  },
+  descriptionInput: {
+    width: '100%',
+    maxWidth: '100%',
+    alignSelf: 'stretch',
+    flexShrink: 1,
+    minHeight: 66,
+    height: undefined,
+    textAlignVertical: 'top',
   },
   revenueRow: {
     flexDirection: 'row',

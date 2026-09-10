@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { radius, space } from '@fieldsolo/design-system/lib/tokens';
 import type { JobDetailViewModel } from '@fieldsolo/shared-types';
 
@@ -14,17 +14,19 @@ export function JobDetailMetricTertiary({
   metrics,
   netEarningsCents,
   typography,
+  onPress,
 }: {
   metrics: JobDetailViewModel['metrics'];
   netEarningsCents: number;
   typography: TextStyles;
+  onPress?: () => void;
 }) {
   const netHrColor =
     metrics.netPerHrDisplay === '—'
       ? fg.primary
       : financialPositiveNegativeColor(netEarningsCents);
 
-  return (
+  const card = (
     <View style={styles.metricCard}>
       <View style={styles.metricTertiaryRow}>
         <View style={styles.metricColEqual}>
@@ -52,6 +54,21 @@ export function JobDetailMetricTertiary({
       </View>
     </View>
   );
+
+  if (onPress) {
+    return (
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Edit metrics"
+        onPress={onPress}
+        style={({ pressed }) => [pressed && styles.pressed]}
+      >
+        {card}
+      </Pressable>
+    );
+  }
+
+  return card;
 }
 
 const styles = StyleSheet.create({
@@ -78,11 +95,10 @@ const styles = StyleSheet.create({
   },
   metricValueCentered: {
     textAlign: 'center',
-    color: fg.primary,
   },
   netHrValue: {
     width: '100%',
     alignItems: 'center',
-    justifyContent: 'center',
   },
+  pressed: { opacity: 0.75 },
 });

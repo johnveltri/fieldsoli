@@ -1,10 +1,13 @@
+import { act, renderHook } from '@testing-library/react-native';
 import type { JobDetailViewModel } from '@fieldsolo/shared-types';
+import { describe, expect, it, jest } from '@jest/globals';
 
 import {
   buildMaterialUnitPriceBlurPatch,
   buildApplyJobDetailEditPayload,
   createJobEditDraft,
   removeJobEditDraftRow,
+  useJobEditDraft,
   validateJobEditDraft,
   type JobEditDraft,
 } from './useJobEditDraft';
@@ -13,6 +16,7 @@ function minimalJob(overrides: Partial<JobDetailViewModel> = {}): JobDetailViewM
   return {
     id: 'job-1',
     shortDescription: 'Test job',
+    longDescription: '',
     customerName: '',
     serviceAddress: '',
     displaySessions: [],
@@ -20,6 +24,9 @@ function minimalJob(overrides: Partial<JobDetailViewModel> = {}): JobDetailViewM
     materialBuckets: [],
     otherCostBuckets: [],
     earnings: { revenueCents: null },
+    noRevenueConfirmed: false,
+    noMaterialsConfirmed: false,
+    noOtherCostsConfirmed: false,
     ...overrides,
   } as JobDetailViewModel;
 }
@@ -28,9 +35,13 @@ describe('validateJobEditDraft capture-now', () => {
   it('only blocks Done when the job title is blank', () => {
     const partialDraft: JobEditDraft = {
       shortDescription: 'Titled job',
+      longDescription: '',
       customerName: '',
       serviceAddress: '',
       revenueCents: null,
+      noRevenueConfirmed: false,
+      noMaterialsConfirmed: false,
+      noOtherCostsConfirmed: false,
       sessions: [
         {
           id: 'sess-1',
@@ -79,6 +90,9 @@ describe('validateJobEditDraft capture-now', () => {
 
     expect(validateJobEditDraft(partialDraft).canDone).toBe(true);
     expect(validateJobEditDraft({ ...partialDraft, shortDescription: '' }).canDone).toBe(false);
+    expect(
+      validateJobEditDraft({ ...partialDraft, shortDescription: 'Untitled Job' }).canDone,
+    ).toBe(true);
   });
 
   it('includes a referenced date-only session in the payload', () => {
@@ -363,7 +377,7 @@ describe('validateJobEditDraft capture-now', () => {
 
   it('preserves the captured total when a unit price is cleared on blur', () => {
     const patch = buildMaterialUnitPriceBlurPatch(
-      { quantity: 2, quantityExplicit: true, unit: 'gal' },
+      { quantityExplicit: true, unit: 'gal' },
       0,
       false,
     );
@@ -378,7 +392,7 @@ describe('validateJobEditDraft capture-now', () => {
 
   it('does not recompute the total when a unit price is committed on blur', () => {
     const patch = buildMaterialUnitPriceBlurPatch(
-      { quantity: 2.5, quantityExplicit: true, unit: 'gal' },
+      { quantityExplicit: true, unit: 'gal' },
       349,
       true,
     );
@@ -388,5 +402,123 @@ describe('validateJobEditDraft capture-now', () => {
       unitCostExplicit: true,
     });
     expect(patch.totalCostCents).toBeUndefined();
+  });
+});
+
+describe('useJobEditDraft confirm-none and refs', () => {
+  function setupHook(job: JobDetailViewModel) {
+    const { result } = renderHook(() => useJobEditDraft(job));
+    act(() => {
+      result.current.resetFromJob(job);
+    });
+    return result;
+  }
+
+  it('does not clear noMaterialsConfirmed when adding a blank material stub', () => {
+    const result = setupHook(minimalJob({ noMaterialsConfirmed: true }));
+    act(() => {
+      result.current.addMaterial();
+    });
+    expect(result.current.draft?.noMaterialsConfirmed).toBe(true);
+    expect(result.current.draft?.materials).toHaveLength(1);
+  });
+
+  it('clears noMaterialsConfirmed when a material becomes usable', () => {
+    const result = setupHook(minimalJob({ noMaterialsConfirmed: true }));
+    act(() => {
+      result.current.addMaterial();
+    });
+    const id = result.current.draft?.materials[0]?.id;
+    expect(id).toBeTruthy();
+    act(() => {
+      result.current.updateMaterial(id!, { description: 'Paint', totalCostCents: 1500 });
+    });
+    expect(result.current.draft?.noMaterialsConfirmed).toBe(false);
+  });
+
+  it('does not clear noOtherCostsConfirmed when adding a blank other-cost stub', () => {
+    const result = setupHook(minimalJob({ noOtherCostsConfirmed: true }));
+    act(() => {
+      result.current.addOtherCost();
+    });
+    expect(result.current.draft?.noOtherCostsConfirmed).toBe(true);
+    expect(result.current.draft?.otherCosts).toHaveLength(1);
+  });
+
+  it('clears noOtherCostsConfirmed when an other cost becomes usable', () => {
+    const result = setupHook(minimalJob({ noOtherCostsConfirmed: true }));
+    act(() => {
+      result.current.addOtherCost();
+    });
+    const id = result.current.draft?.otherCosts[0]?.id;
+    expect(id).toBeTruthy();
+    act(() => {
+      result.current.updateOtherCost(id!, { costType: 'other', costCents: 500 });
+    });
+    expect(result.current.draft?.noOtherCostsConfirmed).toBe(false);
+  });
+
+  it('returns the latest ref state from getDraftSnapshot after updateDraft', () => {
+    const result = setupHook(minimalJob());
+    act(() => {
+      result.current.updateDraft({ customerName: 'Ada', noRevenueConfirmed: true, revenueCents: 0 });
+    });
+    const snap = result.current.getDraftSnapshot();
+    expect(snap.draft?.customerName).toBe('Ada');
+    expect(snap.draft?.noRevenueConfirmed).toBe(true);
+    expect(snap.draft?.revenueCents).toBe(0);
+    expect(snap.snapshot?.customerName).toBe('');
+  });
+
+  it('includes long description on the apply payload', () => {
+    const snapshot = createJobEditDraft(minimalJob());
+    const draft: JobEditDraft = {
+      ...snapshot,
+      longDescription: '  Replace the valve.  ',
+    };
+    expect(buildApplyJobDetailEditPayload(snapshot, draft).job.longDescription).toBe(
+      'Replace the valve.',
+    );
+  });
+
+  it('includes all confirm-none values in the atomic apply payload', () => {
+    const snapshot = createJobEditDraft(minimalJob());
+    const draft: JobEditDraft = {
+      ...snapshot,
+      revenueCents: 0,
+      noRevenueConfirmed: true,
+      noMaterialsConfirmed: true,
+      noOtherCostsConfirmed: true,
+    };
+
+    expect(buildApplyJobDetailEditPayload(snapshot, draft).job).toMatchObject({
+      revenueCents: 0,
+      noRevenueConfirmed: true,
+      noMaterialsConfirmed: true,
+      noOtherCostsConfirmed: true,
+    });
+  });
+
+  it('delegates shared Back through the registered field-flushing handler', () => {
+    const result = setupHook(minimalJob());
+    const handler = jest.fn();
+    const fallback = jest.fn();
+
+    act(() => result.current.setBackHandler(handler));
+    act(() => result.current.requestBack(fallback));
+
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect(fallback).not.toHaveBeenCalled();
+  });
+
+  it('clamps short description to 60 characters on the apply payload', () => {
+    const snapshot = createJobEditDraft(minimalJob());
+    const draft: JobEditDraft = {
+      ...snapshot,
+      shortDescription: `${'A'.repeat(60)}EXTRA`,
+    };
+    expect(buildApplyJobDetailEditPayload(snapshot, draft).job.shortDescription).toBe(
+      'A'.repeat(60),
+    );
   });
 });

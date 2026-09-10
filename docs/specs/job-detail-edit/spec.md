@@ -86,7 +86,7 @@ A solo tradesperson can change everything that belongs on a job — identity, se
 - Synthesized clock when times are omitted: **09:00 local** on the session date, end = start + duration (0h when duration unset), `started_tz` = device IANA zone. These values are storage-only until both start and end clocks are explicit.
 - Duration chips: **30m**, **1h**, **2h**, **4h**, **8h**, plus a numeric field. Picking a duration clears the end clock when a start clock was set; start clock is preserved.
 - Apply payload is a **diff** (creates/updates/deletes), not a replace-all child list, so a live session that ends while Edit is open is not destroyed.
-- RPC is `public.apply_job_detail_edit`, `SECURITY INVOKER`, owner RLS.
+- Client RPC is `public.apply_job_detail_edit_atomic`, `SECURITY INVOKER`, owner RLS; it applies confirmation timestamps and invokes the existing row-diff function within one transaction.
 - Exact copy in the UX contract unless later overridden.
 
 ## Non-goals

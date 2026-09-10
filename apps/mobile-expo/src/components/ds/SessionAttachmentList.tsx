@@ -22,7 +22,9 @@ export type SessionAttachmentListProps = {
   typography: TextStyles;
   attachments: JobDetailSessionAttachment[];
   emptyMessage?: string;
-  onPressAttachment: (item: { kind: 'note' | 'material'; id: string }) => void;
+  /** When true, rows are not tappable (Phase 2 View expand). */
+  readOnly?: boolean;
+  onPressAttachment?: (item: { kind: 'note' | 'material'; id: string }) => void;
 };
 
 /**
@@ -33,6 +35,7 @@ export function SessionAttachmentList({
   typography,
   attachments,
   emptyMessage = 'No notes, materials or photos yet',
+  readOnly = false,
   onPressAttachment,
 }: SessionAttachmentListProps) {
   const [expanded, setExpanded] = useState(false);
@@ -57,14 +60,8 @@ export function SessionAttachmentList({
       <View style={styles.attachmentList}>
         {shown.map((item) => {
           const isNote = item.kind === 'note';
-          return (
-            <Pressable
-              key={`${item.kind}-${item.id}`}
-              accessibilityRole="button"
-              accessibilityLabel={isNote ? 'Open note' : 'Open material'}
-              onPress={() => onPressAttachment({ kind: item.kind, id: item.id })}
-              style={({ pressed }) => [styles.attachmentRow, pressed && styles.pressed]}
-            >
+          const rowContent = (
+            <>
               <View style={styles.rowIcon}>
                 {isNote ? (
                   <SessionCaptureTileNoteIcon color={color('Semantic/Activity/Note')} />
@@ -74,6 +71,7 @@ export function SessionAttachmentList({
               </View>
               <Text
                 style={[typography.bodySmall, styles.titleCell, { color: fg.primary }]}
+                numberOfLines={isNote ? 1 : undefined}
               >
                 {item.title}
               </Text>
@@ -86,6 +84,24 @@ export function SessionAttachmentList({
               ) : (
                 <View style={styles.priceSpacer} />
               )}
+            </>
+          );
+          if (readOnly || !onPressAttachment) {
+            return (
+              <View key={`${item.kind}-${item.id}`} style={styles.attachmentRow}>
+                {rowContent}
+              </View>
+            );
+          }
+          return (
+            <Pressable
+              key={`${item.kind}-${item.id}`}
+              accessibilityRole="button"
+              accessibilityLabel={isNote ? 'Open note' : 'Open material'}
+              onPress={() => onPressAttachment({ kind: item.kind, id: item.id })}
+              style={({ pressed }) => [styles.attachmentRow, pressed && styles.pressed]}
+            >
+              {rowContent}
             </Pressable>
           );
         })}
@@ -166,8 +182,8 @@ const styles = StyleSheet.create({
   footerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: space('Spacing/8'),
+    justifyContent: 'space-between',
+    width: '100%',
     paddingVertical: space('Spacing/8'),
   },
   chevronUp: { transform: [{ rotate: '180deg' }] },

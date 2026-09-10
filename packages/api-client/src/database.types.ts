@@ -317,7 +317,9 @@ export type Database = {
           job_work_status: Database["public"]["Enums"]["job_work_status_enum"]
           last_worked_at: string | null
           list_recency_at: string | null
+          long_description: string | null
           materials_reviewed_at: string | null
+          no_revenue_confirmed_at: string | null
           other_costs_reviewed_at: string | null
           paid_at: string | null
           revenue_cents: number | null
@@ -341,7 +343,9 @@ export type Database = {
           job_work_status?: Database["public"]["Enums"]["job_work_status_enum"]
           last_worked_at?: string | null
           list_recency_at?: string | null
+          long_description?: string | null
           materials_reviewed_at?: string | null
+          no_revenue_confirmed_at?: string | null
           other_costs_reviewed_at?: string | null
           paid_at?: string | null
           revenue_cents?: number | null
@@ -365,7 +369,9 @@ export type Database = {
           job_work_status?: Database["public"]["Enums"]["job_work_status_enum"]
           last_worked_at?: string | null
           list_recency_at?: string | null
+          long_description?: string | null
           materials_reviewed_at?: string | null
+          no_revenue_confirmed_at?: string | null
           other_costs_reviewed_at?: string | null
           paid_at?: string | null
           revenue_cents?: number | null
@@ -650,6 +656,10 @@ export type Database = {
         Returns: boolean
       }
       apply_job_detail_edit: {
+        Args: { p_job_id: string; p_payload: Json }
+        Returns: Json
+      }
+      apply_job_detail_edit_atomic: {
         Args: { p_job_id: string; p_payload: Json }
         Returns: Json
       }
