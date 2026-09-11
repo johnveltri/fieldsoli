@@ -692,6 +692,7 @@ export type Database = {
           helper_labor_cost: number
           job_description: string
           job_id: string
+          long_description: string | null
           last_worked_at: string
           material_cost: number
           other_cost: number

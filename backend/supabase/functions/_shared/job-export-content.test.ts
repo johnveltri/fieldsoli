@@ -11,6 +11,7 @@ function row(overrides: Partial<JobExportRow> = {}): JobExportRow {
   return {
     job_id: '00000000-0000-4000-8000-000000000001',
     job_description: 'Repair sink',
+    long_description: null,
     customer_name: 'José',
     service_address: '1 Main St',
     work_status: 'completed',
@@ -32,20 +33,22 @@ function row(overrides: Partial<JobExportRow> = {}): JobExportRow {
 }
 
 describe('Job Summary CSV contract', () => {
-  it('emits the exact 20 columns, BOM, CRLF, nulls, costs, and formula protection', async () => {
+  it('emits the exact 21 columns, BOM, CRLF, nulls, costs, and formula protection', async () => {
     const fetchPage = vi.fn().mockResolvedValueOnce([row({
       job_description: '=SUM(1,1)\n"quoted"',
+      long_description: '@cmd injection',
       service_address: '+1 Main St',
       paid_at: null,
     })]);
 
     const bytes = await buildJobExportCsv('America/Chicago', fetchPage);
     const text = new TextDecoder().decode(bytes);
-    expect(JOB_EXPORT_HEADERS).toHaveLength(20);
+    expect(JOB_EXPORT_HEADERS).toHaveLength(21);
     expect(Array.from(bytes.slice(0, 3))).toEqual([0xef, 0xbb, 0xbf]);
     expect(text.startsWith(`${JOB_EXPORT_HEADERS.join(',')}\r\n`)).toBe(true);
     expect(text.replaceAll('\r\n', '')).not.toContain('\n');
     expect(text).toContain('"\'=SUM(1,1)\r\n""quoted"""');
+    expect(text).toContain('"\'@cmd injection"');
     expect(text).toContain('"\'+1 Main St"');
     expect(text).toContain('"José"');
     expect(text).toContain('"15.00","-5.00"');

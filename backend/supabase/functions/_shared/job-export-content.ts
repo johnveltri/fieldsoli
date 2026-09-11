@@ -1,5 +1,5 @@
 export const JOB_EXPORT_HEADERS = [
-  'job_id', 'job_description', 'customer_name', 'service_address', 'work_status', 'payment_status',
+  'job_id', 'job_description', 'long_description', 'customer_name', 'service_address', 'work_status', 'payment_status',
   'created_date', 'last_worked_date', 'completed_date', 'paid_date', 'revenue', 'material_cost',
   'helper_labor_cost', 'equipment_rental_cost', 'permit_cost', 'disposal_cost', 'travel_parking_cost',
   'other_cost', 'total_costs', 'net_earnings',
@@ -8,6 +8,7 @@ export const JOB_EXPORT_HEADERS = [
 export type JobExportRow = {
   job_id: string;
   job_description: string;
+  long_description: string | null;
   customer_name: string | null;
   service_address: string | null;
   work_status: string;
@@ -105,6 +106,7 @@ export function jobExportRowToCsv(row: JobExportRow, timeZone: string): string {
   const cells = [
     row.job_id,
     row.job_description,
+    row.long_description,
     row.customer_name,
     row.service_address,
     row.work_status,
@@ -121,7 +123,7 @@ export function jobExportRowToCsv(row: JobExportRow, timeZone: string): string {
 
   return cells.map((cell, index) => {
     // Only free-form, user-supplied fields need spreadsheet-formula protection.
-    if ([1, 2, 3].includes(index)) return csvText(cell);
+    if ([1, 2, 3, 4].includes(index)) return csvText(cell);
     const text = String(cell ?? '');
     return `"${text.replaceAll('"', '""')}"`;
   }).join(',');

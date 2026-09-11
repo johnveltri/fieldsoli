@@ -4,7 +4,7 @@
 
 **Version:** V1
 
-**Last updated:** 2026-08-29
+**Last updated:** 2026-09-11
 
 ## Summary
 
@@ -113,24 +113,27 @@ The fixed columns, in order, are:
 |---:|---|---|
 | 1 | `job_id` | `jobs.id`; always present |
 | 2 | `job_description` | `jobs.short_description`; always present |
-| 3 | `customer_name` | `jobs.customer_name`; blank when null |
-| 4 | `service_address` | Current formatted address; blank when null |
-| 5 | `work_status` | Current work status |
-| 6 | `payment_status` | Current derived payment state |
-| 7 | `created_date` | `created_at` as reporting-zone `YYYY-MM-DD` |
-| 8 | `last_worked_date` | Existing `last_worked_at` as reporting-zone `YYYY-MM-DD`; blank when null |
-| 9 | `completed_date` | `completed_at` as reporting-zone `YYYY-MM-DD` |
-| 10 | `paid_date` | `paid_at` as reporting-zone `YYYY-MM-DD` only when currently paid; otherwise blank |
-| 11 | `revenue` | `revenue_cents`; blank when null |
-| 12 | `material_cost` | Active `material` costs; `0.00` when absent |
-| 13 | `helper_labor_cost` | Active `helper_labor` costs; `0.00` when absent |
-| 14 | `equipment_rental_cost` | Active `equipment_rental` costs; `0.00` when absent |
-| 15 | `permit_cost` | Active `permit` costs; `0.00` when absent |
-| 16 | `disposal_cost` | Active `disposal` costs; `0.00` when absent |
-| 17 | `travel_parking_cost` | Active `travel_parking` costs; `0.00` when absent |
-| 18 | `other_cost` | Active `other` costs; `0.00` when absent |
-| 19 | `total_costs` | Sum of all seven cost columns |
-| 20 | `net_earnings` | Revenue minus total costs; blank when revenue is null and may be negative |
+| 3 | `long_description` | `jobs.long_description`; blank when null |
+| 4 | `customer_name` | `jobs.customer_name`; blank when null |
+| 5 | `service_address` | Current formatted address; blank when null |
+| 6 | `work_status` | Current work status |
+| 7 | `payment_status` | Current derived payment state |
+| 8 | `created_date` | `created_at` as reporting-zone `YYYY-MM-DD` |
+| 9 | `last_worked_date` | Existing `last_worked_at` as reporting-zone `YYYY-MM-DD`; blank when null |
+| 10 | `completed_date` | `completed_at` as reporting-zone `YYYY-MM-DD` |
+| 11 | `paid_date` | `paid_at` as reporting-zone `YYYY-MM-DD` only when currently paid; otherwise blank |
+| 12 | `revenue` | `revenue_cents`; blank when null |
+| 13 | `material_cost` | Active `material` costs; `0.00` when absent |
+| 14 | `helper_labor_cost` | Active `helper_labor` costs; `0.00` when absent |
+| 15 | `equipment_rental_cost` | Active `equipment_rental` costs; `0.00` when absent |
+| 16 | `permit_cost` | Active `permit` costs; `0.00` when absent |
+| 17 | `disposal_cost` | Active `disposal` costs; `0.00` when absent |
+| 18 | `travel_parking_cost` | Active `travel_parking` costs; `0.00` when absent |
+| 19 | `other_cost` | Active `other` costs; `0.00` when absent |
+| 20 | `total_costs` | Sum of all seven cost columns |
+| 21 | `net_earnings` | Revenue minus total costs; blank when revenue is null and may be negative |
+
+`long_description` exports optional Job View/Edit body copy added in Phase 2. It is separate from the title in `job_description`.
 
 Cost aggregation includes active costs linked directly to the job or through an active job session. Exclude deleted costs, costs attached only to deleted sessions, and unassigned Inbox costs. Count each `job_costs.id` once and use stored `total_cost_cents`.
 
@@ -310,7 +313,7 @@ Automated coverage must include:
 
 - timestamp transitions and the one-time `last_worked_at` backfill;
 - time-zone account/current-year validation and DST year boundaries;
-- exact 20-column order, nulls, zero/negative values, all cost types, deduplication, Unicode, multiline text, formula protection, BOM, and CRLF;
+- exact 21-column order, nulls, zero/negative values, all cost types, deduplication, Unicode, multiline text, formula protection, BOM, and CRLF;
 - pagination beyond 1,000 jobs;
 - different-year requests, in-flight same-year deduplication, empty-year no-op, same-year rerequest after 15 minutes, and same-year 15-minute rate limiting;
 - worker recovery, stable email payload/idempotency, and permanent/transient provider errors;
