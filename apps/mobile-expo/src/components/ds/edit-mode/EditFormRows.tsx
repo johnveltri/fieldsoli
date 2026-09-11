@@ -1,4 +1,4 @@
-import { Children, createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { Children, createContext, forwardRef, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import {
   Dimensions,
   Keyboard,
@@ -472,12 +472,18 @@ export function EditSheet({ children }: { children: ReactNode }) {
 }
 
 /** Large borderless title under the header chrome. */
-export function EditTitleField({
-  typography,
-  onFocus,
-  maxLength = JOB_SHORT_DESCRIPTION_MAX_LENGTH,
-  ...props
-}: React.ComponentProps<typeof TextInput> & { typography: TextStyles }) {
+export const EditTitleField = forwardRef<
+  TextInput,
+  React.ComponentProps<typeof TextInput> & { typography: TextStyles }
+>(function EditTitleField(
+  {
+    typography,
+    onFocus,
+    maxLength = JOB_SHORT_DESCRIPTION_MAX_LENGTH,
+    ...props
+  },
+  ref,
+) {
   const scroll = useContext(EditKeyboardScrollContext);
 
   return (
@@ -487,6 +493,7 @@ export function EditTitleField({
     <View style={styles.titleFieldWrap}>
       <View style={styles.titleFieldClip}>
         <TextInput
+          ref={ref}
           placeholderTextColor={fg.secondary}
           style={[typography.titleH3, styles.titleInput]}
           // iOS defaults to word-wrapping when paragraph styles (e.g. lineHeight) are
@@ -504,7 +511,7 @@ export function EditTitleField({
       </View>
     </View>
   );
-}
+});
 
 /**
  * Optional long description under the title — same multiline field as notes.

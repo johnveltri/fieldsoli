@@ -583,13 +583,18 @@ jest.mock('./jobDetailEdit/JobDetailEditMode', () => ({
     hideHeader?: boolean;
     focusTarget?: unknown;
     editApi?: {
-      draft: { noMaterialsConfirmed?: boolean; noOtherCostsConfirmed?: boolean } | null;
+      draft: {
+        noMaterialsConfirmed?: boolean;
+        noOtherCostsConfirmed?: boolean;
+        noRevenueConfirmed?: boolean;
+      } | null;
       updateDraft: (patch: Record<string, unknown>) => void;
     };
   }) => {
     const { Pressable, Text, View } = require('react-native');
     const materialsConfirmed = !!editApi?.draft?.noMaterialsConfirmed;
     const otherCostsConfirmed = !!editApi?.draft?.noOtherCostsConfirmed;
+    const revenueConfirmed = !!editApi?.draft?.noRevenueConfirmed;
     return (
       <View>
         {hideHeader ? null : (
@@ -604,6 +609,21 @@ jest.mock('./jobDetailEdit/JobDetailEditMode', () => ({
         )}
         {focusTarget != null ? (
           <Text testID="edit-focus-target">{JSON.stringify(focusTarget)}</Text>
+        ) : null}
+        {focusTarget === 'revenue' ? (
+          <Pressable
+            accessibilityRole="checkbox"
+            accessibilityLabel={revenueConfirmed ? 'No revenue confirmed' : 'Confirm no revenue'}
+            accessibilityState={{ checked: revenueConfirmed }}
+            onPress={() =>
+              editApi?.updateDraft({
+                noRevenueConfirmed: !revenueConfirmed,
+                revenueCents: revenueConfirmed ? null : 0,
+              })
+            }
+          >
+            <Text>{revenueConfirmed ? 'No revenue confirmed' : 'Confirm no revenue'}</Text>
+          </Pressable>
         ) : null}
         {focusTarget === 'materials' ? (
           <Pressable
@@ -1872,6 +1892,91 @@ describe('JobDetailScreen simplified view (flag on)', () => {
     );
     expect(lastGapScreen.getByLabelText('Done')).toBeTruthy();
     expect(lastGapScreen.queryByLabelText('Next')).toBeNull();
+  });
+
+  it('wizard keeps no-revenue confirmation when advancing revenue to other costs', async () => {
+    const revenueAndOtherCostsGapJob: JobDetailViewModel = {
+      ...incompleteJob,
+      shortDescription: 'Fixture install',
+      metrics: { ...incompleteJob.metrics, sessionCount: 1 },
+      displaySessions: [
+        {
+          id: 'sess-usable',
+          startedAt: '2026-04-17T14:00:00.000Z',
+          endedAt: '2026-04-17T15:00:00.000Z',
+          dateLabel: 'Apr 17, 2026',
+          timeRangeLabel: '9:00 AM – 10:00 AM',
+          durationLabel: '1.0h',
+          clockTimesExplicit: true,
+          clockStartExplicit: true,
+          clockEndExplicit: true,
+          calendarDateExplicit: true,
+          attachments: [],
+        },
+      ],
+      noMaterialsConfirmed: true,
+      noOtherCostsConfirmed: false,
+      noRevenueConfirmed: false,
+    };
+    const revenueConfirmedJob: JobDetailViewModel = {
+      ...revenueAndOtherCostsGapJob,
+      noRevenueConfirmed: true,
+      earnings: { ...revenueAndOtherCostsGapJob.earnings, revenueCents: 0 },
+    };
+    const fullyCompleteJob: JobDetailViewModel = {
+      ...revenueConfirmedJob,
+      noOtherCostsConfirmed: true,
+    };
+
+    apiClient.fetchJobDetail.mockImplementation(async () => {
+      const applyCalls = apiClient.applyJobDetailEdit.mock.calls.length;
+      if (applyCalls >= 2) return { ...fullyCompleteJob };
+      if (applyCalls >= 1) return { ...revenueConfirmedJob };
+      return { ...revenueAndOtherCostsGapJob };
+    });
+
+    const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
+    await waitFor(() => expect(screen.getByText('Primary status action')).toBeTruthy());
+    fireEvent.press(screen.getByText('Primary status action'));
+    await waitFor(() => expect(screen.getByText('Confirm Info')).toBeTruthy());
+    fireEvent.press(screen.getByText('Confirm Info'));
+    await waitFor(() =>
+      expect(screen.getByTestId('edit-focus-target')).toHaveTextContent('"revenue"'),
+    );
+    fireEvent.press(screen.getByLabelText('Confirm no revenue'));
+    fireEvent.press(screen.getByLabelText('Next'));
+    await waitFor(() =>
+      expect(apiClient.applyJobDetailEdit).toHaveBeenNthCalledWith(
+        1,
+        {},
+        'job-1',
+        expect.objectContaining({
+          job: expect.objectContaining({ noRevenueConfirmed: true }),
+        }),
+      ),
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId('edit-focus-target')).toHaveTextContent('"otherCosts"'),
+    );
+    fireEvent.press(screen.getByLabelText('Confirm no other costs'));
+    fireEvent.press(screen.getByLabelText('Done'));
+    await waitFor(() =>
+      expect(apiClient.applyJobDetailEdit).toHaveBeenNthCalledWith(
+        2,
+        {},
+        'job-1',
+        expect.objectContaining({
+          job: expect.objectContaining({
+            noRevenueConfirmed: true,
+            noOtherCostsConfirmed: true,
+          }),
+        }),
+      ),
+    );
+    await waitFor(() =>
+      expect(apiClient.updateJobStatusById).toHaveBeenCalledWith({}, 'job-1', 'completed'),
+    );
+    expect(screen.queryByTestId('edit-focus-target')).toBeNull();
   });
 
   it('TEST-V08 materials confirm-none checkbox in Edit advances completeness gap', async () => {

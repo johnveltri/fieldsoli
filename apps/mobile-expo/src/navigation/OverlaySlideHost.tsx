@@ -144,6 +144,8 @@ export function OverlaySlideHost({
   const panResponder = useMemo(
     () =>
       PanResponder.create({
+        onStartShouldSetPanResponder: () => false,
+        onStartShouldSetPanResponderCapture: () => false,
         onMoveShouldSetPanResponder: (_evt, gesture) => {
           if (!enableSwipeDismiss || !visibleRef.current || nestedOverlayOpenRef.current) {
             return false;

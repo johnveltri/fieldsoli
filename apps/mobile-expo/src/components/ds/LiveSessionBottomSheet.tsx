@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Keyboard,
   Platform,
   Pressable,
   type ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -223,6 +226,8 @@ export function LiveSessionBottomSheet({
   const [pickerTime, setPickerTime] = useState(() => startedDate);
   const [activePicker, setActivePicker] = useState<'date' | 'startTime' | null>(null);
   const [inlineFieldFocused, setInlineFieldFocused] = useState(false);
+  const acceptInlineFocusRef = useRef(false);
+  const titleInputRef = useRef<TextInput>(null);
   const sheetScrollRef = useRef<ScrollView | null>(null);
   const sheetScrollContentRef = useRef<View | null>(null);
   const sheetScrollYRef = useRef(0);
@@ -256,7 +261,29 @@ export function LiveSessionBottomSheet({
       setComposerMaterials([]);
       setNoteDrafts({});
       setMaterialDrafts({});
+      acceptInlineFocusRef.current = false;
+      setInlineFieldFocused(false);
+      Keyboard.dismiss();
     }
+  }, [visible]);
+
+  useEffect(() => {
+    if (!visible) return;
+    // Android grants first-TextInput focus when the overlay appears, which
+    // hides END SESSION. Ignore that until the open animation settles.
+    acceptInlineFocusRef.current = false;
+    setInlineFieldFocused(false);
+    Keyboard.dismiss();
+    titleInputRef.current?.blur();
+    const settle = setTimeout(() => {
+      Keyboard.dismiss();
+      titleInputRef.current?.blur();
+      acceptInlineFocusRef.current = true;
+    }, 320);
+    return () => {
+      clearTimeout(settle);
+      acceptInlineFocusRef.current = false;
+    };
   }, [visible]);
 
   useEffect(() => {
@@ -556,12 +583,23 @@ export function LiveSessionBottomSheet({
 
   const hideEndSessionWhileEditing = useCallback(() => {
     setActivePicker(null);
+    if (!acceptInlineFocusRef.current) {
+      titleInputRef.current?.blur();
+      Keyboard.dismiss();
+      return;
+    }
     setInlineFieldFocused(true);
   }, []);
 
   const restoreEndSessionAfterEditing = useCallback(() => {
     setInlineFieldFocused(false);
   }, []);
+
+  const statusBarTop =
+    Platform.OS === 'android'
+      ? Math.max(insets.top, StatusBar.currentHeight ?? 0)
+      : insets.top;
+  const headerTopPad = Math.max(statusBarTop, 0);
 
   return (
     <EditKeyboardScrollProvider
@@ -577,7 +615,6 @@ export function LiveSessionBottomSheet({
       onClosed={onClosed}
       variant="fullbleedDark"
       autoSizeUpToFraction={1}
-      registerInGlobalStack={false}
       stickyFooter={
         phase3Capture && !inlineFieldFocused ? (
           <FullWidthFab
@@ -594,7 +631,7 @@ export function LiveSessionBottomSheet({
         style={[
           styles.dark,
           // Match Job Detail modal: slight pull under status bar, no drag chrome.
-          { paddingTop: Math.max(insets.top - space('Spacing/8'), 0) + space('Spacing/4') },
+          { paddingTop: headerTopPad + space('Spacing/8') },
         ]}
       >
         <View style={styles.darkContent}>
@@ -665,10 +702,12 @@ export function LiveSessionBottomSheet({
             <View style={styles.pickerHitLayer}>
             <EditSheet>
               <EditTitleField
+                ref={titleInputRef}
                 typography={typography}
                 accessibilityLabel="Job title"
                 placeholder="Job title"
                 value={title}
+                autoFocus={false}
                 onChangeText={(t) => {
                   const next = t.slice(0, JOB_SHORT_DESCRIPTION_MAX_LENGTH);
                   setTitle(next);

@@ -49,8 +49,8 @@ const absoluteFill = {
 type BottomSheetShellVariant =
   | 'standard'
   | /**
-     * Edge-to-edge live-session surface (no outer cream radius / drag handle).
-     * Children own the dark header; sheet fill is canvas-warm for the body + FAB.
+   * Edge-to-edge live-session surface (full-page overlay, no sheet radius).
+   * Children own the dark header; sheet fill is canvas-warm for the body + FAB.
      */
     'fullbleedDark';
 
@@ -242,6 +242,10 @@ export function BottomSheetShell({
       return;
     }
 
+    // Drop elevation immediately. Waiting for the close animation left a
+    // full-screen Android overlay (elevation 1000) over Inbox when `finished`
+    // was false.
+    setStackingElevated(false);
     dragY.setValue(0);
     Animated.parallel([
       Animated.timing(translateY, {
@@ -256,11 +260,9 @@ export function BottomSheetShell({
         easing: Easing.in(Easing.quad),
         useNativeDriver: true,
       }),
-    ]).start(({ finished }) => {
-      if (finished) {
-        setStackingElevated(false);
-        onClosedRef.current?.();
-      }
+    ]).start(() => {
+      setStackingElevated(false);
+      onClosedRef.current?.();
     });
   }, [dragY, hiddenOffset, scrimOpacity, translateY, visible]);
 
@@ -346,9 +348,11 @@ export function BottomSheetShell({
   // is up so primary actions stay reachable. Bottom inset is part of the
   // sheet's internal padding (see `paddingBottom` below) and is included in
   // the cap.
-  const maxSheetHeight = autoSizeUpToFraction
-    ? Math.max(160, windowHeight * autoSizeUpToFraction)
-    : undefined;
+  const maxSheetHeight = isFullbleed
+    ? windowHeight + Math.max(0, insets.top)
+    : autoSizeUpToFraction
+      ? Math.max(160, windowHeight * autoSizeUpToFraction)
+      : undefined;
 
   // A real software keyboard covers the home-indicator / safe-area region, so
   // collapse our own padding to keep the primary CTA flush above it. A
@@ -470,12 +474,19 @@ export function BottomSheetShell({
   // otherwise stacking two sheets (e.g. chooser + edit) swallows the active sheet's
   // taps via the inactive sheet's scrim Pressable.
   const interactive = visible && interactionEnabled;
+  // `absoluteFill` sets top/right/bottom/left, which ignores width/height on
+  // Android — so a "collapsed" overlay still filled the window and ate Inbox taps.
+  const overlayCollapsed = !visible;
   return (
     <View
       testID="bottom-sheet-overlay"
       style={[
-        styles.overlay,
-        stackingElevated ? styles.overlayElevated : styles.overlayFlat,
+        overlayCollapsed ? styles.overlayCollapsed : styles.overlay,
+        overlayCollapsed
+          ? null
+          : stackingElevated
+            ? styles.overlayElevated
+            : styles.overlayFlat,
       ]}
       pointerEvents={interactive ? 'box-none' : 'none'}
       accessibilityViewIsModal={interactive}
@@ -490,7 +501,7 @@ export function BottomSheetShell({
         accessibilityRole="button"
         accessibilityLabel="Close bottom sheet"
         onPress={onClose}
-        style={[absoluteFill, overlayBleedStyle]}
+        style={[absoluteFill, isFullbleed ? null : overlayBleedStyle]}
         pointerEvents={interactive ? 'auto' : 'none'}
       >
         <Animated.View style={[styles.scrim, { opacity: scrimOpacity }]} />
@@ -516,7 +527,7 @@ export function BottomSheetShell({
           height after keyboardDidHide; iOS uses its original padding branch. */}
       <KeyboardAvoidingView
         key={Platform.OS === 'android' ? androidKeyboardAvoidanceEpoch : 'ios'}
-        style={styles.kav}
+        style={[styles.kav, isFullbleed ? styles.kavFullbleed : null]}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         pointerEvents="box-none"
       >
@@ -533,6 +544,7 @@ export function BottomSheetShell({
             failOffsetX={[-24, 24]}
             onGestureEvent={onPanGestureEvent}
             onHandlerStateChange={onPanHandlerStateChange}
+            style={isFullbleed ? styles.fullbleedPan : undefined}
           >
             <Animated.View
               testID="bottom-sheet-surface"
@@ -543,7 +555,9 @@ export function BottomSheetShell({
                 !isFullbleed ? { paddingHorizontal: sheetGutter } : null,
                 {
                   paddingBottom: isFullbleed ? 0 : shellBottomPadding,
-                  maxHeight: maxSheetHeight,
+                  maxHeight: isFullbleed ? undefined : maxSheetHeight,
+                  flexGrow: isFullbleed ? 1 : undefined,
+                  alignSelf: 'stretch',
                   transform: [
                     {
                       translateY: Animated.add(
@@ -621,6 +635,14 @@ const styles = StyleSheet.create({
     zIndex: 0,
     elevation: 0,
   },
+  overlayCollapsed: {
+    position: 'absolute',
+    width: 0,
+    height: 0,
+    overflow: 'hidden',
+    zIndex: -1,
+    elevation: 0,
+  },
   /**
    * `KeyboardAvoidingView` host. Fills the overlay (so its `flex-end`
    * justification anchors the sheet to the bottom of whatever space is left
@@ -630,6 +652,13 @@ const styles = StyleSheet.create({
   kav: {
     ...absoluteFill,
     justifyContent: 'flex-end',
+  },
+  kavFullbleed: {
+    justifyContent: 'flex-start',
+  },
+  fullbleedPan: {
+    flex: 1,
+    alignSelf: 'stretch',
   },
   scrim: {
     ...absoluteFill,
@@ -658,15 +687,10 @@ const styles = StyleSheet.create({
     paddingBottom: space('Spacing/12'),
   },
   /**
-   * Fullbleed live-session surface: no outer cream chrome or drag handle, but
-   * keep the app’s rounded sheet top and clip the dark header into that shape.
-   * Cream fill keeps the sticky End Session gradient on canvas-warm instead of
-   * flashing the dark header color under the FAB fade.
+   * Full-page live-session surface: edge-to-edge, no sheet radius, so the
+   * dark header covers the status bar instead of leaving the tab behind it.
    */
   sheetFullbleed: {
-    borderTopLeftRadius: radius('Radius/32'),
-    borderTopRightRadius: radius('Radius/32'),
-    borderCurve: 'continuous',
     overflow: 'hidden',
     backgroundColor: bg.canvasWarm,
   },
