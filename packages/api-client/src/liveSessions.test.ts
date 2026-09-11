@@ -44,6 +44,9 @@ describe('live sessions api client', () => {
         session_status: 'in_progress',
         started_at: '2026-04-25T15:00:00.000Z',
         started_tz: 'America/Chicago',
+        clock_start_explicit: true,
+        clock_times_explicit: true,
+        calendar_date_explicit: true,
       });
       expect(result).toEqual({
         id: 'sess-live-1',
@@ -310,6 +313,8 @@ describe('live sessions api client', () => {
       expect(patch).toEqual({
         session_status: 'ended',
         ended_at: '2026-04-25T16:00:00.000Z',
+        clock_end_explicit: true,
+        clock_times_explicit: true,
       });
       expect((builder.eq as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith(
         'session_status',
@@ -351,7 +356,12 @@ describe('live sessions api client', () => {
         startedAt: '2026-04-25T12:30:00.000Z',
       });
 
-      expect(patch).toEqual({ started_at: '2026-04-25T12:30:00.000Z' });
+      expect(patch).toEqual({
+        started_at: '2026-04-25T12:30:00.000Z',
+        clock_start_explicit: true,
+        clock_times_explicit: true,
+        calendar_date_explicit: true,
+      });
     });
 
     it('rejects invalid timestamps', async () => {

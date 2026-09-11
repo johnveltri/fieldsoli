@@ -48,9 +48,8 @@ const absoluteFill = {
 type BottomSheetShellVariant =
   | 'standard'
   | /**
-     * No outer cream shell, drag handle, or top corner radius. Children own
-     * the entire visual frame (header, body, padding). Used by the Live
-     * Session sheet which paints its own dark `live-session-header` slab.
+     * Edge-to-edge live-session surface (no outer cream radius / drag handle).
+     * Children own the dark header; sheet fill is canvas-warm for the body + FAB.
      */
     'fullbleedDark';
 
@@ -104,6 +103,11 @@ type BottomSheetShellProps = {
    * sheet owns touch and accessibility focus. Defaults to `true`.
    */
   interactionEnabled?: boolean;
+  /**
+   * Renders below the scroll viewport and stays pinned while content scrolls.
+   * Used by Live Session for the End Session full-width FAB.
+   */
+  stickyFooter?: ReactNode;
 };
 
 /**
@@ -127,12 +131,14 @@ export function BottomSheetShell({
   contentExtendsToBottomEdge = false,
   accessibilityTitle,
   interactionEnabled = true,
+  stickyFooter,
 }: BottomSheetShellProps) {
   const insets = useSafeAreaInsets();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const sheetGutter = contentGutter(windowWidth);
   const sheetStack = useBottomSheetStackWriters();
   const sheetId = useId();
+  const [stickyFooterHeight, setStickyFooterHeight] = useState(0);
   // Keep `onClose` in a ref so re-registering the sheet (when the prop
   // identity changes between renders) doesn't churn the global stack.
   const onCloseRef = useRef(onClose);
@@ -352,12 +358,18 @@ export function BottomSheetShell({
   const shellBottomPadding = contentExtendsToBottomEdge
     ? 0
     : effectiveSafeBottom + bottomPaddingExtra;
+  // Fullbleed sticky footers overlay the scroll viewport (gradient FAB) so
+  // chrome height stays zero for scroll sizing — content pads itself instead.
+  const stickyOverlaysScroll = Boolean(stickyFooter && isFullbleed);
   const sheetChromeHeight = isFullbleed
-    ? effectiveSafeBottom + bottomPaddingExtra
+    ? stickyOverlaysScroll
+      ? 0
+      : (stickyFooter ? stickyFooterHeight : effectiveSafeBottom) + bottomPaddingExtra
     : space('Spacing/12') /* paddingTop */ +
       space('Spacing/12') /* handleHitArea paddingBottom */ +
       6 /* handle h */ +
-      shellBottomPadding;
+      shellBottomPadding +
+      stickyFooterHeight;
 
   const scrollViewMaxHeight =
     maxSheetHeight != null ? Math.max(0, maxSheetHeight - sheetChromeHeight) : undefined;
@@ -490,9 +502,7 @@ export function BottomSheetShell({
           styles.bottomFill,
           {
             height: visible ? Math.max(insets.bottom, keyboardReservedHeight) : 0,
-            backgroundColor: isFullbleed
-              ? color('Foundation/Border/Default')
-              : bg.canvasWarm,
+            backgroundColor: bg.canvasWarm,
           },
         ]}
       />
@@ -551,7 +561,12 @@ export function BottomSheetShell({
                 <BottomSheetScrollView
                   waitFor={scrollAtTop ? panRef : undefined}
                   style={{ maxHeight: scrollViewMaxHeight }}
-                  contentContainerStyle={isFullbleed ? undefined : styles.contentContainer}
+                  contentContainerStyle={[
+                    isFullbleed ? null : styles.contentContainer,
+                    stickyOverlaysScroll && stickyFooterHeight > 0
+                      ? { paddingBottom: stickyFooterHeight }
+                      : null,
+                  ]}
                   scrollEnabled={contentOverflow || Platform.OS === 'android'}
                   showsVerticalScrollIndicator={contentOverflow}
                   scrollEventThrottle={16}
@@ -568,6 +583,18 @@ export function BottomSheetShell({
               ) : (
                 <View style={styles.content}>{children}</View>
               )}
+              {stickyFooter ? (
+                <View
+                  pointerEvents="box-none"
+                  onLayout={(event) => {
+                    const next = Math.ceil(event.nativeEvent.layout.height);
+                    setStickyFooterHeight((prev) => (prev === next ? prev : next));
+                  }}
+                  style={stickyOverlaysScroll ? styles.stickyFooterOverlay : undefined}
+                >
+                  {stickyFooter}
+                </View>
+              ) : null}
             </Animated.View>
           </PanGestureHandler>
         </BottomSheetScrollProvider>
@@ -626,16 +653,19 @@ const styles = StyleSheet.create({
     paddingBottom: space('Spacing/12'),
   },
   /**
-   * Fullbleed variant: caller owns ALL visual chrome (top corners, header
-   * background, padding) so the dark live-session header can run flush to
-   * the rounded top edge. Sheet fill matches the live-session header blue so
-   * the clipped radius never flashes cream above the header.
+   * Fullbleed live-session surface: edge-to-edge modal (no sheet radius / handle).
+   * Cream fill so the sticky End Session gradient sits on canvas-warm instead of
+   * flashing the dark header color under the FAB fade.
    */
   sheetFullbleed: {
-    borderTopLeftRadius: radius('Radius/32'),
-    borderTopRightRadius: radius('Radius/32'),
     overflow: 'hidden',
-    backgroundColor: color('Foundation/Border/Default'),
+    backgroundColor: bg.canvasWarm,
+  },
+  stickyFooterOverlay: {
+    position: 'absolute',
+    right: 0,
+    bottom: 0,
+    left: 0,
   },
   handle: {
     alignSelf: 'center',

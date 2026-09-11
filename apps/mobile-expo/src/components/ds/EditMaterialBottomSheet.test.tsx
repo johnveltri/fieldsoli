@@ -192,4 +192,56 @@ describe('EditMaterialBottomSheet', () => {
     fireEvent.press(screen.getByLabelText('Delete'));
     expect(onDeletePress).toHaveBeenCalled();
   });
+
+  it('TEST-Q02 total-first mode saves with description and total only', () => {
+    const onSavePress = jest.fn();
+    const screen = render(
+      <EditMaterialBottomSheet
+        {...baseProps}
+        totalFirstMode
+        values={{
+          description: 'Copper pipe',
+          unitCostCents: 0,
+          quantity: 0,
+          unit: 'ea',
+          totalCostCents: 2500,
+        }}
+        onSavePress={onSavePress}
+      />,
+    );
+
+    expect(screen.getByPlaceholderText('Total')).toBeTruthy();
+    expect(screen.queryByPlaceholderText('Unit Price')).toBeNull();
+    fireEvent.press(screen.getByLabelText('SAVE NEW MATERIAL'));
+    expect(onSavePress).toHaveBeenCalledWith(
+      expect.objectContaining({
+        description: 'Copper pipe',
+        quantity: 1,
+        totalCostCents: 2500,
+        quantityExplicit: false,
+        unitCostExplicit: false,
+      }),
+    );
+  });
+
+  it('TEST-Q02 total-first mode disables save without total', () => {
+    const onSavePress = jest.fn();
+    const screen = render(
+      <EditMaterialBottomSheet
+        {...baseProps}
+        totalFirstMode
+        values={{
+          description: 'Copper pipe',
+          unitCostCents: 0,
+          quantity: 0,
+          unit: 'ea',
+        }}
+        onSavePress={onSavePress}
+      />,
+    );
+
+    fireEvent.changeText(screen.getByPlaceholderText('Total'), '');
+    fireEvent.press(screen.getByLabelText('SAVE NEW MATERIAL'));
+    expect(onSavePress).not.toHaveBeenCalled();
+  });
 });

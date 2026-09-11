@@ -93,6 +93,10 @@ export async function createLiveSession(
       session_status: 'in_progress',
       started_at: startedAt,
       started_tz: startedTz,
+      // Live timer start is a real clock — Job Detail View shows it.
+      clock_start_explicit: true,
+      clock_times_explicit: true,
+      calendar_date_explicit: true,
     })
     .select('id')
     .single();
@@ -114,6 +118,9 @@ export async function createLiveSession(
         entry_mode: 'live',
         session_status: 'in_progress',
         started_at: startedAt,
+        clock_start_explicit: true,
+        clock_times_explicit: true,
+        calendar_date_explicit: true,
       })
       .select('id')
       .single();
@@ -221,6 +228,9 @@ export async function endLiveSession(
     .update({
       session_status: 'ended',
       ended_at: endedAt,
+      // Ending a live timer stamps a real end clock for Job Detail View.
+      clock_end_explicit: true,
+      clock_times_explicit: true,
     })
     .eq('id', sessionId)
     .eq('session_status', 'in_progress')
@@ -259,7 +269,12 @@ export async function updateLiveSessionStart(
 
   const { data, error } = await client
     .from('sessions')
-    .update({ started_at: input.startedAt })
+    .update({
+      started_at: input.startedAt,
+      clock_start_explicit: true,
+      clock_times_explicit: true,
+      calendar_date_explicit: true,
+    })
     .eq('id', sessionId)
     .eq('session_status', 'in_progress')
     .select('id')

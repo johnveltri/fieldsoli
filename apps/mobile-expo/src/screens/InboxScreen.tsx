@@ -22,6 +22,8 @@ import {
   platformHeaderRowStyle,
 } from '../components/platform/platformHeaderMetrics';
 import {
+  deleteMaterial,
+  deleteNote,
   listInboxMaterials,
   listInboxNotes,
   updateMaterial,
@@ -37,16 +39,21 @@ import type {
 
 import { CanvasTiledBackground } from '../components/CanvasTiledBackground';
 import {
+  CaptureComposerSheet,
   ChooseJobBottomSheet,
   SectionHeader,
   ViewMaterialsBuckets,
   ViewNotesBuckets,
+  type CaptureComposerMaterialValues,
+  type CaptureComposerNoteValues,
   type ChooseJobBottomSheetJob,
 } from '../components/ds';
 import { TopHeaderBackIcon } from '../components/figma-icons/TopHeaderIcons';
 import { shellBottomNavOuterHeight } from '../components/platform/shellDockMetrics';
+import { useAuth } from '../context/AuthContext';
 import { useJobsListInvalidation } from '../context/JobsListInvalidationContext';
 import { analytics, errorProperties } from '../lib/analytics';
+import { useJobDetailFullscreenEditFlag } from '../lib/featureFlags/useJobDetailFullscreenEditFlag';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import {
   recencyBucket,
@@ -118,17 +125,27 @@ function groupByRecency<T extends { createdAt: string }>(
   }));
 }
 
+function excerptNote(body: string, max = 120): string {
+  const t = body.trim();
+  if (t.length <= max) return t;
+  return `${t.slice(0, max)}…`;
+}
+
 /**
  * Inbox screen — quick-capture notes / materials with no parent job. Grouped
  * by recency (TODAY / PAST WEEK / PAST MONTH / OLDER) using the shared
- * `timeBuckets` logic. Tapping an item opens the "Add to Job" sheet; assigning
- * removes it from the Inbox.
+ * `timeBuckets` logic. Flag-off: tapping an item opens the "Add to Job"
+ * sheet. Flag-on: tap opens edit; assign via JOB pill; swipe deletes.
  */
 export function InboxScreen({ loadKey = 0, onRequestClose }: InboxScreenProps) {
   const insets = useSafeAreaInsets();
   const { columnStyle } = useContentColumn();
   const scrollY = useMemo(() => new Animated.Value(0), []);
   const { invalidateJobsList, version } = useJobsListInvalidation();
+  const { session } = useAuth();
+  const { enabled: fullscreenEditEnabled, ready: fullscreenEditReady } =
+    useJobDetailFullscreenEditFlag(session?.user.id);
+  const phase3 = fullscreenEditReady && fullscreenEditEnabled;
 
   const [fontsLoaded] = useFonts(fieldsoloExpoFontAssets);
 
@@ -170,6 +187,18 @@ export function InboxScreen({ loadKey = 0, onRequestClose }: InboxScreenProps) {
   const [assigning, setAssigning] = useState(false);
   const hasLoadedInboxRef = useRef(false);
   const prevLoadKeyRef = useRef(loadKey);
+
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  const [noteSheetVisible, setNoteSheetVisible] = useState(false);
+  const [draftBody, setDraftBody] = useState('');
+  const [noteSaving, setNoteSaving] = useState(false);
+
+  const [editingMaterialId, setEditingMaterialId] = useState<string | null>(null);
+  const [materialSheetVisible, setMaterialSheetVisible] = useState(false);
+  const [matDraft, setMatDraft] = useState<CaptureComposerMaterialValues | null>(
+    null,
+  );
+  const [materialSaving, setMaterialSaving] = useState(false);
 
   const refetch = useCallback(async (isCancelled: () => boolean) => {
     const startedAt = Date.now();
@@ -252,7 +281,23 @@ export function InboxScreen({ loadKey = 0, onRequestClose }: InboxScreenProps) {
   const noteGroups = useMemo(() => groupByRecency(notes), [notes]);
   const materialGroups = useMemo(() => groupByRecency(materials), [materials]);
 
-  const openAssign = useCallback((kind: InboxTab, id: string) => {
+  const closeNoteEdit = useCallback(() => {
+    setNoteSheetVisible(false);
+    setEditingNoteId(null);
+    setDraftBody('');
+  }, []);
+
+  const closeMaterialEdit = useCallback(() => {
+    setMaterialSheetVisible(false);
+    setEditingMaterialId(null);
+    setMatDraft(null);
+  }, []);
+
+  const openAssign = useCallback((
+    kind: InboxTab,
+    id: string,
+    options?: { fromEdit?: boolean },
+  ) => {
     const startedAt = Date.now();
     const item =
       kind === 'notes'
@@ -261,29 +306,30 @@ export function InboxScreen({ loadKey = 0, onRequestClose }: InboxScreenProps) {
     analytics.capture('inbox_item_selected', {
       kind,
       item_id: id,
+      action: options?.fromEdit ? 'assign_from_edit' : 'assign',
       age_bucket: item ? recencyBucket(null, item.createdAt, Date.now()) : null,
     });
     setAssignTarget({ kind, id });
+    setAssignJobs([]);
     setAssignJobsError(null);
     setAssignJobsLoading(true);
     void (async () => {
-      if (!isSupabaseConfigured()) {
-        setAssignJobsError('Supabase is not configured.');
-        setAssignJobsLoading(false);
-        return;
-      }
       try {
+        if (!isSupabaseConfigured()) {
+          setAssignJobsError('Supabase is not configured.');
+          return;
+        }
         const jobs = await listAllJobsForAssign();
         setAssignJobs(jobs);
-        analytics.capture('inbox_assign_sheet_opened', {
-          kind,
-          available_job_count: jobs.length,
+        analytics.capture('inbox_assign_jobs_loaded', {
+          jobs_count: jobs.length,
           load_duration_ms: Date.now() - startedAt,
         });
       } catch (err) {
-        setAssignJobsError(err instanceof Error ? err.message : 'Could not load jobs.');
+        setAssignJobsError(
+          err instanceof Error ? err.message : 'Failed to load jobs.',
+        );
         analytics.capture('inbox_assign_jobs_load_failed', {
-          kind,
           load_duration_ms: Date.now() - startedAt,
           ...errorProperties(err),
         });
@@ -292,6 +338,68 @@ export function InboxScreen({ loadKey = 0, onRequestClose }: InboxScreenProps) {
       }
     })();
   }, [materials, notes]);
+
+  const openEditNote = useCallback(
+    (id: string) => {
+      const item = notes.find((n) => n.id === id);
+      if (!item) return;
+      analytics.capture('inbox_item_selected', {
+        kind: 'notes',
+        item_id: id,
+        action: 'edit',
+        age_bucket: recencyBucket(null, item.createdAt, Date.now()),
+      });
+      setEditingNoteId(id);
+      setDraftBody(item.body);
+      setNoteSheetVisible(true);
+    },
+    [notes],
+  );
+
+  const openEditMaterial = useCallback(
+    (id: string) => {
+      const item = materials.find((m) => m.id === id);
+      if (!item) return;
+      analytics.capture('inbox_item_selected', {
+        kind: 'materials',
+        item_id: id,
+        action: 'edit',
+        age_bucket: recencyBucket(null, item.createdAt, Date.now()),
+      });
+      const totalCostCents = item.totalCostCents ?? 0;
+      const quantity =
+        item.quantity != null && item.quantity > 0 ? item.quantity : 1;
+      const unitCostCents = item.unitCostCents ?? 0;
+      setEditingMaterialId(id);
+      setMatDraft({
+        description: item.name,
+        totalCostCents,
+        quantity,
+        unit: item.unit?.trim() || 'ea',
+        unitCostCents,
+        quantityExplicit: item.quantityExplicit,
+        unitCostExplicit: item.unitCostExplicit,
+      });
+      setMaterialSheetVisible(true);
+    },
+    [materials],
+  );
+
+  const onNotePress = useCallback(
+    (id: string) => {
+      if (phase3) openEditNote(id);
+      else openAssign('notes', id);
+    },
+    [openAssign, openEditNote, phase3],
+  );
+
+  const onMaterialPress = useCallback(
+    (id: string) => {
+      if (phase3) openEditMaterial(id);
+      else openAssign('materials', id);
+    },
+    [openAssign, openEditMaterial, phase3],
+  );
 
   const closeAssign = useCallback(() => {
     setAssignTarget(null);
@@ -308,11 +416,39 @@ export function InboxScreen({ loadKey = 0, onRequestClose }: InboxScreenProps) {
       setAssigning(true);
       try {
         if (target.kind === 'notes') {
-          await updateNote(supabase, target.id, { sessionId: null, jobId });
+          const patch: { sessionId: null; jobId: string; body?: string } = {
+            sessionId: null,
+            jobId,
+          };
+          if (editingNoteId === target.id && draftBody.trim().length > 0) {
+            patch.body = draftBody;
+          }
+          await updateNote(supabase, target.id, patch);
           setNotes((prev) => prev.filter((n) => n.id !== target.id));
+          closeNoteEdit();
         } else {
-          await updateMaterial(supabase, target.id, { sessionId: null, jobId });
+          const patch: {
+            sessionId: null;
+            jobId: string;
+            description?: string;
+            quantity?: number;
+            unit?: string;
+            unitCostCents?: number;
+          } = { sessionId: null, jobId };
+          if (editingMaterialId === target.id && matDraft) {
+            const totalFirst = !(
+              matDraft.quantityExplicit && matDraft.unitCostExplicit
+            );
+            patch.description = matDraft.description;
+            patch.quantity = totalFirst ? 1 : Math.max(1, matDraft.quantity);
+            patch.unit = matDraft.unit || 'ea';
+            patch.unitCostCents = totalFirst
+              ? Math.max(0, matDraft.totalCostCents)
+              : Math.max(0, matDraft.unitCostCents);
+          }
+          await updateMaterial(supabase, target.id, patch);
           setMaterials((prev) => prev.filter((m) => m.id !== target.id));
+          closeMaterialEdit();
         }
         analytics.capture('inbox_item_assigned_to_job', {
           kind: target.kind,
@@ -333,9 +469,236 @@ export function InboxScreen({ loadKey = 0, onRequestClose }: InboxScreenProps) {
         setAssigning(false);
       }
     },
-    [assignTarget, assigning, invalidateJobsList],
+    [
+      assignTarget,
+      assigning,
+      closeMaterialEdit,
+      closeNoteEdit,
+      draftBody,
+      editingMaterialId,
+      editingNoteId,
+      invalidateJobsList,
+      matDraft,
+    ],
   );
 
+  const onSaveNoteChanges = useCallback(
+    async ({ body }: CaptureComposerNoteValues) => {
+      if (!editingNoteId || noteSaving) return;
+      if (!isSupabaseConfigured()) {
+        Alert.alert('Save failed', 'Supabase is not configured.');
+        return;
+      }
+      setNoteSaving(true);
+      try {
+        await updateNote(supabase, editingNoteId, { body });
+        const savedId = editingNoteId;
+        setNotes((prev) =>
+          prev.map((n) =>
+            n.id === savedId
+              ? { ...n, body, excerpt: excerptNote(body) }
+              : n,
+          ),
+        );
+        analytics.capture('note_updated', {
+          note_id: savedId,
+          source: 'inbox',
+        });
+        closeNoteEdit();
+      } catch (e) {
+        analytics.capture('note_update_failed', {
+          note_id: editingNoteId,
+          source: 'inbox',
+          ...errorProperties(e),
+        });
+        Alert.alert('Save failed', e instanceof Error ? e.message : 'Could not save note.');
+      } finally {
+        setNoteSaving(false);
+      }
+    },
+    [closeNoteEdit, editingNoteId, noteSaving],
+  );
+
+  const onSaveMaterialChanges = useCallback(
+    async (values: CaptureComposerMaterialValues) => {
+      if (!editingMaterialId || materialSaving) return;
+      if (!isSupabaseConfigured()) {
+        Alert.alert('Save failed', 'Supabase is not configured.');
+        return;
+      }
+      setMaterialSaving(true);
+      try {
+        const totalFirst = !(values.quantityExplicit && values.unitCostExplicit);
+        const quantity = totalFirst ? 1 : values.quantity;
+        const unitCostCents = totalFirst
+          ? Math.max(0, values.totalCostCents)
+          : values.unitCostCents;
+        await updateMaterial(supabase, editingMaterialId, {
+          description: values.description,
+          quantity,
+          unit: values.unit || 'ea',
+          unitCostCents,
+        });
+        const savedId = editingMaterialId;
+        const totalCostCents = Math.round(unitCostCents * quantity);
+        setMaterials((prev) =>
+          prev.map((m) =>
+            m.id === savedId
+              ? {
+                  ...m,
+                  name: values.description.trim() || 'Material',
+                  quantity,
+                  unit: values.unit || 'ea',
+                  unitCostCents,
+                  totalCostCents,
+                  quantityExplicit: !totalFirst,
+                  unitCostExplicit: !totalFirst,
+                }
+              : m,
+          ),
+        );
+        analytics.capture('material_updated', {
+          material_id: savedId,
+          source: 'inbox',
+        });
+        closeMaterialEdit();
+      } catch (e) {
+        analytics.capture('material_update_failed', {
+          material_id: editingMaterialId,
+          source: 'inbox',
+          ...errorProperties(e),
+        });
+        Alert.alert(
+          'Save failed',
+          e instanceof Error ? e.message : 'Could not save material.',
+        );
+      } finally {
+        setMaterialSaving(false);
+      }
+    },
+    [closeMaterialEdit, editingMaterialId, materialSaving],
+  );
+
+  const performDeleteNote = useCallback(
+    async (noteId: string) => {
+      if (!isSupabaseConfigured()) {
+        Alert.alert('Delete failed', 'Supabase is not configured.');
+        return;
+      }
+      try {
+        await deleteNote(supabase, noteId);
+        setNotes((prev) => prev.filter((n) => n.id !== noteId));
+        if (editingNoteId === noteId) closeNoteEdit();
+        analytics.capture('note_deleted', {
+          note_id: noteId,
+          source: 'inbox',
+        });
+      } catch (e) {
+        analytics.capture('note_delete_failed', {
+          note_id: noteId,
+          source: 'inbox',
+          ...errorProperties(e),
+        });
+        Alert.alert('Delete failed', e instanceof Error ? e.message : 'Could not delete note.');
+      }
+    },
+    [closeNoteEdit, editingNoteId],
+  );
+
+  const performDeleteMaterial = useCallback(
+    async (materialId: string) => {
+      if (!isSupabaseConfigured()) {
+        Alert.alert('Delete failed', 'Supabase is not configured.');
+        return;
+      }
+      try {
+        await deleteMaterial(supabase, materialId);
+        setMaterials((prev) => prev.filter((m) => m.id !== materialId));
+        if (editingMaterialId === materialId) closeMaterialEdit();
+        analytics.capture('material_deleted', {
+          material_id: materialId,
+          source: 'inbox',
+        });
+      } catch (e) {
+        analytics.capture('material_delete_failed', {
+          material_id: materialId,
+          source: 'inbox',
+          ...errorProperties(e),
+        });
+        Alert.alert(
+          'Delete failed',
+          e instanceof Error ? e.message : 'Could not delete material.',
+        );
+      }
+    },
+    [closeMaterialEdit, editingMaterialId],
+  );
+
+  const onDeleteNote = useCallback(
+    (noteId: string) => {
+      Alert.alert('Delete this note?', 'This cannot be undone.', [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            void performDeleteNote(noteId);
+          },
+        },
+      ]);
+    },
+    [performDeleteNote],
+  );
+
+  const onDeleteMaterial = useCallback(
+    (materialId: string) => {
+      Alert.alert('Delete this material?', 'This cannot be undone.', [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            void performDeleteMaterial(materialId);
+          },
+        },
+      ]);
+    },
+    [performDeleteMaterial],
+  );
+
+  const onAddToJobFromNote = useCallback(
+    (values: CaptureComposerNoteValues) => {
+      if (!editingNoteId) return;
+      setDraftBody(values.body);
+      setNoteSheetVisible(false);
+      openAssign('notes', editingNoteId, { fromEdit: true });
+    },
+    [editingNoteId, openAssign],
+  );
+
+  const onAddToJobFromMaterial = useCallback(
+    (values: CaptureComposerMaterialValues) => {
+      if (!editingMaterialId) return;
+      setMatDraft(values);
+      setMaterialSheetVisible(false);
+      openAssign('materials', editingMaterialId, { fromEdit: true });
+    },
+    [editingMaterialId, openAssign],
+  );
+
+  // If assign is dismissed without selecting, restore the edit sheet when we
+  // still have an editing id from the Add-to-job path.
+  const onAssignClosed = useCallback(() => {
+    closeAssign();
+    if (editingNoteId) setNoteSheetVisible(true);
+    if (editingMaterialId) setMaterialSheetVisible(true);
+  }, [closeAssign, editingMaterialId, editingNoteId]);
+
+  const noteInitial = useMemo(
+    (): CaptureComposerNoteValues | null =>
+      editingNoteId ? { body: draftBody } : null,
+    [draftBody, editingNoteId],
+  );
   const bottomNavReservedHeight = shellBottomNavOuterHeight(insets.bottom);
 
   if (!fontsLoaded) {
@@ -466,8 +829,10 @@ export function InboxScreen({ loadKey = 0, onRequestClose }: InboxScreenProps) {
                 <ViewNotesBuckets
                   buckets={[bucket]}
                   typography={typography}
-                  onNotePress={(id) => openAssign('notes', id)}
+                  onNotePress={onNotePress}
+                  onDeleteNote={phase3 ? onDeleteNote : undefined}
                   showNoteIcon={false}
+                  hideBucketHeaders
                 />
               </View>
             );
@@ -490,7 +855,9 @@ export function InboxScreen({ loadKey = 0, onRequestClose }: InboxScreenProps) {
                 <ViewMaterialsBuckets
                   buckets={[bucket]}
                   typography={typography}
-                  onMaterialPress={(id) => openAssign('materials', id)}
+                  onMaterialPress={onMaterialPress}
+                  onDeleteMaterial={phase3 ? onDeleteMaterial : undefined}
+                  hideBucketHeaders
                 />
               </View>
             );
@@ -506,10 +873,42 @@ export function InboxScreen({ loadKey = 0, onRequestClose }: InboxScreenProps) {
         loading={assignJobsLoading}
         error={assignJobsError}
         busy={assigning}
-        onClose={closeAssign}
-        onBack={closeAssign}
+        onClose={onAssignClosed}
+        onBack={onAssignClosed}
         onSelect={(jobId) => void onAssignToJob(jobId)}
       />
+
+      {phase3 ? (
+        <>
+          <CaptureComposerSheet
+            typography={typography}
+            visible={noteSheetVisible && assignTarget === null}
+            kind="note-edit"
+            saving={noteSaving}
+            initialNote={noteInitial}
+            onClose={closeNoteEdit}
+            onSaveNote={(values) => {
+              setDraftBody(values.body);
+              void onSaveNoteChanges(values);
+            }}
+            onAddToJobNote={onAddToJobFromNote}
+          />
+
+          <CaptureComposerSheet
+            typography={typography}
+            visible={materialSheetVisible && assignTarget === null}
+            kind="material-edit"
+            saving={materialSaving}
+            initialMaterial={matDraft}
+            onClose={closeMaterialEdit}
+            onSaveMaterial={(values) => {
+              setMatDraft(values);
+              void onSaveMaterialChanges(values);
+            }}
+            onAddToJobMaterial={onAddToJobFromMaterial}
+          />
+        </>
+      ) : null}
     </View>
   );
 }

@@ -65,6 +65,8 @@ type LiveSessionOverlayProps = {
    * to refresh an already-open Job Detail or stay on the tab shell.
    */
   onSessionEnded: (input: { jobId: string }) => void;
+  /** Phase 3: inline identity + capture; no nested Edit Job / Edit Live sheets. */
+  phase3Capture?: boolean;
 };
 
 /**
@@ -74,7 +76,10 @@ type LiveSessionOverlayProps = {
  *
  * Renders nothing when there is no active live session.
  */
-export function LiveSessionOverlay({ onSessionEnded }: LiveSessionOverlayProps) {
+export function LiveSessionOverlay({
+  onSessionEnded,
+  phase3Capture = false,
+}: LiveSessionOverlayProps) {
   const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
   const minimizedBarMetrics = useMemo(() => contentColumnMetrics(windowWidth), [windowWidth]);
@@ -477,13 +482,21 @@ export function LiveSessionOverlay({ onSessionEnded }: LiveSessionOverlayProps) 
       if (!jobId) return;
       setMaterialSaving(true);
       try {
+        const totalFirst =
+          phase3Capture &&
+          values.totalCostCents != null &&
+          !(values.quantityExplicit && values.unitCostExplicit);
+        const quantity = totalFirst ? 1 : values.quantity;
+        const unitCostCents = totalFirst
+          ? Math.max(0, values.totalCostCents ?? 0)
+          : values.unitCostCents;
         const materialId = await createMaterial(supabase, {
           jobId,
           sessionId: matDraftSessionId,
           description: values.description,
-          quantity: values.quantity,
-          unit: values.unit,
-          unitCostCents: values.unitCostCents,
+          quantity,
+          unit: values.unit || 'ea',
+          unitCostCents,
         });
         await refetchJobDetail();
         closeMaterialFlow();
@@ -494,8 +507,8 @@ export function LiveSessionOverlay({ onSessionEnded }: LiveSessionOverlayProps) 
           job_id: jobId,
           session_id: matDraftSessionId,
           unit: values.unit,
-          quantity_bucket: quantityBucket(values.quantity),
-          cost_bucket: moneyBucket(values.unitCostCents),
+          quantity_bucket: quantityBucket(quantity),
+          cost_bucket: moneyBucket(unitCostCents),
           text_length_bucket: textLengthBucket(values.description),
         });
       } catch (e) {
@@ -511,7 +524,14 @@ export function LiveSessionOverlay({ onSessionEnded }: LiveSessionOverlayProps) 
         setMaterialSaving(false);
       }
     },
-    [closeMaterialFlow, formatErrorMessage, jobId, matDraftSessionId, refetchJobDetail],
+    [
+      closeMaterialFlow,
+      formatErrorMessage,
+      jobId,
+      matDraftSessionId,
+      phase3Capture,
+      refetchJobDetail,
+    ],
   );
 
   const onSaveMaterialChanges = useCallback(
@@ -699,14 +719,118 @@ export function LiveSessionOverlay({ onSessionEnded }: LiveSessionOverlayProps) 
   }, [jobDetail, liveSession]);
 
   const openEditJob = useCallback(() => {
-    if (!liveSession) return;
+    if (!liveSession || phase3Capture) return;
     analytics.capture('job_edit_opened', {
       source: 'live_session_header',
       job_id: liveSession.jobId,
     });
     setEditJobMounted(true);
     setEditJobOpen(true);
-  }, [liveSession]);
+  }, [liveSession, phase3Capture]);
+
+  const phase3JobIdentity = useMemo(() => {
+    if (!phase3Capture) return undefined;
+    if (jobDetail) {
+      return {
+        shortDescription: jobDetail.shortDescription,
+        longDescription: jobDetail.longDescription ?? '',
+        customerName: jobDetail.customerName ?? '',
+        serviceAddress: jobDetail.serviceAddress ?? '',
+        revenueCents: jobDetail.earnings.revenueCents ?? null,
+      };
+    }
+    if (!liveSession) return undefined;
+    return {
+      shortDescription: liveSession.jobShortDescription || '',
+      longDescription: '',
+      customerName: '',
+      serviceAddress: '',
+      revenueCents: null as number | null,
+    };
+  }, [jobDetail, liveSession, phase3Capture]);
+
+  const onPhase3JobIdentityChange = useCallback(
+    async (patch: {
+      shortDescription?: string;
+      longDescription?: string;
+      customerName?: string;
+      serviceAddress?: string;
+      revenueCents?: number | null;
+    }) => {
+      if (!liveSession || !phase3Capture) return;
+      const base = phase3JobIdentity ?? {
+        shortDescription: liveSession.jobShortDescription || '',
+        longDescription: '',
+        customerName: '',
+        serviceAddress: '',
+        revenueCents: null as number | null,
+      };
+      const next = {
+        shortDescription: patch.shortDescription ?? base.shortDescription,
+        longDescription: patch.longDescription ?? base.longDescription,
+        customerName: patch.customerName ?? base.customerName,
+        serviceAddress: patch.serviceAddress ?? base.serviceAddress,
+        revenueCents:
+          patch.revenueCents !== undefined ? patch.revenueCents : base.revenueCents,
+      };
+      const title = next.shortDescription.trim();
+      if (!title) return;
+      try {
+        await updateJobById(supabase, liveSession.jobId, {
+          shortDescription: title,
+          longDescription: next.longDescription,
+          customerName: next.customerName.trim(),
+          serviceAddress: next.serviceAddress.trim(),
+          revenueCents: next.revenueCents,
+        });
+        if (patch.shortDescription !== undefined) {
+          updateLiveSessionJobShortDescription({
+            jobId: liveSession.jobId,
+            jobShortDescription: title,
+          });
+        }
+        await refetchJobDetail();
+        invalidateJobsList();
+      } catch (e) {
+        Alert.alert(
+          'Update failed',
+          formatErrorMessage(e) || "Couldn't update this job. Try again.",
+        );
+      }
+    },
+    [
+      formatErrorMessage,
+      invalidateJobsList,
+      liveSession,
+      phase3Capture,
+      phase3JobIdentity,
+      refetchJobDetail,
+      updateLiveSessionJobShortDescription,
+    ],
+  );
+
+  const onPhase3ChangeStartedAt = useCallback(
+    async (iso: string) => {
+      if (!liveSession || !phase3Capture) return;
+      const previousStartedAt = liveSession.startedAt;
+      try {
+        await updateLiveSessionStartedAt({ startedAt: iso });
+        analytics.capture('live_session_start_time_changed', {
+          session_id: liveSession.id,
+          job_id: liveSession.jobId,
+          delta_minutes: Math.round(
+            (Date.parse(iso) - Date.parse(previousStartedAt)) / 60000,
+          ),
+        });
+      } catch (e) {
+        Alert.alert(
+          'Update failed',
+          formatErrorMessage(e) || "Couldn't update start time. Try again.",
+        );
+      }
+    },
+    [formatErrorMessage, liveSession, phase3Capture, updateLiveSessionStartedAt],
+  );
 
   const closeEditJob = useCallback(() => {
     setEditJobOpen(false);
@@ -838,6 +962,149 @@ export function LiveSessionOverlay({ onSessionEnded }: LiveSessionOverlayProps) 
     }
   }, [elapsedSeconds, liveSession, mode]);
 
+  const phase3LiveNotes = useMemo(() => {
+    if (!phase3Capture || !jobDetail || !liveSession) return [];
+    return jobDetail.noteBuckets
+      .flatMap((bucket) => bucket.notes)
+      .filter((note) => note.sessionId === liveSession.id)
+      .map((note) => ({ id: note.id, body: note.body }));
+  }, [jobDetail, liveSession, phase3Capture]);
+
+  const phase3LiveMaterials = useMemo(() => {
+    if (!phase3Capture || !jobDetail || !liveSession) return [];
+    return jobDetail.materialBuckets
+      .flatMap((bucket) => bucket.items)
+      .filter((material) => material.sessionId === liveSession.id)
+      .map((material) => ({
+        id: material.id,
+        description: material.name,
+        totalCostCents: material.totalCostCents,
+      }));
+  }, [jobDetail, liveSession, phase3Capture]);
+
+  const onPhase3CreateNote = useCallback(
+    async (body: string) => {
+      if (!liveSession || !jobId) return;
+      try {
+        const noteId = await createNote(supabase, {
+          jobId,
+          sessionId: liveSession.id,
+          body,
+        });
+        await refetchJobDetail();
+        analytics.capture('note_created', {
+          source: 'live_session',
+          note_id: noteId,
+          parent_type: 'session',
+          job_id: jobId,
+          session_id: liveSession.id,
+          text_length_bucket: textLengthBucket(body),
+        });
+      } catch (e) {
+        analytics.capture('note_create_failed', {
+          source: 'live_session',
+          parent_type: 'session',
+          job_id: jobId,
+          session_id: liveSession.id,
+          ...errorProperties(e),
+        });
+        Alert.alert('Save failed', formatErrorMessage(e) || 'Could not save note.');
+      }
+    },
+    [formatErrorMessage, jobId, liveSession, refetchJobDetail],
+  );
+
+  const onPhase3UpdateNote = useCallback(
+    async (id: string, body: string) => {
+      try {
+        await updateNote(supabase, id, { body });
+        await refetchJobDetail();
+      } catch (e) {
+        Alert.alert('Save failed', formatErrorMessage(e) || 'Could not save note.');
+      }
+    },
+    [formatErrorMessage, refetchJobDetail],
+  );
+
+  const onPhase3DeleteNote = useCallback(
+    async (id: string) => {
+      try {
+        await deleteNote(supabase, id);
+        await refetchJobDetail();
+      } catch (e) {
+        Alert.alert('Delete failed', formatErrorMessage(e) || 'Could not delete note.');
+      }
+    },
+    [formatErrorMessage, refetchJobDetail],
+  );
+
+  const onPhase3CreateMaterial = useCallback(
+    async (input: { description: string; totalCostCents: number }) => {
+      if (!liveSession || !jobId) return;
+      try {
+        const materialId = await createMaterial(supabase, {
+          jobId,
+          sessionId: liveSession.id,
+          description: input.description,
+          quantity: 1,
+          unit: 'ea',
+          unitCostCents: Math.max(0, input.totalCostCents),
+        });
+        await refetchJobDetail();
+        analytics.capture('material_created', {
+          source: 'live_session',
+          material_id: materialId,
+          parent_type: 'session',
+          job_id: jobId,
+          session_id: liveSession.id,
+          unit: 'ea',
+          quantity_bucket: quantityBucket(1),
+          cost_bucket: moneyBucket(input.totalCostCents),
+          text_length_bucket: textLengthBucket(input.description),
+        });
+      } catch (e) {
+        analytics.capture('material_create_failed', {
+          source: 'live_session',
+          parent_type: 'session',
+          job_id: jobId,
+          session_id: liveSession.id,
+          ...errorProperties(e),
+        });
+        Alert.alert('Save failed', formatErrorMessage(e) || 'Could not save material.');
+      }
+    },
+    [formatErrorMessage, jobId, liveSession, refetchJobDetail],
+  );
+
+  const onPhase3UpdateMaterial = useCallback(
+    async (id: string, input: { description: string; totalCostCents: number }) => {
+      try {
+        await updateMaterial(supabase, id, {
+          description: input.description,
+          quantity: 1,
+          unit: 'ea',
+          unitCostCents: Math.max(0, input.totalCostCents),
+        });
+        await refetchJobDetail();
+      } catch (e) {
+        Alert.alert('Save failed', formatErrorMessage(e) || 'Could not save material.');
+      }
+    },
+    [formatErrorMessage, refetchJobDetail],
+  );
+
+  const onPhase3DeleteMaterial = useCallback(
+    async (id: string) => {
+      try {
+        await deleteMaterial(supabase, id);
+        await refetchJobDetail();
+      } catch (e) {
+        Alert.alert('Delete failed', formatErrorMessage(e) || 'Could not delete material.');
+      }
+    },
+    [formatErrorMessage, refetchJobDetail],
+  );
+
   if (!fontsLoaded || !liveSession) return null;
 
   const barVisible = mode === 'minimized' && !hasRegisteredSheet;
@@ -854,6 +1121,22 @@ export function LiveSessionOverlay({ onSessionEnded }: LiveSessionOverlayProps) 
         jobShortDescription={liveSession.jobShortDescription}
         startedAt={liveSession.startedAt}
         attachments={liveAttachments}
+        phase3Capture={phase3Capture}
+        jobIdentity={phase3JobIdentity}
+        onJobIdentityChange={
+          phase3Capture
+            ? (patch) => {
+                void onPhase3JobIdentityChange(patch);
+              }
+            : undefined
+        }
+        onChangeStartedAt={
+          phase3Capture
+            ? (iso) => {
+                void onPhase3ChangeStartedAt(iso);
+              }
+            : undefined
+        }
         onAddNote={openAddNoteFromLive}
         onAddMaterial={openAddMaterialFromLive}
         onPressAttachment={({ kind, id }) => {
@@ -863,12 +1146,21 @@ export function LiveSessionOverlay({ onSessionEnded }: LiveSessionOverlayProps) 
             openEditMaterial(id);
           }
         }}
+        liveNotes={phase3LiveNotes}
+        liveMaterials={phase3LiveMaterials}
+        onCreateNote={phase3Capture ? onPhase3CreateNote : undefined}
+        onUpdateNote={phase3Capture ? onPhase3UpdateNote : undefined}
+        onDeleteNote={phase3Capture ? onPhase3DeleteNote : undefined}
+        onCreateMaterial={phase3Capture ? onPhase3CreateMaterial : undefined}
+        onUpdateMaterial={phase3Capture ? onPhase3UpdateMaterial : undefined}
+        onDeleteMaterial={phase3Capture ? onPhase3DeleteMaterial : undefined}
         onMinimize={minimize}
-        onEditPress={openEditSheet}
-        onEditJobPress={openEditJob}
+        onEditPress={phase3Capture ? undefined : openEditSheet}
+        onEditJobPress={phase3Capture ? undefined : openEditJob}
         onEndSessionPress={() => void handleEndSession()}
       />
 
+      {!phase3Capture ? (
       <EditLiveSessionBottomSheet
         typography={typography}
         visible={mode === 'editSheet'}
@@ -880,8 +1172,9 @@ export function LiveSessionOverlay({ onSessionEnded }: LiveSessionOverlayProps) 
         onSavePress={(payload) => void handleEditSave(payload)}
         onDeletePress={() => void handleEditDelete()}
       />
+      ) : null}
 
-      {editJobMounted ? (
+      {!phase3Capture && editJobMounted ? (
         <EditJobBottomSheet
           typography={typography}
           values={editJobValues}
@@ -904,7 +1197,10 @@ export function LiveSessionOverlay({ onSessionEnded }: LiveSessionOverlayProps) 
         Note / material + pickers: swap into the same modal layer as the live
         session sheet (same idea as `mode === 'editSheet'` vs `sheet` for
         Edit Live). No second scrim on top of the live session.
+        Phase 3 uses inline Job-Edit rows instead of these nested sheets.
       */}
+      {!phase3Capture ? (
+        <>
       <EditNoteBottomSheet
         typography={typography}
         visible={showNoteForm}
@@ -1016,6 +1312,8 @@ export function LiveSessionOverlay({ onSessionEnded }: LiveSessionOverlayProps) 
         onBack={returnToMaterialSheet}
         onSelect={onSelectMaterialUnit}
       />
+        </>
+      ) : null}
 
       {/*
         Bar stays mounted whenever a live session exists, so the morph

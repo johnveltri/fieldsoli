@@ -8,15 +8,12 @@ import {
   createMaterial,
   createNote,
   deleteJobById,
-  listRecentJobsForCurrentUser,
   tryBumpJobToInProgressIfNotStarted,
-  type RecentJobItem,
 } from '@fieldsolo/api-client';
 import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
   useMemo,
   useRef,
   useState,
@@ -25,18 +22,13 @@ import {
 import { Alert, Modal, Platform, StyleSheet, View } from 'react-native';
 
 import {
-  DropdownBottomSheet,
-  EditMaterialBottomSheet,
-  EditNoteBottomSheet,
-  QuickActionsBottomSheet,
-  type EditMaterialBottomSheetValues,
-  type EditNoteBottomSheetValues,
-  type QuickActionsRecentJob,
-  type QuickActionsStep,
+  CaptureComposerSheet,
+  type CaptureComposerMaterialValues,
+  type CaptureComposerNoteValues,
 } from '../components/ds';
 import type { PrimaryActionMenuItemId } from '../components/platform/PlatformPrimaryAction';
 import { useJobsListInvalidation } from '../context/JobsListInvalidationContext';
-import { useHasLiveSession, useLiveSession } from '../context/LiveSessionContext';
+import { useLiveSession } from '../context/LiveSessionContext';
 import {
   analytics,
   errorProperties,
@@ -47,7 +39,6 @@ import {
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { createTextStyles } from '../theme/nativeTokens';
 import {
-  CAPTURE_UNIT_OPTIONS,
   formatCaptureError,
   formatLiveSessionJobTitle,
   type CaptureStep,
@@ -59,6 +50,7 @@ type CaptureMode = 'inbox' | 'job';
 type QuickActionsFlowContextValue = {
   handlePrimaryAction: (id: PrimaryActionMenuItemId) => void;
   creatingJob: boolean;
+  /** True while inbox note/material capture UI is open. */
   quickActionsVisible: boolean;
 };
 
@@ -69,6 +61,10 @@ export type QuickActionsFlowProviderProps = {
   onCreateJob: () => Promise<unknown>;
   /** Called after a quick note/material is saved so the underlying screen can refresh. */
   onQuickCaptureSaved?: (info: { mode: CaptureMode; jobId: string | null }) => void;
+  /**
+   * Kept for call-site compatibility. Quick capture always uses description + total.
+   */
+  totalFirstMaterialCapture?: boolean;
 };
 
 export function QuickActionsFlowProvider({
@@ -76,133 +72,42 @@ export function QuickActionsFlowProvider({
   onCreateJob,
   onQuickCaptureSaved,
 }: QuickActionsFlowProviderProps) {
-  const hasLiveSession = useHasLiveSession();
   const { startLiveSession, refresh: refreshLiveSession } = useLiveSession();
   const { invalidateJobsList } = useJobsListInvalidation();
 
-  const [quickActionsVisible, setQuickActionsVisible] = useState(false);
-  const [recentJobs, setRecentJobs] = useState<RecentJobItem[]>([]);
-  const [recentJobsLoading, setRecentJobsLoading] = useState(false);
-  const [recentJobsError, setRecentJobsError] = useState<string | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
   const [creatingJob, setCreatingJob] = useState(false);
   const creatingJobRef = useRef(false);
+  const startingRef = useRef(false);
 
-  const [qaStep, setQaStep] = useState<QuickActionsStep>('chooseJob');
   const [captureStep, setCaptureStep] = useState<CaptureStep>('idle');
   const [captureKind, setCaptureKind] = useState<QuickCaptureKind>('note');
   const [captureSaving, setCaptureSaving] = useState(false);
-  const [draftBody, setDraftBody] = useState('');
-  const [matDraftDescription, setMatDraftDescription] = useState('');
-  const [matDraftUnitCostCents, setMatDraftUnitCostCents] = useState(0);
-  const [matDraftQuantity, setMatDraftQuantity] = useState(1);
-  const [matDraftUnit, setMatDraftUnit] = useState('ea');
 
   const [fontsLoaded] = useFonts(fieldsoloExpoFontAssets);
 
   const typography = useMemo(
-    () =>
-      createTextStyles(fieldsoloLoadedFonts),
+    () => createTextStyles(fieldsoloLoadedFonts),
     [],
   );
 
-  useEffect(() => {
-    if (!quickActionsVisible || captureStep !== 'idle') return;
-    setActionError(null);
-    let cancelled = false;
-    setRecentJobsLoading(true);
-    setRecentJobsError(null);
-    void (async () => {
-      if (!isSupabaseConfigured()) {
-        if (!cancelled) {
-          setRecentJobsError('Supabase is not configured.');
-          setRecentJobsLoading(false);
-        }
-        return;
-      }
-      try {
-        const items = await listRecentJobsForCurrentUser(supabase, { limit: 3 });
-        if (!cancelled) {
-          setRecentJobs(items);
-          analytics.capture('home_quick_actions_opened', {
-            recent_job_count: items.length,
-            has_live_session: hasLiveSession,
-          });
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setRecentJobsError(err instanceof Error ? err.message : 'Could not load jobs.');
-        }
-      } finally {
-        if (!cancelled) {
-          setRecentJobsLoading(false);
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [captureStep, hasLiveSession, quickActionsVisible]);
+  const quickActionsVisible = captureStep !== 'idle';
 
-  const onSelectExistingJob = useCallback(
-    async (job: RecentJobItem) => {
-      if (!isSupabaseConfigured()) {
-        setActionError('Supabase is not configured.');
-        return;
-      }
-      setActionError(null);
-      setStarting(true);
-      analytics.capture('session_start_requested', {
-        source: 'quick_actions',
-        job_id: job.id,
-        placeholder_job: false,
-      });
-      analytics.capture('home_quick_action_selected', {
-        action: 'start_session_existing_job',
-        recent_job_count: recentJobs.length,
-      });
-      try {
-        const created = await startLiveSession({
-          jobId: job.id,
-          jobShortDescription: job.shortDescription,
-        });
-        await tryBumpJobToInProgressIfNotStarted(supabase, job.id);
-        analytics.capture('live_session_started', {
-          source: 'quick_actions',
-          session_id: created.id,
-          job_id: job.id,
-          placeholder_job: false,
-        });
-        setQuickActionsVisible(false);
-        invalidateJobsList();
-      } catch (err) {
-        // eslint-disable-next-line no-console
-        console.error('[QuickActionsFlow] startLiveSession (existing job)', err);
-        void refreshLiveSession();
-        analytics.capture('live_session_start_failed', {
-          source: 'quick_actions',
-          job_id: job.id,
-          placeholder_job: false,
-          recovery_result: 'refresh_requested',
-          ...errorProperties(err),
-        });
-        setActionError(err instanceof Error ? err.message : 'Could not start session.');
-      } finally {
-        setStarting(false);
-      }
-    },
-    [invalidateJobsList, recentJobs.length, refreshLiveSession, startLiveSession],
-  );
-
-  const onStartNewSession = useCallback(async () => {
+  /**
+   * FAB Live Session: skip the old Start Session / attach-job chooser and start
+   * immediately. Sessions still require a job row in the DB, so we create a
+   * lightweight placeholder the live overlay can edit (same as former
+   * "Start New Session").
+   */
+  const startLiveSessionFromFab = useCallback(async () => {
+    if (startingRef.current) return;
     if (!isSupabaseConfigured()) {
-      setActionError('Supabase is not configured.');
+      Alert.alert('Start failed', 'Supabase is not configured.');
       return;
     }
     const shortDescription = formatLiveSessionJobTitle(new Date());
     let createdJobId: string | null = null;
-    setActionError(null);
+    startingRef.current = true;
     setStarting(true);
     analytics.capture('session_start_requested', {
       source: 'quick_actions',
@@ -210,11 +115,14 @@ export function QuickActionsFlowProvider({
     });
     analytics.capture('home_quick_action_selected', {
       action: 'start_session_new_job',
-      recent_job_count: recentJobs.length,
+      recent_job_count: 0,
     });
     try {
       createdJobId = await createBlankJobForLiveSessionStart(supabase, { shortDescription });
-      const created = await startLiveSession({ jobId: createdJobId, jobShortDescription: shortDescription });
+      const created = await startLiveSession({
+        jobId: createdJobId,
+        jobShortDescription: shortDescription,
+      });
       await tryBumpJobToInProgressIfNotStarted(supabase, createdJobId);
       analytics.capture('job_created', {
         source: 'home_quick_session',
@@ -227,11 +135,10 @@ export function QuickActionsFlowProvider({
         job_id: createdJobId,
         placeholder_job: true,
       });
-      setQuickActionsVisible(false);
       invalidateJobsList();
     } catch (err) {
       // eslint-disable-next-line no-console
-      console.error('[QuickActionsFlow] startLiveSession (new job)', err);
+      console.error('[QuickActionsFlow] startLiveSession (fab)', err);
       let recoveredJobId: string | null = null;
       try {
         const recovered = await refreshLiveSession();
@@ -247,7 +154,6 @@ export function QuickActionsFlowProvider({
           recovery_result: 'recovered_created_job_session',
           ...errorProperties(err),
         });
-        setQuickActionsVisible(false);
         invalidateJobsList();
         return;
       }
@@ -267,65 +173,36 @@ export function QuickActionsFlowProvider({
         recovery_result: createdJobId ? 'placeholder_job_deleted' : 'no_job_created',
         ...errorProperties(err),
       });
-      setActionError(err instanceof Error ? err.message : 'Could not start session.');
+      Alert.alert(
+        'Start failed',
+        err instanceof Error ? err.message : 'Could not start session.',
+      );
     } finally {
+      startingRef.current = false;
       setStarting(false);
     }
-  }, [invalidateJobsList, recentJobs.length, refreshLiveSession, startLiveSession]);
+  }, [invalidateJobsList, refreshLiveSession, startLiveSession]);
 
-  const resetCapture = useCallback(() => {
+  const closeQuickActions = useCallback(() => {
     setCaptureStep('idle');
-    setDraftBody('');
-    setMatDraftDescription('');
-    setMatDraftUnitCostCents(0);
-    setMatDraftQuantity(1);
-    setMatDraftUnit('ea');
     setCaptureSaving(false);
   }, []);
 
-  const closeQuickActions = useCallback(() => {
-    setQuickActionsVisible(false);
-    resetCapture();
-  }, [resetCapture]);
-
-  const openQuickActionsAtStep = useCallback(
-    (step: QuickActionsStep) => {
-      resetCapture();
-      setQaStep(step);
-      setActionError(null);
-      setQuickActionsVisible(true);
-    },
-    [resetCapture],
-  );
-
-  const beginInboxCapture = useCallback(
-    (kind: QuickCaptureKind) => {
-      setQuickActionsVisible(true);
-      analytics.capture('home_quick_action_selected', {
-        action: kind === 'note' ? 'new_note' : 'new_material',
-        recent_job_count: recentJobs.length,
-      });
-      analytics.capture(kind === 'note' ? 'note_create_opened' : 'material_create_opened', {
-        source: 'quick_actions',
-        parent: 'inbox',
-      });
-      setCaptureKind(kind);
-      if (kind === 'note') {
-        setDraftBody('');
-        setCaptureStep('noteEdit');
-      } else {
-        setMatDraftDescription('');
-        setMatDraftUnitCostCents(0);
-        setMatDraftQuantity(1);
-        setMatDraftUnit('ea');
-        setCaptureStep('materialEdit');
-      }
-    },
-    [recentJobs.length],
-  );
+  const beginInboxCapture = useCallback((kind: QuickCaptureKind) => {
+    analytics.capture('home_quick_action_selected', {
+      action: kind === 'note' ? 'new_note' : 'new_material',
+      recent_job_count: 0,
+    });
+    analytics.capture(kind === 'note' ? 'note_create_opened' : 'material_create_opened', {
+      source: 'quick_actions',
+      parent: 'inbox',
+    });
+    setCaptureKind(kind);
+    setCaptureStep(kind === 'note' ? 'noteEdit' : 'materialEdit');
+  }, []);
 
   const saveCaptureNote = useCallback(
-    async ({ body }: EditNoteBottomSheetValues) => {
+    async ({ body }: CaptureComposerNoteValues) => {
       if (captureSaving) return;
       if (!isSupabaseConfigured()) {
         Alert.alert('Save failed', 'Supabase is not configured.');
@@ -367,7 +244,7 @@ export function QuickActionsFlowProvider({
   );
 
   const saveCaptureMaterial = useCallback(
-    async (values: EditMaterialBottomSheetValues) => {
+    async (values: CaptureComposerMaterialValues) => {
       if (captureSaving) return;
       if (!isSupabaseConfigured()) {
         Alert.alert('Save failed', 'Supabase is not configured.');
@@ -375,13 +252,19 @@ export function QuickActionsFlowProvider({
       }
       setCaptureSaving(true);
       try {
+        const totalFirst = !(values.quantityExplicit && values.unitCostExplicit);
+        const quantity = totalFirst ? 1 : values.quantity;
+        const unitCostCents = totalFirst
+          ? Math.max(0, values.totalCostCents)
+          : Math.max(0, values.unitCostCents);
+        const unit = values.unit.trim() || 'ea';
         const materialId = await createMaterial(supabase, {
           jobId: null,
           sessionId: null,
           description: values.description,
-          quantity: values.quantity,
-          unit: values.unit,
-          unitCostCents: values.unitCostCents,
+          quantity,
+          unit,
+          unitCostCents,
         });
         analytics.capture('material_created', {
           source: 'quick_actions',
@@ -389,9 +272,9 @@ export function QuickActionsFlowProvider({
           parent_type: 'inbox',
           job_id: null,
           session_id: null,
-          unit: values.unit,
-          quantity_bucket: quantityBucket(values.quantity),
-          cost_bucket: moneyBucket(values.unitCostCents),
+          unit,
+          quantity_bucket: quantityBucket(quantity),
+          cost_bucket: moneyBucket(unitCostCents),
           text_length_bucket: textLengthBucket(values.description),
         });
         closeQuickActions();
@@ -435,7 +318,7 @@ export function QuickActionsFlowProvider({
           return;
         }
         case 'live_session':
-          openQuickActionsAtStep('chooseJob');
+          void startLiveSessionFromFab();
           return;
         case 'quick_note':
           beginInboxCapture('note');
@@ -449,16 +332,16 @@ export function QuickActionsFlowProvider({
         }
       }
     },
-    [beginInboxCapture, onCreateJob, openQuickActionsAtStep],
+    [beginInboxCapture, onCreateJob, startLiveSessionFromFab],
   );
 
   const contextValue = useMemo(
     () => ({
       handlePrimaryAction,
-      creatingJob,
+      creatingJob: creatingJob || starting,
       quickActionsVisible,
     }),
-    [creatingJob, handlePrimaryAction, quickActionsVisible],
+    [creatingJob, handlePrimaryAction, quickActionsVisible, starting],
   );
 
   return (
@@ -474,78 +357,14 @@ export function QuickActionsFlowProvider({
           onRequestClose={closeQuickActions}
         >
           <View style={styles.modalHost}>
-            <QuickActionsBottomSheet
+            <CaptureComposerSheet
               typography={typography}
-              visible={captureStep === 'idle'}
-              step={qaStep}
-              recentJobs={recentJobs}
-              recentJobsLoading={recentJobsLoading}
-              recentJobsError={recentJobsError}
-              actionError={actionError}
-              starting={starting}
+              visible={captureStep === 'noteEdit' || captureStep === 'materialEdit'}
+              kind={captureKind}
+              saving={captureSaving}
               onClose={closeQuickActions}
-              onSelectExistingJob={onSelectExistingJob}
-              onStartNewSession={onStartNewSession}
-            />
-
-            <EditNoteBottomSheet
-              typography={typography}
-              visible={captureStep === 'noteEdit'}
-              title="New Note"
-              primaryLabel="SAVE NOTE TO INBOX"
-              subtitle="Unassigned quick capture note"
-              values={{ body: draftBody }}
-              assignedSession={null}
-              canAttachSession={false}
-              registerInGlobalStack={false}
-              onClose={closeQuickActions}
-              onBack={closeQuickActions}
-              onSavePress={(values) => void saveCaptureNote(values)}
-              onDeletePress={closeQuickActions}
-            />
-
-            <EditMaterialBottomSheet
-              typography={typography}
-              visible={captureStep === 'materialEdit'}
-              title="New Material"
-              primaryLabel="SAVE MATERIAL TO INBOX"
-              subtitle="Unassigned quick capture material"
-              values={{
-                description: matDraftDescription,
-                unitCostCents: matDraftUnitCostCents,
-                quantity: matDraftQuantity,
-                unit: matDraftUnit,
-              }}
-              assignedSession={null}
-              canAttachSession={false}
-              registerInGlobalStack={false}
-              onClose={closeQuickActions}
-              onBack={closeQuickActions}
-              onUnitPress={(values) => {
-                setMatDraftDescription(values.description);
-                setMatDraftUnitCostCents(values.unitCostCents);
-                setMatDraftQuantity(values.quantity);
-                setMatDraftUnit(values.unit);
-                setCaptureStep('materialUnit');
-              }}
-              onSavePress={(values) => void saveCaptureMaterial(values)}
-              onDeletePress={closeQuickActions}
-            />
-
-            <DropdownBottomSheet
-              typography={typography}
-              visible={captureStep === 'materialUnit'}
-              options={CAPTURE_UNIT_OPTIONS}
-              currentValue={matDraftUnit}
-              allowCustom
-              customPlaceholder="Custom"
-              registerInGlobalStack={false}
-              onClose={closeQuickActions}
-              onBack={() => setCaptureStep('materialEdit')}
-              onSelect={(unit) => {
-                setMatDraftUnit(unit || 'ea');
-                setCaptureStep('materialEdit');
-              }}
+              onSaveNote={(values) => void saveCaptureNote(values)}
+              onSaveMaterial={(values) => void saveCaptureMaterial(values)}
             />
           </View>
         </Modal>
