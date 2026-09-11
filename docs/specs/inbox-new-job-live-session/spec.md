@@ -36,6 +36,7 @@ A solo tradesperson can capture work in the field without choosing a job first, 
   - Start date/time **in place** (tappable); persist via `updateLiveSessionStart`. **End Session** is the only end path on the overlay.
   - `Add note` / `Add material` rows (Job Edit–style); persist immediately on `createNote` / `createMaterial` attached to **this live session** (not Inbox).
   - This session’s notes/materials listed as Job View–style rows: scan, tap to edit (compact composer), swipe to delete. No chevron, no `N notes · M materials` on a session header.
+  - Hide **END SESSION** while any inline text field is focused; restore it after blur so entering a value cannot accidentally end the session.
   - **Not on overlay:** other costs, past sessions, confirm-none checkboxes, job `Missing:` line, Delete job, nested fullscreen Job Edit with **Done**.
   - Live writes do **not** use `apply_job_detail_edit`.
 - **Deleting a running live session** is not a primary overlay action. **End Session** keeps the ended session on the job. Hard-delete of a live session stays off the overlay (ended sessions deletable from Job View/Edit swipe as today).

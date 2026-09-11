@@ -10,6 +10,7 @@
 | Live overlay nested Edit / Done returns | High | Medium | TEST-L08 |
 | Live identity requires Done | High | Medium | TEST-L04 |
 | Live capture not immediate | High | Medium | TEST-L05 |
+| End Session is tappable while entering an inline value | High | Medium | TEST-L07 |
 | Start tile visible during another live | Medium | Medium | TEST-L02 |
 | Material quick capture still requires qty+unit | Medium | High | TEST-Q02 |
 | Flag-off regression | High | Medium | TEST-F02 |
@@ -36,7 +37,7 @@
 | TEST-L04 | REQ-L04, DATA-L03 | Change customer on live overlay (flag on) | `updateJobById` called; no Done; bar title updates | Integration | Auto | Jest |
 | TEST-L05 | REQ-L05 | Add note/material on overlay (flag on) | Persist with live sessionId; a failed write keeps the local draft for retry | Integration | Auto | Jest |
 | TEST-L06 | REQ-L06 | Overlay list (flag on) | Flat rows; no chevron; tap opens edit | Component | Auto | Jest |
-| TEST-L07 | REQ-L07 | Change started time rapidly; end session | Latest value persists without overlapping writes; no EditLiveSession sheet; end opens Job View | Component + integration | Auto | Jest |
+| TEST-L07 | REQ-L07 | Edit any inline value; change started time rapidly; end session | Focused text field scrolls above the software keyboard; End Session hides while focused and restores on blur; latest start value persists without overlapping writes; no EditLiveSession sheet; end opens Job View | Component + integration | Auto | Jest |
 | TEST-L08 | REQ-L08 | Render expanded live overlay (flag on) | No header EDIT; no EditJobBottomSheet trigger | Component | Auto | Jest |
 | TEST-S01 | REQ-S01 | Composer + quick sheets | Use shared Edit row testIDs/components | Component | Auto | Jest |
 | TEST-L09 | UX-L10 | Minimize live | Back minimizes; session continues | Component | Auto | Jest |

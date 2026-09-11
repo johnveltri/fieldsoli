@@ -73,9 +73,12 @@ jest.mock('./BottomSheetShell', () => {
   };
 });
 
-jest.mock('./InlineMonthCalendar', () => ({
-  InlineMonthCalendar: () => null,
-}));
+jest.mock('./InlineMonthCalendar', () => {
+  const { View } = require('react-native');
+  return {
+    InlineMonthCalendar: () => <View testID="inline-month-calendar" />,
+  };
+});
 
 jest.mock('./LiveSessionCaptureCard', () => ({
   LiveSessionCaptureCard: () => null,
@@ -193,6 +196,34 @@ describe('LiveSessionBottomSheet phase3Capture', () => {
     jest.useRealTimers();
   });
 
+  it('hides End Session while an inline field is focused and restores it on blur', () => {
+    const screen = render(
+      <LiveSessionBottomSheet
+        typography={typography}
+        visible
+        jobShortDescription="Panel upgrade"
+        startedAt={new Date().toISOString()}
+        attachments={[]}
+        phase3Capture
+        jobIdentity={identity}
+        onAddNote={noop}
+        onAddMaterial={noop}
+        onPressAttachment={noop}
+        onMinimize={noop}
+        onEndSessionPress={noop}
+      />,
+    );
+
+    const title = screen.getByLabelText('Job title');
+    expect(screen.getByLabelText('End session')).toBeTruthy();
+
+    fireEvent(title, 'focus', { nativeEvent: { target: 1 } });
+    expect(screen.queryByLabelText('End session')).toBeNull();
+
+    fireEvent(title, 'blur');
+    expect(screen.getByLabelText('End session')).toBeTruthy();
+  });
+
   it('TEST-L05 keeps a new note visible when its save fails so it can be retried', async () => {
     const onCreateNote = jest.fn<() => Promise<void>>().mockRejectedValue(new Error('Offline'));
     const screen = render(
@@ -302,6 +333,122 @@ describe('LiveSessionBottomSheet phase3Capture', () => {
     const expectedLatest = new Date(latest);
     expectedLatest.setSeconds(0, 0);
     expect(onChangeStartedAt).toHaveBeenLastCalledWith(expectedLatest.toISOString());
+  });
+
+  it('closes the started date picker when another field is focused', () => {
+    const screen = render(
+      <LiveSessionBottomSheet
+        typography={typography}
+        visible
+        jobShortDescription="Panel upgrade"
+        startedAt={new Date().toISOString()}
+        attachments={[]}
+        phase3Capture
+        jobIdentity={identity}
+        onAddNote={noop}
+        onAddMaterial={noop}
+        onPressAttachment={noop}
+        onMinimize={noop}
+        onEndSessionPress={noop}
+      />,
+    );
+
+    fireEvent.press(screen.getByLabelText('Started date'));
+    expect(screen.getByTestId('inline-month-calendar')).toBeTruthy();
+
+    fireEvent(screen.getByPlaceholderText('Customer'), 'focus', {
+      nativeEvent: { target: 1 },
+    });
+    expect(screen.queryByTestId('inline-month-calendar')).toBeNull();
+  });
+
+  it('closes the started time picker when another field is focused', () => {
+    const screen = render(
+      <LiveSessionBottomSheet
+        typography={typography}
+        visible
+        jobShortDescription="Panel upgrade"
+        startedAt={new Date().toISOString()}
+        attachments={[]}
+        phase3Capture
+        jobIdentity={identity}
+        onAddNote={noop}
+        onAddMaterial={noop}
+        onPressAttachment={noop}
+        onMinimize={noop}
+        onEndSessionPress={noop}
+      />,
+    );
+
+    fireEvent.press(screen.getByLabelText('Started time'));
+    expect(screen.getByTestId('datetime-picker')).toBeTruthy();
+
+    fireEvent(screen.getByLabelText('Job title'), 'focus', {
+      nativeEvent: { target: 1 },
+    });
+    expect(screen.queryByTestId('datetime-picker')).toBeNull();
+  });
+
+  it('closes started pickers when tapping outside the field', () => {
+    const screen = render(
+      <LiveSessionBottomSheet
+        typography={typography}
+        visible
+        jobShortDescription="Panel upgrade"
+        startedAt={new Date().toISOString()}
+        attachments={[]}
+        phase3Capture
+        jobIdentity={identity}
+        onAddNote={noop}
+        onAddMaterial={noop}
+        onPressAttachment={noop}
+        onMinimize={noop}
+        onEndSessionPress={noop}
+      />,
+    );
+
+    fireEvent.press(screen.getByLabelText('Started date'));
+    expect(screen.getByTestId('inline-month-calendar')).toBeTruthy();
+
+    fireEvent.press(screen.getByLabelText('Dismiss started picker'));
+    expect(screen.queryByTestId('inline-month-calendar')).toBeNull();
+
+    fireEvent.press(screen.getByLabelText('Started time'));
+    expect(screen.getByTestId('datetime-picker')).toBeTruthy();
+
+    fireEvent.press(screen.getByLabelText('Dismiss started picker'));
+    expect(screen.queryByTestId('datetime-picker')).toBeNull();
+  });
+
+  it('closes started pickers when tapping the Started row chrome', () => {
+    const screen = render(
+      <LiveSessionBottomSheet
+        typography={typography}
+        visible
+        jobShortDescription="Panel upgrade"
+        startedAt={new Date().toISOString()}
+        attachments={[]}
+        phase3Capture
+        jobIdentity={identity}
+        onAddNote={noop}
+        onAddMaterial={noop}
+        onPressAttachment={noop}
+        onMinimize={noop}
+        onEndSessionPress={noop}
+      />,
+    );
+
+    fireEvent.press(screen.getByLabelText('Started date'));
+    expect(screen.getByTestId('inline-month-calendar')).toBeTruthy();
+
+    fireEvent.press(screen.getByText('Started'));
+    expect(screen.queryByTestId('inline-month-calendar')).toBeNull();
+
+    fireEvent.press(screen.getByLabelText('Started time'));
+    expect(screen.getByTestId('datetime-picker')).toBeTruthy();
+
+    fireEvent.press(screen.getByText('Started'));
+    expect(screen.queryByTestId('datetime-picker')).toBeNull();
   });
 
   it('TEST-F02 keeps the complete legacy live-session sheet when the flag is off', () => {

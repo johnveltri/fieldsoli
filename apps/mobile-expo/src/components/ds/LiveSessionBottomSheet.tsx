@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Platform,
   Pressable,
+  type ScrollView,
   StyleSheet,
   Text,
   View,
@@ -34,6 +35,7 @@ import {
   EditFieldInput,
   EditIconGroup,
   EditIconRow,
+  EditKeyboardScrollProvider,
   EditSheet,
   EditTappableValue,
   EditTitleField,
@@ -220,6 +222,10 @@ export function LiveSessionBottomSheet({
   const [pickerDate, setPickerDate] = useState(() => startOfDay(startedDate));
   const [pickerTime, setPickerTime] = useState(() => startedDate);
   const [activePicker, setActivePicker] = useState<'date' | 'startTime' | null>(null);
+  const [inlineFieldFocused, setInlineFieldFocused] = useState(false);
+  const sheetScrollRef = useRef<ScrollView | null>(null);
+  const sheetScrollContentRef = useRef<View | null>(null);
+  const sheetScrollYRef = useRef(0);
   const [startTimeError, setStartTimeError] = useState<string | null>(null);
   const persistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingStartedAt = useRef<string | null>(null);
@@ -471,10 +477,12 @@ export function LiveSessionBottomSheet({
   const iconColor = fg.secondary;
 
   const addComposerNote = useCallback(() => {
+    setActivePicker(null);
     setComposerNotes((prev) => [...prev, { localId: newLocalId(), body: '' }]);
   }, []);
 
   const addComposerMaterial = useCallback(() => {
+    setActivePicker(null);
     setComposerMaterials((prev) => [
       ...prev,
       { localId: newLocalId(), description: '', totalText: '' },
@@ -542,22 +550,44 @@ export function LiveSessionBottomSheet({
     [liveMaterials, onUpdateMaterial],
   );
 
+  const dismissStartedPickers = useCallback(() => {
+    setActivePicker(null);
+  }, []);
+
+  const hideEndSessionWhileEditing = useCallback(() => {
+    setActivePicker(null);
+    setInlineFieldFocused(true);
+  }, []);
+
+  const restoreEndSessionAfterEditing = useCallback(() => {
+    setInlineFieldFocused(false);
+  }, []);
+
   return (
+    <EditKeyboardScrollProvider
+      scrollViewRef={sheetScrollRef}
+      scrollContentRef={sheetScrollContentRef}
+      scrollYRef={sheetScrollYRef}
+      active={visible && phase3Capture}
+    >
     <BottomSheetShell
       visible={visible}
+      scrollViewRef={sheetScrollRef}
       onClose={onMinimize}
       onClosed={onClosed}
       variant="fullbleedDark"
       autoSizeUpToFraction={1}
       registerInGlobalStack={false}
       stickyFooter={
-        <FullWidthFab
-          typography={typography}
-          label="END SESSION"
-          accessibilityLabel="End session"
-          onPress={onEndSessionPress}
-          includeSafeArea
-        />
+        phase3Capture && !inlineFieldFocused ? (
+          <FullWidthFab
+            typography={typography}
+            label="END SESSION"
+            accessibilityLabel="End session"
+            onPress={onEndSessionPress}
+            includeSafeArea
+          />
+        ) : undefined
       }
     >
       <View
@@ -611,15 +641,28 @@ export function LiveSessionBottomSheet({
             </View>
           ) : null}
 
-          <View style={styles.timerWrap}>
+          <Pressable
+            accessible={false}
+            onPress={dismissStartedPickers}
+            style={styles.timerWrap}
+          >
             <Text style={styles.timer}>{formatTimer(elapsed)}</Text>
-          </View>
+          </Pressable>
         </View>
       </View>
 
-      <View style={styles.body}>
+      <View ref={sheetScrollContentRef} style={styles.body}>
+        {phase3Capture && activePicker != null ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Dismiss started picker"
+            onPress={dismissStartedPickers}
+            style={styles.pickerDismissOverlay}
+          />
+        ) : null}
         {phase3Capture ? (
           <>
+            <View style={styles.pickerHitLayer}>
             <EditSheet>
               <EditTitleField
                 typography={typography}
@@ -632,7 +675,11 @@ export function LiveSessionBottomSheet({
                   draftRef.current = { ...draftRef.current, title: next };
                   schedulePersist();
                 }}
-                onBlur={() => flushIdentity()}
+                onFocus={hideEndSessionWhileEditing}
+                onBlur={() => {
+                  restoreEndSessionAfterEditing();
+                  flushIdentity();
+                }}
               />
               <EditDescriptionField
                 typography={typography}
@@ -644,30 +691,42 @@ export function LiveSessionBottomSheet({
                   draftRef.current = { ...draftRef.current, longDescription: t };
                   schedulePersist();
                 }}
-                onBlur={() => flushIdentity()}
+                onFocus={hideEndSessionWhileEditing}
+                onBlur={() => {
+                  restoreEndSessionAfterEditing();
+                  flushIdentity();
+                }}
               />
             </EditSheet>
+            </View>
 
+            <View style={styles.pickerHitLayer}>
             <EditSheet>
-              <EditIconRow icon={<JobDetailIconSectionSessions color={iconColor} />}>
-                <View style={styles.startedContent}>
-                  <Text style={[typography.bodySmall, { color: fg.secondary }]}>Started</Text>
-                  <View style={styles.startedValues}>
-                    <EditTappableValue
-                      typography={typography}
-                      value={pickerDateLabel}
-                      accessibilityLabel="Started date"
-                      onPress={openDatePicker}
-                    />
-                    <EditTappableValue
-                      typography={typography}
-                      value={timeValueLabel}
-                      accessibilityLabel="Started time"
-                      onPress={openTimePicker}
-                    />
+              <Pressable
+                accessible={false}
+                disabled={activePicker == null}
+                onPress={dismissStartedPickers}
+              >
+                <EditIconRow icon={<JobDetailIconSectionSessions color={iconColor} />}>
+                  <View style={styles.startedContent}>
+                    <Text style={[typography.bodySmall, { color: fg.secondary }]}>Started</Text>
+                    <View style={styles.startedValues}>
+                      <EditTappableValue
+                        typography={typography}
+                        value={pickerDateLabel}
+                        accessibilityLabel="Started date"
+                        onPress={openDatePicker}
+                      />
+                      <EditTappableValue
+                        typography={typography}
+                        value={timeValueLabel}
+                        accessibilityLabel="Started time"
+                        onPress={openTimePicker}
+                      />
+                    </View>
                   </View>
-                </View>
-              </EditIconRow>
+                </EditIconRow>
+              </Pressable>
               {activePicker === 'date' ? (
                 <View style={styles.pickerWrap}>
                   <InlineMonthCalendar
@@ -702,7 +761,9 @@ export function LiveSessionBottomSheet({
                 </Text>
               ) : null}
             </EditSheet>
+            </View>
 
+            <View style={styles.pickerHitLayer}>
             <EditSheet>
               <EditIconRow icon={<EditIconPerson color={iconColor} />}>
                 <EditFieldInput
@@ -714,7 +775,11 @@ export function LiveSessionBottomSheet({
                     draftRef.current = { ...draftRef.current, customerName: t };
                     schedulePersist();
                   }}
-                  onBlur={() => flushIdentity()}
+                  onFocus={hideEndSessionWhileEditing}
+                  onBlur={() => {
+                    restoreEndSessionAfterEditing();
+                    flushIdentity();
+                  }}
                 />
               </EditIconRow>
               <EditIconRow icon={<EditIconLocation color={iconColor} />} showTopBorder>
@@ -728,7 +793,11 @@ export function LiveSessionBottomSheet({
                     draftRef.current = { ...draftRef.current, serviceAddress: t };
                     schedulePersist();
                   }}
-                  onBlur={() => flushIdentity()}
+                  onFocus={hideEndSessionWhileEditing}
+                  onBlur={() => {
+                    restoreEndSessionAfterEditing();
+                    flushIdentity();
+                  }}
                 />
               </EditIconRow>
             </EditSheet>
@@ -745,7 +814,9 @@ export function LiveSessionBottomSheet({
                     setRevenueText(t);
                     draftRef.current = { ...draftRef.current, revenueText: t };
                   }}
+                  onFocus={hideEndSessionWhileEditing}
                   onBlur={() => {
+                    restoreEndSessionAfterEditing();
                     const cents = parseMoneyToCents(draftRef.current.revenueText);
                     const formatted =
                       cents != null && cents > 0 ? formatUsdCombined(cents) : '';
@@ -789,7 +860,9 @@ export function LiveSessionBottomSheet({
                             }))
                           }
                           placeholder="Description"
+                          onFocus={hideEndSessionWhileEditing}
                           onBlur={() => {
+                            restoreEndSessionAfterEditing();
                             void persistExistingMaterial(
                               material.id,
                               draft.description,
@@ -808,7 +881,9 @@ export function LiveSessionBottomSheet({
                           }
                           placeholder="Total"
                           keyboardType="decimal-pad"
+                          onFocus={hideEndSessionWhileEditing}
                           onBlur={() => {
+                            restoreEndSessionAfterEditing();
                             const cents = parseMoneyToCents(draft.totalText);
                             const formatted =
                               cents != null && cents > 0
@@ -864,7 +939,9 @@ export function LiveSessionBottomSheet({
                           )
                         }
                         placeholder="Description"
+                        onFocus={hideEndSessionWhileEditing}
                         onBlur={() => {
+                          restoreEndSessionAfterEditing();
                           void persistNewMaterial(
                             material.localId,
                             material.description,
@@ -886,7 +963,9 @@ export function LiveSessionBottomSheet({
                         }
                         placeholder="Total"
                         keyboardType="decimal-pad"
+                        onFocus={hideEndSessionWhileEditing}
                         onBlur={() => {
+                          restoreEndSessionAfterEditing();
                           void persistNewMaterial(
                             material.localId,
                             material.description,
@@ -929,7 +1008,9 @@ export function LiveSessionBottomSheet({
                         }
                         placeholder="Note"
                         multiline
+                        onFocus={hideEndSessionWhileEditing}
                         onBlur={() => {
+                          restoreEndSessionAfterEditing();
                           void persistExistingNote(
                             note.id,
                             noteDrafts[note.id] ?? note.body,
@@ -973,7 +1054,9 @@ export function LiveSessionBottomSheet({
                         }
                         placeholder="Note"
                         multiline
+                        onFocus={hideEndSessionWhileEditing}
                         onBlur={() => {
+                          restoreEndSessionAfterEditing();
                           void persistNewNote(note.localId, note.body);
                         }}
                       />
@@ -989,6 +1072,7 @@ export function LiveSessionBottomSheet({
                 showTopBorder={liveNotes.length + composerNotes.length > 0}
               />
             </EditSheet>
+            </View>
           </>
         ) : (
           <LiveSessionCaptureCard
@@ -1006,6 +1090,7 @@ export function LiveSessionBottomSheet({
         )}
       </View>
     </BottomSheetShell>
+    </EditKeyboardScrollProvider>
   );
 }
 
@@ -1136,6 +1221,14 @@ const styles = StyleSheet.create({
   pickerWrap: {
     paddingHorizontal: space('Spacing/16'),
     paddingBottom: space('Spacing/12'),
+  },
+  pickerDismissOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 1,
+  },
+  pickerHitLayer: {
+    zIndex: 2,
+    gap: space('Spacing/12'),
   },
   startTimeError: {
     color: color('Semantic/Status/Error/Text'),

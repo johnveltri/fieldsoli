@@ -14,6 +14,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  type ScrollView,
   StyleSheet,
   useWindowDimensions,
   type KeyboardEvent,
@@ -108,6 +109,8 @@ type BottomSheetShellProps = {
    * Used by Live Session for the End Session full-width FAB.
    */
   stickyFooter?: ReactNode;
+  /** Optional owner ref for the internal scroll viewport. */
+  scrollViewRef?: React.RefObject<ScrollView | null>;
 };
 
 /**
@@ -132,6 +135,7 @@ export function BottomSheetShell({
   accessibilityTitle,
   interactionEnabled = true,
   stickyFooter,
+  scrollViewRef,
 }: BottomSheetShellProps) {
   const insets = useSafeAreaInsets();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
@@ -559,6 +563,7 @@ export function BottomSheetShell({
               ) : null}
               {scrollViewMaxHeight != null ? (
                 <BottomSheetScrollView
+                  scrollViewRef={scrollViewRef}
                   waitFor={scrollAtTop ? panRef : undefined}
                   style={{ maxHeight: scrollViewMaxHeight }}
                   contentContainerStyle={[
