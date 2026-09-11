@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { color, radius, space } from '@fieldsolo/design-system/lib/tokens';
@@ -180,6 +181,30 @@ export function CaptureComposerSheet({
   const [totalFocused, setTotalFocused] = useState(false);
   const [committing, setCommitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const jobTitleRef = useRef<TextInput>(null);
+  const jobTitleFocusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const jobTitleFocusFrameRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!visible || kind !== 'job') return;
+
+    jobTitleFocusFrameRef.current = requestAnimationFrame(() => {
+      jobTitleFocusTimeoutRef.current = setTimeout(() => {
+        jobTitleRef.current?.focus();
+      }, 80);
+    });
+
+    return () => {
+      if (jobTitleFocusFrameRef.current != null) {
+        cancelAnimationFrame(jobTitleFocusFrameRef.current);
+        jobTitleFocusFrameRef.current = null;
+      }
+      if (jobTitleFocusTimeoutRef.current) {
+        clearTimeout(jobTitleFocusTimeoutRef.current);
+        jobTitleFocusTimeoutRef.current = null;
+      }
+    };
+  }, [kind, visible]);
 
   useEffect(() => {
     if (!visible) return;
@@ -355,6 +380,7 @@ export function CaptureComposerSheet({
           {kind === 'job' ? (
             <EditSheet>
               <EditTitleField
+                ref={jobTitleRef}
                 typography={typography}
                 accessibilityLabel="Job title"
                 placeholder="Job title"

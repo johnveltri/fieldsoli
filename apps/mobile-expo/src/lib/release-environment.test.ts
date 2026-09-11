@@ -24,6 +24,15 @@ describe('validateReleaseEnvironment', () => {
     ).not.toThrow();
   });
 
+  it('allows the Android emulator host loopback during development', () => {
+    expect(() =>
+      validateReleaseEnvironment({
+        EXPO_PUBLIC_APP_ENV: 'development',
+        EXPO_PUBLIC_SUPABASE_URL: 'http://10.0.2.2:54321',
+      }),
+    ).not.toThrow();
+  });
+
   it('rejects the production project during development', () => {
     expect(() =>
       validateReleaseEnvironment({
@@ -68,6 +77,15 @@ describe('validateReleaseEnvironment', () => {
       validateReleaseEnvironment({
         ...hostedReleaseEnv,
         EXPO_PUBLIC_SUPABASE_URL: 'http://127.0.0.1:54321',
+      }),
+    ).toThrow('HTTPS hosted Supabase URL');
+  });
+
+  it('rejects the Android emulator host loopback for production builds', () => {
+    expect(() =>
+      validateReleaseEnvironment({
+        ...hostedReleaseEnv,
+        EXPO_PUBLIC_SUPABASE_URL: 'http://10.0.2.2:54321',
       }),
     ).toThrow('HTTPS hosted Supabase URL');
   });

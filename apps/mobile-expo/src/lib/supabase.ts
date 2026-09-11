@@ -1,11 +1,16 @@
 import { createFieldSoloClient } from '@fieldsolo/api-client';
+import { Platform } from 'react-native';
 
 import { authStorage } from './authStorage';
+import { resolveSupabaseUrlForPlatform } from './resolveSupabaseUrl';
 import { FIELD_SOLO_AUTH_STORAGE_KEY } from './storageKeys';
 
 type FieldSoloClient = ReturnType<typeof createFieldSoloClient>;
 
-const url = (process.env.EXPO_PUBLIC_SUPABASE_URL ?? '').trim();
+const url = resolveSupabaseUrlForPlatform(
+  (process.env.EXPO_PUBLIC_SUPABASE_URL ?? '').trim(),
+  Platform.OS,
+);
 const anon = (process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '').trim();
 
 const configured = url.length > 0 && anon.length > 0;

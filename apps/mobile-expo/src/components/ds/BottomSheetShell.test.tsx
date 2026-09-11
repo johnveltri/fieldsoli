@@ -20,6 +20,7 @@ import {
   useHasRegisteredBottomSheet,
 } from '../../context/BottomSheetStackContext';
 import { BottomSheetShell } from './BottomSheetShell';
+import { bg } from '../../theme/nativeTokens';
 
 function SheetStackStatus() {
   const hasRegisteredSheet = useHasRegisteredBottomSheet();
@@ -160,17 +161,18 @@ describe('BottomSheetShell accessibility', () => {
     expect(surfaceStyle.paddingBottom).toBe(0);
   });
 
-  it('clips a fullbleed live-session header into the standard rounded sheet top', () => {
+  it('presents a fullbleed live session as a full-page overlay', () => {
     render(
       <BottomSheetShell visible variant="fullbleedDark">
         <Text>Live session</Text>
       </BottomSheetShell>,
     );
 
+    const overlayStyle = StyleSheet.flatten(screen.getByTestId('bottom-sheet-overlay').props.style);
+    expect(overlayStyle.top).toBe(0);
     const surfaceStyle = StyleSheet.flatten(screen.getByTestId('bottom-sheet-surface').props.style);
-    expect(surfaceStyle.borderTopLeftRadius).toBeGreaterThan(0);
-    expect(surfaceStyle.borderTopRightRadius).toBeGreaterThan(0);
-    expect(surfaceStyle.borderCurve).toBe('continuous');
+    expect(surfaceStyle.borderTopLeftRadius).toBeUndefined();
+    expect(surfaceStyle.flexGrow).toBe(1);
     expect(surfaceStyle.overflow).toBe('hidden');
   });
 
@@ -206,5 +208,35 @@ describe('BottomSheetShell accessibility', () => {
 
     expect(timingSpy).toHaveBeenCalledTimes(animationCountAfterOpen);
     timingSpy.mockRestore();
+  });
+
+  it('collapses a hidden overlay so it cannot intercept taps', () => {
+    render(
+      <BottomSheetShell visible={false} onClose={jest.fn()}>
+        <Text>Hidden sheet content</Text>
+      </BottomSheetShell>,
+    );
+
+    const overlay = screen.getByTestId('bottom-sheet-overlay', {
+      includeHiddenElements: true,
+    });
+    const overlayStyle = StyleSheet.flatten(overlay.props.style);
+    expect(overlay.props.pointerEvents).toBe('none');
+    expect(overlayStyle).toEqual(expect.objectContaining({ width: 0, height: 0 }));
+    expect(overlayStyle.right).toBeUndefined();
+    expect(overlayStyle.bottom).toBeUndefined();
+  });
+
+  it('fills the live-session bottom inset with the sheet surface', () => {
+    render(
+      <BottomSheetShell visible variant="fullbleedDark" onClose={jest.fn()}>
+        <Text>Live session sheet</Text>
+      </BottomSheetShell>,
+    );
+
+    expect(
+      StyleSheet.flatten(screen.getByTestId('bottom-sheet-bottom-fill').props.style)
+        .backgroundColor,
+    ).toBe(bg.canvasWarm);
   });
 });

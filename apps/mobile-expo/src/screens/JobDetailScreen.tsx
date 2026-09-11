@@ -375,6 +375,8 @@ export function JobDetailScreen({
   const supabaseReady = isSupabaseConfigured();
   const { invalidateJobsList } = useJobsListInvalidation();
   const [job, setJob] = useState<JobDetailViewModel | null>(null);
+  /** Latest job detail — updated synchronously before `setJob` so wizard advance can seed Edit from a fresh snapshot. */
+  const jobRef = useRef<JobDetailViewModel | null>(null);
   const [jobLoading, setJobLoading] = useState(supabaseReady);
   const [jobSaving, setJobSaving] = useState(false);
   const [editSheetMounted, setEditSheetMounted] = useState(false);
@@ -386,6 +388,9 @@ export function JobDetailScreen({
   // navigation window before the Saving render reaches the edit controls.
   const editSavingRef = useRef(false);
   const editApi = useJobEditDraft(job);
+  useEffect(() => {
+    jobRef.current = job;
+  }, [job]);
   const { enabled: fullscreenEditEnabled, ready: fullscreenEditReady } =
     useJobDetailFullscreenEditFlag(sessionUserId);
   const useFullscreenEdit = fullscreenEditReady && fullscreenEditEnabled;
@@ -642,10 +647,15 @@ export function JobDetailScreen({
   );
 
   const openEditFromView = useCallback(
-    (focusTarget: JobDetailEditFocusTarget, source: JobEditOpenedSource) => {
-      if (!job || !useFullscreenEdit) return;
+    (
+      focusTarget: JobDetailEditFocusTarget,
+      source: JobEditOpenedSource,
+      jobSeed?: JobDetailViewModel,
+    ) => {
+      const seed = jobSeed ?? jobRef.current ?? job;
+      if (!seed || !useFullscreenEdit) return;
       captureJobEditOpened(source);
-      editApi.resetFromJob(job);
+      editApi.resetFromJob(seed);
       setEditFocusTarget(focusTarget);
       setDetailMode('edit');
     },
@@ -2111,20 +2121,21 @@ export function JobDetailScreen({
   }, [formatErrorMessage, job, maybeShowCompletionFeedbackPrompt, refetchJob]);
 
   const openMarkCompleteGap = useCallback(
-    (gap: FinancialCompletenessGap) => {
-      if (useFullscreenEdit && job) {
+    (gap: FinancialCompletenessGap, jobSeed?: JobDetailViewModel) => {
+      const seed = jobSeed ?? jobRef.current ?? job;
+      if (useFullscreenEdit && seed) {
         switch (gap) {
           case 'revenue':
-            openEditFromView('revenue', 'complete_wizard');
+            openEditFromView('revenue', 'complete_wizard', seed);
             return;
           case 'session':
-            openEditFromView('sessions', 'complete_wizard');
+            openEditFromView('sessions', 'complete_wizard', seed);
             return;
           case 'materials':
-            openEditFromView('materials', 'complete_wizard');
+            openEditFromView('materials', 'complete_wizard', seed);
             return;
           case 'otherCosts':
-            openEditFromView('otherCosts', 'complete_wizard');
+            openEditFromView('otherCosts', 'complete_wizard', seed);
             return;
         }
       }
@@ -2178,7 +2189,7 @@ export function JobDetailScreen({
         void performMarkJobCompleted();
         return;
       }
-      openMarkCompleteGap(gaps[0]);
+      openMarkCompleteGap(gaps[0], refreshedJob);
     },
     [openMarkCompleteGap, performMarkJobCompleted, setCompleteWizardActive],
   );
@@ -2643,6 +2654,7 @@ export function JobDetailScreen({
       await applyJobDetailEdit(supabase, job.id, payload);
       const refreshed = await fetchJobDetail(supabase, job.id);
       if (refreshed) {
+        jobRef.current = refreshed;
         setJob(refreshed);
         editApi.resetFromJob(refreshed);
       }

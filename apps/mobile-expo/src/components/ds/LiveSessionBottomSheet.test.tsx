@@ -197,6 +197,7 @@ describe('LiveSessionBottomSheet phase3Capture', () => {
   });
 
   it('hides End Session while an inline field is focused and restores it on blur', () => {
+    jest.useFakeTimers();
     const screen = render(
       <LiveSessionBottomSheet
         typography={typography}
@@ -218,10 +219,19 @@ describe('LiveSessionBottomSheet phase3Capture', () => {
     expect(screen.getByLabelText('End session')).toBeTruthy();
 
     fireEvent(title, 'focus', { nativeEvent: { target: 1 } });
+    expect(screen.getByLabelText('End session')).toBeTruthy();
+
+    act(() => {
+      jest.advanceTimersByTime(320);
+    });
+
+    fireEvent(title, 'focus', { nativeEvent: { target: 1 } });
     expect(screen.queryByLabelText('End session')).toBeNull();
 
     fireEvent(title, 'blur');
     expect(screen.getByLabelText('End session')).toBeTruthy();
+    screen.unmount();
+    jest.useRealTimers();
   });
 
   it('TEST-L05 keeps a new note visible when its save fails so it can be retried', async () => {

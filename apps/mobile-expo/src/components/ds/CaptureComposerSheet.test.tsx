@@ -1,5 +1,6 @@
 import React from 'react';
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
+import { TextInput } from 'react-native';
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 
 import { CaptureComposerSheet } from './CaptureComposerSheet';
@@ -112,6 +113,44 @@ describe('CaptureComposerSheet', () => {
       fireEvent.changeText(screen.getByLabelText('Job title'), 'Abandoned draft');
       onClose();
       expect(mockCreateJobForCurrentUser).not.toHaveBeenCalled();
+    });
+
+    it('TEST-N05 focuses the job title field when the sheet becomes visible', async () => {
+      jest.useFakeTimers();
+      const focusSpy = jest.spyOn(TextInput.prototype, 'focus');
+
+      const screen = render(
+        <CaptureComposerSheet
+          typography={typography}
+          visible={false}
+          kind="job"
+          onClose={() => undefined}
+          onJobCreated={() => undefined}
+        />,
+      );
+
+      expect(focusSpy).not.toHaveBeenCalled();
+
+      screen.rerender(
+        <CaptureComposerSheet
+          typography={typography}
+          visible
+          kind="job"
+          onClose={() => undefined}
+          onJobCreated={() => undefined}
+        />,
+      );
+
+      await Promise.resolve();
+      jest.runOnlyPendingTimers();
+      jest.advanceTimersByTime(80);
+
+      await waitFor(() => {
+        expect(focusSpy).toHaveBeenCalled();
+      });
+
+      focusSpy.mockRestore();
+      jest.useRealTimers();
     });
 
     it('TEST-N04 Add details creates the job and opens fullscreen Edit', async () => {
