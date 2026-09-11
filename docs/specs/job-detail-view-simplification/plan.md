@@ -55,5 +55,5 @@ Mobile only. Same PostHog flag.
 ## Product-context closeout
 
 - This folder is the Phase 2 contract (View quality, not subtraction-only).
-- Phase 3 spec: Inbox view + Todoist new job + Quick Note/Material minimum-save UX + Live Session View tile and overlay capture; principles in this UX contract Deferred section.
+- Phase 3 spec: [`../inbox-new-job-live-session/`](../inbox-new-job-live-session/) (approved product spec + contracts + plan).
 - Do not implement Customers table.

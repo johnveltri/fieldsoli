@@ -104,7 +104,7 @@ A solo tradesperson can change everything that belongs on a job — identity, se
 ## Deferred work
 
 - Phase 2 Job View quality: [`../job-detail-view-simplification/spec.md`](../job-detail-view-simplification/spec.md).
-- **Phase 3** (Inbox view, Todoist new job, Quick Note/Material minimum-save UX, Live Session View tile + overlay capture) is specified from Job View deferred work, not this Edit packet.
+- **Phase 3** (Inbox, New Job composer, Quick capture, Live Session) — [`../inbox-new-job-live-session/spec.md`](../inbox-new-job-live-session/spec.md).
 - Live overlay redesign is Phase 3, not this packet.
 - Re-homing mark-complete gaps onto Edit after View sheets go away.
 - **Customers (next iteration, not this RPC):** user-owned customer records; job points at a customer; Edit Customer row becomes search/select/create; View customer name becomes Inspect (full customer fields / manage). Preserved seams for this release:

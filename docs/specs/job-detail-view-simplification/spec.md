@@ -95,11 +95,11 @@ REQ-V06 (View Live Session start tile) and REQ-V14 (live expanded capture) are r
 
 ## Deferred work
 
-- **Phase 3 — Inbox, quick capture, Todoist job add, and Live Session** (one spec, after this View phase). Same scan/act idea as Job View:
-  - **Inbox:** viewing surface for unassigned captures. Tap = edit the note/material; **Add to job** is explicit; delete via swipe or overflow. Not “tap only assigns.”
-  - **New job:** Todoist-style. A non-blank title is enough to save (`Untitled Job` is a valid title; blank titles are rejected). Optional control to add more (opens Job Edit / remaining fields). Abandoned empty drafts are not left on the jobs list.
-  - **Quick Note / Quick Material:** keep direct Inbox save (no job chooser — already Phase 1). UX matches the same minimum-to-save rule: note body enough to save; material description + total enough to save; extra fields (session, qty, unit price) only if they choose to add more.
-  - **Live Session:** dedicated View start tile when this job has no in-progress session (`Live Session` / `Start a timer now`; start uses existing path and closes job detail). Expanded live sheet is the capture surface: Edit-style `Add note` / `Add material` rows that persist immediately; start time editable in place; End Session remains; no nested job-Edit mode and no second Done. Writes use existing note/material create and start-time APIs, not `apply_job_detail_edit`.
+- **Phase 3 — Inbox, quick capture, Todoist job add, and Live Session** — specified in [`../inbox-new-job-live-session/spec.md`](../inbox-new-job-live-session/spec.md) (approved 2026-09-09). Principles unchanged from the bullet list below; full contract is in that folder.
+  - **Inbox:** viewing surface for unassigned captures. Tap = edit the note/material; **Add to job** is explicit; delete via swipe. Not “tap only assigns.”
+  - **New job:** Todoist-style expandable composer. A non-blank title is enough to **Add Job** (`Untitled Job` is a valid title if typed; blank titles are rejected). Optional expand reveals Job Edit tiles. Abandoned drafts are not left on the jobs list.
+  - **Quick Note / Quick Material:** direct Inbox save (no job chooser). Note body enough to save; material description + total enough to save.
+  - **Live Session:** View start tile; overlay capture with immediate persist for notes, materials, start time, and job identity tiles; no nested Job Edit **Done**.
 - Customers Inspect; invoice/receipt actions in the CTA row.
 - Insights/recos modules on View.
 - Flag 100% / delete unused sheets.
