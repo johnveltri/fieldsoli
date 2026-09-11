@@ -9,6 +9,11 @@
     "packages/*",
     "apps/*"
   ],
+  "overrides": {
+    "react-native": "0.86.3",
+    "@react-native/virtualized-lists": "0.86.3",
+    "react-native-worklets": "0.10.1"
+  },
   "scripts": {
     "test": "npm run test:api-client && npm run test:marketing && npm run test:edge-functions && npm run test:design-system",
     "test:design-system": "npx vitest run packages/design-system/lib/contrast.test.ts",

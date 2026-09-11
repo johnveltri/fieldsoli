@@ -3926,7 +3926,7 @@ const styles = StyleSheet.create({
   },
   /** Inactive crossfade pane — overlay so it does not stack and split height. */
   bodyInactive: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   doneButton: {
     minHeight: 44,

@@ -480,6 +480,7 @@ export function BottomSheetShell({
   return (
     <View
       testID="bottom-sheet-overlay"
+      collapsable={false}
       style={[
         overlayCollapsed ? styles.overlayCollapsed : styles.overlay,
         overlayCollapsed
@@ -544,13 +545,13 @@ export function BottomSheetShell({
             failOffsetX={[-24, 24]}
             onGestureEvent={onPanGestureEvent}
             onHandlerStateChange={onPanHandlerStateChange}
-            style={isFullbleed ? styles.fullbleedPan : undefined}
           >
             <Animated.View
               testID="bottom-sheet-surface"
               onLayout={handleSheetLayout}
               collapsable={false}
               style={[
+                isFullbleed ? styles.fullbleedPan : null,
                 isFullbleed ? styles.sheetFullbleed : styles.sheet,
                 !isFullbleed ? { paddingHorizontal: sheetGutter } : null,
                 {
@@ -577,7 +578,7 @@ export function BottomSheetShell({
               ) : null}
               {scrollViewMaxHeight != null ? (
                 <BottomSheetScrollView
-                  scrollViewRef={scrollViewRef}
+                  scrollViewRef={scrollViewRef as React.RefObject<ScrollView>}
                   waitFor={scrollAtTop ? panRef : undefined}
                   style={{ maxHeight: scrollViewMaxHeight }}
                   contentContainerStyle={[

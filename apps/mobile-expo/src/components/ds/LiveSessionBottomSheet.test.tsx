@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { describe, expect, it, jest } from '@jest/globals';
 
 import { LiveSessionBottomSheet } from './LiveSessionBottomSheet';
@@ -53,19 +53,24 @@ jest.mock('../platform/PlatformHeaderAction', () => {
 });
 
 jest.mock('./BottomSheetShell', () => {
-  const { View } = require('react-native');
+  const { View, Text } = require('react-native');
   return {
     BottomSheetShell: ({
       visible,
       children,
       stickyFooter,
+      registerInGlobalStack,
     }: {
       visible: boolean;
       children: React.ReactNode;
       stickyFooter?: React.ReactNode;
+      registerInGlobalStack?: boolean;
     }) =>
       visible ? (
         <View>
+          <Text testID="bottom-sheet-register-flag">
+            {registerInGlobalStack === false ? 'opt-out' : 'registered'}
+          </Text>
           {children}
           {stickyFooter}
         </View>
@@ -130,6 +135,27 @@ const identity = {
 const noop = () => undefined;
 
 describe('LiveSessionBottomSheet phase3Capture', () => {
+  it('opts out of the global bottom-sheet stack so NativeTabs stay mounted', () => {
+    render(
+      <LiveSessionBottomSheet
+        typography={typography}
+        visible
+        phase3Capture
+        jobShortDescription="Panel upgrade"
+        startedAt="2026-01-01T12:00:00.000Z"
+        attachments={[]}
+        jobIdentity={identity}
+        onAddNote={noop}
+        onAddMaterial={noop}
+        onPressAttachment={noop}
+        onMinimize={noop}
+        onEndSessionPress={noop}
+      />,
+    );
+
+    expect(screen.getByTestId('bottom-sheet-register-flag').props.children).toBe('opt-out');
+  });
+
   it('TEST-L08 hides header EDIT and shows inline identity + add rows', () => {
     const onJobIdentityChange = jest.fn();
     const onAddNote = jest.fn();

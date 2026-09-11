@@ -53,13 +53,13 @@ export function EditSwipeableRow({
       friction={2}
       overshootRight={false}
       renderRightActions={renderRightActions}
-      accessibilityActions={[{ name: 'delete', label: 'Delete' }]}
-      onAccessibilityAction={(e) => {
-        if (e.nativeEvent.actionName === 'delete') onDelete();
-      }}
     >
       <View
         accessibilityLabel={accessibilityLabel}
+        accessibilityActions={[{ name: 'delete', label: 'Delete' }]}
+        onAccessibilityAction={(e) => {
+          if (e.nativeEvent.actionName === 'delete') onDelete();
+        }}
         style={styles.row}
       >
         {children}

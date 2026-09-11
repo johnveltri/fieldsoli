@@ -4,7 +4,8 @@ import {
   fieldsoloLoadedFonts,
 } from '@fieldsolo/design-system/expo/loadFieldSoloFonts';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Animated, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Alert, Animated, Modal, Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
@@ -1126,8 +1127,9 @@ export function LiveSessionOverlay({
   if (!fontsLoaded || !liveSession) return null;
 
   const barVisible = mode === 'minimized' && !hasRegisteredSheet;
+  const liveSessionSheetHostOpen = mode === 'sheet' || mode === 'editSheet';
 
-  return (
+  const liveSessionSheets = (
     <>
       {/*
         Sheet stack: both BottomSheetShells stay mounted so they can play
@@ -1345,6 +1347,34 @@ export function LiveSessionOverlay({
       />
         </>
       ) : null}
+    </>
+  );
+
+  const androidSheetHost =
+    liveSessionSheetHostOpen ? (
+      <Modal
+        visible
+        transparent
+        animationType="none"
+        statusBarTranslucent
+        navigationBarTranslucent
+        onRequestClose={() => {
+          if (mode === 'editSheet') {
+            minimizeFromEdit();
+            return;
+          }
+          minimize();
+        }}
+      >
+        <GestureHandlerRootView collapsable={false} style={styles.androidSheetHost}>
+          {liveSessionSheets}
+        </GestureHandlerRootView>
+      </Modal>
+    ) : null;
+
+  return (
+    <View pointerEvents="box-none" collapsable={false} style={styles.overlayHost}>
+      {Platform.OS === 'android' ? androidSheetHost : liveSessionSheets}
 
       {/*
         Bar stays mounted whenever a live session exists, so the morph
@@ -1374,11 +1404,21 @@ export function LiveSessionOverlay({
           onPress={handleBarPress}
         />
       </Animated.View>
-    </>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  overlayHost: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+  },
+  androidSheetHost: {
+    flex: 1,
+  },
   minimizedAnchor: {
     position: 'absolute',
     left: 0,

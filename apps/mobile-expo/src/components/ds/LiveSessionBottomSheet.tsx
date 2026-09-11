@@ -615,6 +615,12 @@ export function LiveSessionBottomSheet({
       onClosed={onClosed}
       variant="fullbleedDark"
       autoSizeUpToFraction={1}
+      // Opt out of the global sheet stack — same as LegacyLiveSessionBottomSheet.
+      // Registering would hide NativeTabs while the sheet opens; on Android that
+      // races RNScreens fragment updates when restoring from the minimized bar
+      // over another overlay (e.g. Inbox) and crashes with "Unexpected fragment
+      // manager state".
+      registerInGlobalStack={false}
       stickyFooter={
         phase3Capture && !inlineFieldFocused ? (
           <FullWidthFab
@@ -1262,7 +1268,7 @@ const styles = StyleSheet.create({
     paddingBottom: space('Spacing/12'),
   },
   pickerDismissOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     zIndex: 1,
   },
   pickerHitLayer: {

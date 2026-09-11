@@ -402,7 +402,7 @@ export function JobDetailEditMode({
         scrollContentRef={scrollContentRef}
       />
       <EditModeScrollView
-        scrollViewRef={scrollRef}
+        scrollViewRef={scrollRef as React.RefObject<ScrollView>}
         scrollYRef={scrollYRef}
         style={styles.flex}
         contentContainerStyle={{
