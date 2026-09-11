@@ -50,7 +50,7 @@ No new tables. Optional additive API helper for title-required job create.
 ## Invariants and calculations
 
 - **Create job:** `short_description` = trimmed composer title; must be non-blank. Do **not** call `createBlankJobForCurrentUser` on flag-on path.
-- **Material minimum (quick/Inbox):** `description` + `total_cost_cents` sufficient to save; `quantity` defaults may be stored but breakdown explicitness follows Phase 1 rules when qty/unit omitted.
+- **Material minimum (quick/Inbox):** `description` + `total_cost_cents` sufficient to save; omitted quantity or unit cost is stored as `null` with its explicitness flag set to `false`, so the total remains authoritative.
 - **Inbox assign:** `updateNote(id, { jobId, sessionId: null })` or `updateMaterial(id, { jobId, sessionId: null })`.
 - **Live identity:** `updateJobById` rejects or skips blank `shortDescription`; other fields may be cleared to empty string/null per existing normalizer.
 - **Live capture:** `createNote({ sessionId: liveId, jobId: liveJobId, body })` / `createMaterial({ sessionId: liveId, jobId: liveJobId, ... })` — exact parent shape matches existing live overlay writers.

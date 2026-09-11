@@ -43,7 +43,7 @@ jest.mock('../context/LiveSessionContext', () => ({
   useLiveSession: () => ({
     liveSession: mockLiveSession,
     hydrating: false,
-    hasLiveSession: false,
+    hasLiveSession: Boolean(mockLiveSession),
     mode: 'hidden' as const,
     startLiveSession: mockStartLiveSession,
     openSheet: jest.fn(),
@@ -57,7 +57,7 @@ jest.mock('../context/LiveSessionContext', () => ({
     updateLiveSessionJobShortDescription: mockUpdateLiveSessionJobShortDescription,
     refresh: mockRefreshLiveSession,
   }),
-  useHasLiveSession: () => false,
+  useHasLiveSession: () => Boolean(mockLiveSession),
 }));
 
 jest.mock('../components/CanvasTiledBackground', () => ({
@@ -540,6 +540,24 @@ jest.mock('../components/ds', () => ({
             </Text>
           ))}
       </View>
+    );
+  },
+  LiveSessionStartTile: ({
+    onPress,
+    disabled,
+  }: {
+    onPress: () => void;
+    disabled?: boolean;
+  }) => {
+    const { Text } = require('react-native');
+    return (
+      <Text
+        accessibilityRole="button"
+        accessibilityLabel="Start live session"
+        onPress={disabled ? undefined : onPress}
+      >
+        LIVE
+      </Text>
     );
   },
 }));
@@ -1570,7 +1588,7 @@ describe('JobDetailScreen simplified view (flag on)', () => {
     expect(screen.queryByText('No other costs recorded')).toBeNull();
   });
 
-  it('does not show No sessions recorded while a live session is in progress', async () => {
+  it('keeps No sessions recorded for an empty job while a live session is in progress', async () => {
     apiClient.fetchJobDetail.mockResolvedValue({
       ...incompleteJob,
       displaySessions: [],
@@ -1589,8 +1607,7 @@ describe('JobDetailScreen simplified view (flag on)', () => {
       },
     });
     const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
-    await waitFor(() => expect(screen.getByText('Live session in progress')).toBeTruthy());
-    expect(screen.queryByText('No sessions recorded')).toBeNull();
+    await waitFor(() => expect(screen.getByText('No sessions recorded')).toBeTruthy());
   });
 
   it('blocks Paid from the status sheet until financial completeness is met', async () => {
@@ -1951,5 +1968,56 @@ describe('JobDetailScreen simplified view (flag on)', () => {
     await waitFor(() =>
       expect(screen.getByText('Confirm minimum info before marking complete')).toBeTruthy(),
     );
+  });
+
+  it('TEST-L01 shows + LIVE in Sessions header when no live session', async () => {
+    apiClient.fetchJobDetail.mockResolvedValue({
+      ...incompleteJob,
+      displaySessions: [],
+    });
+    const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
+    await waitFor(() =>
+      expect(screen.getByLabelText('Start live session')).toBeTruthy(),
+    );
+    expect(screen.getByText('LIVE')).toBeTruthy();
+    expect(screen.getByText('No sessions recorded')).toBeTruthy();
+  });
+
+  it('TEST-L02 hides + LIVE when a live session exists elsewhere', async () => {
+    mockLiveSession = { id: 'sess-live-other', jobId: 'job-other' };
+    apiClient.fetchJobDetail.mockResolvedValue({
+      ...incompleteJob,
+      displaySessions: [],
+    });
+    const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
+    await waitFor(() => expect(screen.getByText('Sessions')).toBeTruthy());
+    expect(screen.queryByLabelText('Start live session')).toBeNull();
+    expect(screen.getByText('No sessions recorded')).toBeTruthy();
+  });
+
+  it('TEST-L03 starts live session from + LIVE and closes job detail', async () => {
+    apiClient.fetchJobDetail.mockResolvedValue({
+      ...incompleteJob,
+      displaySessions: [],
+    });
+    const onRequestClose = jest.fn();
+    const screen = render(
+      <JobDetailScreen
+        jobId="job-1"
+        sessionUserId="user-1"
+        onRequestClose={onRequestClose}
+      />,
+    );
+    await waitFor(() =>
+      expect(screen.getByLabelText('Start live session')).toBeTruthy(),
+    );
+    fireEvent.press(screen.getByLabelText('Start live session'));
+    await waitFor(() => {
+      expect(mockStartLiveSession).toHaveBeenCalledWith({
+        jobId: 'job-1',
+        jobShortDescription: 'Untitled Job',
+      });
+      expect(onRequestClose).toHaveBeenCalledTimes(1);
+    });
   });
 });

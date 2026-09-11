@@ -1,3 +1,11 @@
+export {
+  CaptureComposerSheet,
+  type CaptureComposerKind,
+  type CaptureComposerJobCreatedOptions,
+  type CaptureComposerMaterialValues,
+  type CaptureComposerNoteValues,
+  type CaptureComposerSheetProps,
+} from './CaptureComposerSheet';
 export { JobDetailCategoryChip } from './JobDetailCategoryChip';
 export { JobDetailCtaRow } from './JobDetailCtaRow';
 export {
@@ -38,8 +46,17 @@ export {
 } from './EditSessionBottomSheet';
 export { IncompleteJobRowCard } from './IncompleteJobRowCard';
 export { JobCard } from './JobCard';
-export { LiveSessionBottomSheet } from './LiveSessionBottomSheet';
+export { FullWidthFab } from './FullWidthFab';
+export type { FullWidthFabProps } from './FullWidthFab';
+export {
+  LiveSessionBottomSheet,
+  type LiveSessionJobIdentity,
+  type LiveSessionJobIdentityPatch,
+  type LiveSessionInlineNote,
+  type LiveSessionInlineMaterial,
+} from './LiveSessionBottomSheet';
 export { LiveSessionCaptureCard } from './LiveSessionCaptureCard';
+export { LiveSessionStartTile } from './LiveSessionStartTile';
 export { MinimizedLiveSessionBar } from './MinimizedLiveSessionBar';
 export {
   JobsOpenStackSectionHeader,

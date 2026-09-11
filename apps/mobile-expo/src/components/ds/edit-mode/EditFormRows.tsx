@@ -555,16 +555,30 @@ export function EditIconRow({
 export function EditIconGroup({
   icon,
   children,
+  iconAlign = 'center',
 }: {
   icon: ReactNode;
   children: ReactNode;
+  /** Vertical alignment of the leading icon vs row content. */
+  iconAlign?: 'center' | 'top';
 }) {
   const items = Children.toArray(children);
   return (
     <>
       {items.map((child, index) => (
-        <View key={index} style={styles.iconRow}>
-          <View style={styles.iconSlot}>
+        <View
+          key={index}
+          style={[
+            styles.iconRow,
+            iconAlign === 'top' && styles.iconRowTop,
+          ]}
+        >
+          <View
+            style={[
+              styles.iconSlot,
+              iconAlign === 'top' && styles.iconSlotTop,
+            ]}
+          >
             <View style={styles.iconFrame}>{index === 0 ? icon : null}</View>
           </View>
           <View style={styles.iconContent}>{child}</View>
@@ -658,7 +672,10 @@ function EditMultilineField({
   const [contentHeight, setContentHeight] = useState(EDIT_BODY_LINE_HEIGHT);
   const hasValue = typeof value === 'string' && value.length > 0;
   const shown = hasValue ? value : placeholder && placeholder.length > 0 ? placeholder : ' ';
-  const boxHeight = Math.max(EDIT_BODY_LINE_HEIGHT, sizerHeight, contentHeight);
+  const flatStyle = StyleSheet.flatten(style);
+  const styleMinHeight =
+    typeof flatStyle?.minHeight === 'number' ? flatStyle.minHeight : EDIT_BODY_LINE_HEIGHT;
+  const boxHeight = Math.max(styleMinHeight, sizerHeight, contentHeight);
 
   return (
     <View style={[styles.fieldInputMultilineWrap, { minHeight: boxHeight }]}>
@@ -1044,11 +1061,18 @@ const styles = StyleSheet.create({
     paddingRight: space('Spacing/16'),
     gap: space('Spacing/12'),
   },
+  iconRowTop: {
+    alignItems: 'flex-start',
+  },
   iconSlot: {
     width: EDIT_ICON_SLOT + space('Spacing/16'),
     paddingLeft: space('Spacing/16'),
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  iconSlotTop: {
+    paddingTop: 4,
+    justifyContent: 'flex-start',
   },
   iconFrame: {
     width: EDIT_ICON_SLOT,

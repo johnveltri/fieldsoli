@@ -113,6 +113,43 @@ describe('materials api client', () => {
     expect((inserted as { total_cost_cents: number }).total_cost_cents).toBe(500);
   });
 
+  it('createMaterial preserves a total-only capture without inventing a breakdown', async () => {
+    let inserted: unknown;
+    const client = makeClient({
+      authUserId: 'user-1',
+      buildersByTable: {
+        job_costs: [
+          makeBuilder({
+            onInsert: (payload) => {
+              inserted = payload;
+            },
+            singleResult: { data: { id: 'mat-total-only' }, error: null },
+          }),
+        ],
+      },
+    });
+
+    await createMaterial(client as never, {
+      jobId: 'job-9',
+      sessionId: null,
+      description: 'Permit fee',
+      quantity: 1,
+      unit: 'ea',
+      unitCostCents: 4750,
+      quantityExplicit: false,
+      unitCostExplicit: false,
+      totalCostCents: 4750,
+    });
+
+    expect(inserted).toMatchObject({
+      quantity: null,
+      quantity_explicit: false,
+      unit_cost_cents: null,
+      unit_cost_explicit: false,
+      total_cost_cents: 4750,
+    });
+  });
+
   it('createMaterial rejects a blank description', async () => {
     const client = makeClient({
       authUserId: 'user-1',
@@ -233,6 +270,39 @@ describe('materials api client', () => {
       quantity: 4,
       unit_cost_cents: 250,
       total_cost_cents: 1000,
+    });
+  });
+
+  it('updateMaterial preserves a total-only capture without a synthetic quantity or unit cost', async () => {
+    let patch: unknown;
+    const client = makeClient({
+      authUserId: 'user-1',
+      buildersByTable: {
+        job_costs: [
+          makeBuilder({
+            onUpdate: (value) => {
+              patch = value;
+            },
+            maybeSingleResult: { data: { id: 'mat-1' }, error: null },
+          }),
+        ],
+      },
+    });
+
+    await updateMaterial(client as never, 'mat-1', {
+      quantity: 1,
+      unitCostCents: 4750,
+      quantityExplicit: false,
+      unitCostExplicit: false,
+      totalCostCents: 4750,
+    });
+
+    expect(patch).toEqual({
+      quantity: null,
+      quantity_explicit: false,
+      unit_cost_cents: null,
+      unit_cost_explicit: false,
+      total_cost_cents: 4750,
     });
   });
 

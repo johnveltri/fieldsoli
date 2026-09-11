@@ -101,7 +101,10 @@ export function LiveSessionCaptureCard({
 
           <SessionAttachmentList
             typography={typography}
-            attachments={attachments}
+            attachments={attachments.filter(
+              (a): a is Extract<(typeof attachments)[number], { kind: 'note' | 'material' }> =>
+                a.kind === 'note' || a.kind === 'material',
+            )}
             onPressAttachment={onPressAttachment}
           />
         </View>

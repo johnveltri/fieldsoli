@@ -26,6 +26,8 @@ export {
 export {
   createBlankJobForCurrentUser,
   createBlankJobForLiveSessionStart,
+  createJobForCurrentUser,
+  type CreateJobForCurrentUserInput,
   deleteJobById,
   fetchFirstJobIdForCurrentUser,
   fetchJobById,

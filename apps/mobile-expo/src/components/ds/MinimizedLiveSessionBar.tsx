@@ -217,7 +217,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Ubuntu_700Bold',
     fontSize: 18,
     lineHeight: 22,
-    color: color('Brand/Primary'),
+    color: color('Foundation/Background/CanvasWarm'),
   },
   expandIcon: {
     width: 20,

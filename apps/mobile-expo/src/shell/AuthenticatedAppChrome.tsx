@@ -1,3 +1,8 @@
+import { useFonts } from 'expo-font';
+import {
+  fieldsoloExpoFontAssets,
+  fieldsoloLoadedFonts,
+} from '@fieldsolo/design-system/expo/loadFieldSoloFonts';
 import { usePathname, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
@@ -12,6 +17,7 @@ import {
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import type { JobsOpenSectionKind } from '../components/ds';
+import { CaptureComposerSheet } from '../components/ds';
 import { BlurTargetView } from 'expo-blur';
 import { LiveSessionOverlay } from '../components/LiveSessionOverlay';
 import { PrimaryActionOverlay } from '../components/shell/PrimaryActionOverlay';
@@ -33,6 +39,7 @@ import {
 } from '@fieldsolo/api-client';
 import { analytics, emailProperties } from '../lib/analytics';
 import { resolveAnalyticsConsentForUser } from '../lib/analytics/consentSync';
+import { useJobDetailFullscreenEditFlag } from '../lib/featureFlags/useJobDetailFullscreenEditFlag';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import {
   REQUIRED_PRIVACY_VERSION,
@@ -48,7 +55,7 @@ import type { EarningsWindow } from '../screens/EarningsScreen';
 import { JobDetailScreen } from '../screens/JobDetailScreen';
 import { OverlaySlideHost } from '../navigation/OverlaySlideHost';
 import { color } from '@fieldsolo/design-system/lib/tokens';
-import { bg } from '../theme/nativeTokens';
+import { bg, createTextStyles } from '../theme/nativeTokens';
 import {
   SHELL_TAB_HREF,
   shellMainTabFromPathname,
@@ -132,11 +139,26 @@ export function AuthenticatedAppChrome({ children }: AuthenticatedAppChromeProps
     if (inboxOpen) setInboxMounted(true);
   }, [inboxOpen]);
   const [inboxLoadKey, setInboxLoadKey] = useState(0);
+  const [newJobComposerOpen, setNewJobComposerOpen] = useState(false);
+  const [newJobComposerSource, setNewJobComposerSource] = useState<
+    'jobs_fab' | 'home_empty' | 'primary_action'
+  >('primary_action');
 
   const liveSession = useLiveSession();
   const { invalidateJobsList } = useJobsListInvalidation();
   const sheetStackWriters = useBottomSheetStackWriters();
   const topmostSheet = useTopmostBottomSheet();
+  const {
+    enabled: fullscreenEditEnabled,
+    ready: fullscreenEditReady,
+  } = useJobDetailFullscreenEditFlag(session?.user.id);
+  const phase3Enabled = fullscreenEditReady && fullscreenEditEnabled;
+
+  const [fontsLoaded] = useFonts(fieldsoloExpoFontAssets);
+  const typography = useMemo(
+    () => createTextStyles(fieldsoloLoadedFonts),
+    [],
+  );
 
   useEffect(() => {
     if (!session || signupLegalPending) {
@@ -287,6 +309,12 @@ export function AuthenticatedAppChrome({ children }: AuthenticatedAppChromeProps
 
   const createJobAndOpen = useCallback(
     async (source: 'jobs_fab' | 'home_empty' | 'primary_action') => {
+      if (phase3Enabled) {
+        analytics.capture('job_create_started', { source, composer: true });
+        setNewJobComposerSource(source);
+        setNewJobComposerOpen(true);
+        return '';
+      }
       if (!isSupabaseConfigured()) throw new Error('Supabase is not configured.');
       analytics.capture('job_create_started', { source });
       try {
@@ -300,7 +328,25 @@ export function AuthenticatedAppChrome({ children }: AuthenticatedAppChromeProps
         throw error;
       }
     },
-    [invalidateJobsList, openJobDetail],
+    [invalidateJobsList, openJobDetail, phase3Enabled],
+  );
+
+  const onNewJobCreated = useCallback(
+    (jobId: string, options?: { initialEditOpen?: boolean }) => {
+      setNewJobComposerOpen(false);
+      analytics.capture('job_created', {
+        source: newJobComposerSource,
+        job_id: jobId,
+        placeholder: false,
+        opened_in_edit: options?.initialEditOpen === true,
+      });
+      invalidateJobsList();
+      openJobDetail(jobId, {
+        initialEditOpen: options?.initialEditOpen === true,
+        entrySource: newJobComposerSource,
+      });
+    },
+    [invalidateJobsList, newJobComposerSource, openJobDetail],
   );
 
   useEffect(() => {
@@ -353,18 +399,9 @@ export function AuthenticatedAppChrome({ children }: AuthenticatedAppChromeProps
 
   const onLiveSessionEnded = useCallback(
     (jobId: string) => {
-      if (jobDetailOpen && selectedJobId === jobId) {
-        setJobDetailLoadKey((k) => k + 1);
-        return;
-      }
-      if (jobDetailOpen) {
-        setJobDetailEntrySource('live_session_overlay');
-        setSelectedJobId(jobId);
-        setJobDetailInitialEditOpen(false);
-        setJobDetailLoadKey((k) => k + 1);
-      }
+      openJobDetail(jobId, { entrySource: 'live_session_overlay' });
     },
-    [jobDetailOpen, selectedJobId],
+    [openJobDetail],
   );
 
   const currentScreen = useMemo(() => {
@@ -578,6 +615,7 @@ export function AuthenticatedAppChrome({ children }: AuthenticatedAppChromeProps
         <QuickActionsFlowProvider
           onCreateJob={() => createJobAndOpen('primary_action')}
           onQuickCaptureSaved={onQuickCaptureSaved}
+          phase3Enabled={phase3Enabled}
         >
           <ShellAppContext.Provider value={shellContextValue}>
             <ShellOverlayProvider value={shellOverlayValue}>
@@ -603,7 +641,20 @@ export function AuthenticatedAppChrome({ children }: AuthenticatedAppChromeProps
               />
             </View>
 
-            <LiveSessionOverlay onSessionEnded={({ jobId }) => onLiveSessionEnded(jobId)} />
+            <LiveSessionOverlay
+              onSessionEnded={({ jobId }) => onLiveSessionEnded(jobId)}
+              phase3Capture={phase3Enabled}
+            />
+
+            {fontsLoaded && phase3Enabled ? (
+              <CaptureComposerSheet
+                typography={typography}
+                visible={newJobComposerOpen}
+                kind="job"
+                onClose={() => setNewJobComposerOpen(false)}
+                onJobCreated={onNewJobCreated}
+              />
+            ) : null}
 
             {Platform.OS === 'android' && jobDetailMounted ? (
               <View style={styles.jobDetailOverlayHost} testID="job-detail-modal">

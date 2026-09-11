@@ -76,11 +76,12 @@
   5. **END SESSION** — full-width destructive primary at bottom.
 - No expandable session card, no chevron on session, no `N notes · M materials` summary line, no add tiles grid, no nested `EditJobBottomSheet`, no **Done**.
 - Minimized bar: job title (persisted), timer, tap to expand.
-- End Session: confirm if needed (use existing copy); navigate/refresh per parent (`onSessionEnded`).
+- End Session: hidden while an inline text field is focused and restored on blur; confirm if needed (use existing copy); navigate/refresh per parent (`onSessionEnded`).
+- Inline text fields: use the Job Detail Edit keyboard-scroll behavior so the focused field is brought above the software keyboard.
 
 ### Flag off
 
-- Legacy New Job (Untitled insert + Edit), Inbox tap-to-assign, legacy Quick Material validation, legacy live overlay — unchanged.
+- Legacy New Job (Untitled insert + Edit), Inbox tap-to-assign, legacy Quick Material validation, and legacy live overlay remain. Ending a session opens its Job View in either state.
 
 ## Navigation and continuity
 

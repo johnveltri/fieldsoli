@@ -85,30 +85,6 @@ jest.mock('../components/figma-icons/TopHeaderIcons', () => ({
   TopHeaderProfileIcon: () => null,
 }));
 
-jest.mock('../components/ds/QuickActionsBottomSheet', () => ({
-  QuickActionsBottomSheet: ({
-    visible,
-    actionError,
-    onStartNewSession,
-    onCreateQuickCapture,
-  }: {
-    visible: boolean;
-    actionError: string | null;
-    onStartNewSession: () => void;
-    onCreateQuickCapture: (kind: 'note' | 'material') => void;
-  }) => {
-    const { Text, View } = require('react-native');
-    if (!visible) return null;
-    return (
-      <View>
-        <Text onPress={onStartNewSession}>Start New Session</Text>
-        <Text onPress={() => onCreateQuickCapture('note')}>Create Quick Note</Text>
-        {actionError ? <Text>{actionError}</Text> : null}
-      </View>
-    );
-  },
-}));
-
 jest.mock('../components/shell/ShellBottomNav', () => ({
   shellBottomNavOuterHeight: () => 80,
 }));

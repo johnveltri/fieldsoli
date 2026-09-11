@@ -20,7 +20,7 @@ const PREVIEW_MAX = 3;
 
 export type SessionAttachmentListProps = {
   typography: TextStyles;
-  attachments: JobDetailSessionAttachment[];
+  attachments: Array<Extract<JobDetailSessionAttachment, { kind: 'note' | 'material' }>>;
   emptyMessage?: string;
   /** When true, rows are not tappable (Phase 2 View expand). */
   readOnly?: boolean;

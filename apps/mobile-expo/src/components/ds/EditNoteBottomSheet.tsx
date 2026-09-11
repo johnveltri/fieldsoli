@@ -141,7 +141,7 @@ export function EditNoteBottomSheet({
           {onJobPillPress ? (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Attach to job"
+              accessibilityLabel="Add to job"
               onPress={() => onJobPillPress({ body })}
               style={({ pressed }) => [styles.sessionButton, pressed && styles.pressed]}
             >

@@ -13,9 +13,10 @@ export type MaterialId = string;
  * writing **exactly one** parent (job_id OR session_id) so the UI stays
  * symmetric with Notes.
  *
- * `unitCostCents` is the per-unit cost; `total_cost_cents` is computed as
- * `Math.round(unitCostCents * quantity)` on every write so that the
- * per-job materials rollup in `fetchJobDetail` stays consistent.
+ * When both quantity and unit cost are explicit, `total_cost_cents` is
+ * computed as `Math.round(unitCostCents * quantity)`. A total-only capture
+ * instead preserves its authoritative `totalCostCents` and marks the
+ * breakdown fields as non-explicit.
  */
 export type CreateMaterialInput = {
   /**
@@ -28,6 +29,9 @@ export type CreateMaterialInput = {
   quantity: number;
   unit: string;
   unitCostCents: number;
+  quantityExplicit?: boolean;
+  unitCostExplicit?: boolean;
+  totalCostCents?: number;
 };
 
 /**
@@ -49,6 +53,9 @@ export type UpdateMaterialInput = {
   quantity?: number;
   unit?: string;
   unitCostCents?: number;
+  quantityExplicit?: boolean;
+  unitCostExplicit?: boolean;
+  totalCostCents?: number;
   sessionId?: SessionId | null;
   jobId?: JobId | null;
 };
@@ -71,6 +78,12 @@ function assertUnitCostNonNegative(unitCostCents: number): void {
   }
 }
 
+function assertTotalCostNonNegative(totalCostCents: number): void {
+  if (!Number.isFinite(totalCostCents) || totalCostCents < 0) {
+    throw new Error('Material total cost must be a non-negative number of cents.');
+  }
+}
+
 function computeTotalCostCents(unitCostCents: number, quantity: number): number {
   return Math.round(unitCostCents * quantity);
 }
@@ -83,6 +96,9 @@ export async function createMaterial(
   assertDescriptionNotBlank(input.description);
   assertQuantityPositive(input.quantity);
   assertUnitCostNonNegative(input.unitCostCents);
+  if (input.totalCostCents !== undefined) {
+    assertTotalCostNonNegative(input.totalCostCents);
+  }
 
   const { data: authData, error: authError } = await client.auth.getUser();
   if (authError) throw authError;
@@ -94,10 +110,17 @@ export async function createMaterial(
   const row = {
     user_id: userId,
     description: input.description.trim(),
-    quantity: input.quantity,
+    quantity: input.quantityExplicit === false ? null : input.quantity,
+    ...(input.quantityExplicit === undefined
+      ? {}
+      : { quantity_explicit: input.quantityExplicit }),
     unit: input.unit.trim(),
-    unit_cost_cents: input.unitCostCents,
-    total_cost_cents: computeTotalCostCents(input.unitCostCents, input.quantity),
+    unit_cost_cents: input.unitCostExplicit === false ? null : input.unitCostCents,
+    ...(input.unitCostExplicit === undefined
+      ? {}
+      : { unit_cost_explicit: input.unitCostExplicit }),
+    total_cost_cents:
+      input.totalCostCents ?? computeTotalCostCents(input.unitCostCents, input.quantity),
     cost_type: 'material',
     // When a session is chosen we null out job_id. Otherwise job-scoped, or —
     // when jobId is also null — an Inbox quick capture with no parent. Matches
@@ -149,12 +172,32 @@ export async function updateMaterial(
     assertUnitCostNonNegative(input.unitCostCents);
     patch.unit_cost_cents = input.unitCostCents;
   }
+  if (input.quantityExplicit !== undefined) {
+    patch.quantity_explicit = input.quantityExplicit;
+    if (!input.quantityExplicit) patch.quantity = null;
+  }
+  if (input.unitCostExplicit !== undefined) {
+    patch.unit_cost_explicit = input.unitCostExplicit;
+    if (!input.unitCostExplicit) patch.unit_cost_cents = null;
+  }
+
+  const hasIncompleteBreakdown =
+    input.quantityExplicit === false || input.unitCostExplicit === false;
+  if (hasIncompleteBreakdown && input.totalCostCents === undefined) {
+    throw new Error('Material total cost is required when its breakdown is incomplete.');
+  }
+  if (input.totalCostCents !== undefined) {
+    assertTotalCostNonNegative(input.totalCostCents);
+    patch.total_cost_cents = input.totalCostCents;
+  }
 
   // If either side of the cost changed, recompute total_cost_cents. When
   // only one side is provided we read the current row so the total stays
   // accurate against the persisted value on the other side.
   const willTouchCost =
-    input.quantity !== undefined || input.unitCostCents !== undefined;
+    input.totalCostCents === undefined &&
+    !hasIncompleteBreakdown &&
+    (input.quantity !== undefined || input.unitCostCents !== undefined);
 
   if (willTouchCost) {
     let effectiveQty = input.quantity;

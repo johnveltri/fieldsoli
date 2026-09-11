@@ -12,6 +12,7 @@ import {
   Platform,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
+  type ScrollView as NativeScrollView,
   type ScrollViewProps,
 } from 'react-native';
 import { ScrollView } from 'react-native-gesture-handler';
@@ -67,6 +68,8 @@ export function BottomSheetScrollProvider({
 }
 
 type BottomSheetScrollViewProps = ScrollViewProps & {
+  /** Optional owner ref for keyboard-aware sheet form scrolling. */
+  scrollViewRef?: RefObject<NativeScrollView | null>;
   /** RNGH: let the dismiss pan claim the gesture first when enabled. */
   waitFor?: RefObject<unknown> | RefObject<unknown>[];
   simultaneousHandlers?: RefObject<unknown> | RefObject<unknown>[];
@@ -74,6 +77,7 @@ type BottomSheetScrollViewProps = ScrollViewProps & {
 
 /** ScrollView that closes the sheet when the user pulls past the top (modal overscroll). */
 export function BottomSheetScrollView({
+  scrollViewRef,
   onScroll,
   onScrollEndDrag,
   onMomentumScrollEnd,
@@ -86,6 +90,7 @@ export function BottomSheetScrollView({
 
   return (
     <ScrollView
+      ref={scrollViewRef}
       {...rest}
       bounces={bounces}
       overScrollMode={Platform.OS === 'android' ? 'always' : undefined}

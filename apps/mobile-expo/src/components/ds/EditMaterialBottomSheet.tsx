@@ -26,9 +26,13 @@ export type EditMaterialBottomSheetValues = {
   description: string;
   /** Per-unit cost in cents. Zero is allowed (e.g. unknown). */
   unitCostCents: number;
-  /** Raw numeric quantity. Must be > 0 for the primary action to enable. */
+  /** Raw numeric quantity. Must be > 0 for the primary action to enable (legacy). */
   quantity: number;
   unit: string;
+  /** Phase 3 total-first: authoritative total when breakdown is incomplete. */
+  totalCostCents?: number;
+  quantityExplicit?: boolean;
+  unitCostExplicit?: boolean;
 };
 
 export type EditMaterialBottomSheetAssignedSession = {
@@ -87,6 +91,11 @@ type EditMaterialBottomSheetProps = {
   onNoneConfirmPress?: () => void;
   /** @default true — set false when this sheet replaces another (e.g. live session) without stacking. */
   registerInGlobalStack?: boolean;
+  /**
+   * Phase 3: description + total are enough to save; qty/unit price optional.
+   * When true, primary field is Total; breakdown fields remain available.
+   */
+  totalFirstMode?: boolean;
 };
 
 function toCurrencyString(cents: number): string {
@@ -177,6 +186,7 @@ export function EditMaterialBottomSheet({
   noneConfirmLabel,
   onNoneConfirmPress,
   registerInGlobalStack = true,
+  totalFirstMode = false,
 }: EditMaterialBottomSheetProps) {
   const [description, setDescription] = useState<string>(
     values?.description ?? '',
@@ -187,16 +197,25 @@ export function EditMaterialBottomSheet({
   const [qtyText, setQtyText] = useState<string>(
     toQuantityString(values?.quantity ?? 0),
   );
+  const [totalText, setTotalText] = useState<string>(
+    toCurrencyString(values?.totalCostCents ?? values?.unitCostCents ?? 0),
+  );
+  const [showBreakdown, setShowBreakdown] = useState(false);
 
   useEffect(() => {
     if (!visible) return;
     setDescription(values?.description ?? '');
     setPriceText(toCurrencyString(values?.unitCostCents ?? 0));
     setQtyText(toQuantityString(values?.quantity ?? 0));
+    setTotalText(
+      toCurrencyString(values?.totalCostCents ?? values?.unitCostCents ?? 0),
+    );
+    setShowBreakdown(false);
   }, [
     values?.description,
     values?.unitCostCents,
     values?.quantity,
+    values?.totalCostCents,
     visible,
   ]);
 
@@ -205,10 +224,15 @@ export function EditMaterialBottomSheet({
 
   const cents = parseCentsFromText(priceText);
   const qty = parseQuantityFromText(qtyText);
+  const totalCents = parseCentsFromText(totalText);
   const hasDescription = description.trim().length > 0;
   const hasQty = Number.isFinite(qty) && qty > 0;
   const hasValidCost = Number.isFinite(cents) && cents >= 0;
-  const canSave = hasDescription && hasQty && hasValidCost;
+  const hasTotalText = totalText.trim().length > 0;
+  const hasValidTotal = hasTotalText && Number.isFinite(totalCents) && totalCents >= 0;
+  const canSave = totalFirstMode
+    ? hasDescription && hasValidTotal
+    : hasDescription && hasQty && hasValidCost;
 
   const showSessionPill = canAttachSession || assignedSession !== null;
   const currentUnit = values?.unit?.trim() ?? '';
@@ -218,12 +242,33 @@ export function EditMaterialBottomSheet({
    * the session pill and unit pressables so the parent can cache these
    * before swapping to another sub-sheet.
    */
-  const currentDraft = (): EditMaterialBottomSheetValues => ({
-    description: description.trim(),
-    unitCostCents: Number.isFinite(cents) ? cents : 0,
-    quantity: Number.isFinite(qty) ? qty : 0,
-    unit: currentUnit || 'ea',
-  });
+  const currentDraft = (): EditMaterialBottomSheetValues => {
+    if (totalFirstMode) {
+      const qtyExplicit = showBreakdown && hasQty;
+      const unitExplicit = showBreakdown && hasValidCost && priceText.trim() !== '';
+      const resolvedTotal =
+        qtyExplicit && unitExplicit
+          ? Math.round(cents * qty)
+          : Number.isFinite(totalCents)
+            ? totalCents
+            : 0;
+      return {
+        description: description.trim(),
+        unitCostCents: unitExplicit ? cents : resolvedTotal,
+        quantity: qtyExplicit ? qty : 1,
+        unit: currentUnit || 'ea',
+        totalCostCents: resolvedTotal,
+        quantityExplicit: qtyExplicit,
+        unitCostExplicit: unitExplicit,
+      };
+    }
+    return {
+      description: description.trim(),
+      unitCostCents: Number.isFinite(cents) ? cents : 0,
+      quantity: Number.isFinite(qty) ? qty : 0,
+      unit: currentUnit || 'ea',
+    };
+  };
 
   return (
     <BottomSheetShell
@@ -255,7 +300,7 @@ export function EditMaterialBottomSheet({
           {onJobPillPress ? (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Attach to job"
+              accessibilityLabel="Add to job"
               onPress={() => onJobPillPress(currentDraft())}
               style={({ pressed }) => [styles.sessionButton, pressed && styles.pressed]}
             >
@@ -303,6 +348,34 @@ export function EditMaterialBottomSheet({
           />
         </View>
 
+        {totalFirstMode ? (
+          <>
+            <View style={styles.inputShell}>
+              <TextInput
+                value={totalText}
+                onChangeText={setTotalText}
+                placeholder="Total"
+                placeholderTextColor={fg.secondary}
+                keyboardType="decimal-pad"
+                style={[typography.body, styles.inputText]}
+              />
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={
+                showBreakdown ? 'Hide quantity and unit price' : 'Add quantity and unit price'
+              }
+              onPress={() => setShowBreakdown((v) => !v)}
+              style={({ pressed }) => [styles.breakdownToggle, pressed && styles.pressed]}
+            >
+              <Text style={[typography.bodySmall, { color: fg.secondary }]}>
+                {showBreakdown ? 'Hide qty & unit price' : 'Add qty & unit price'}
+              </Text>
+            </Pressable>
+          </>
+        ) : null}
+
+        {!totalFirstMode || showBreakdown ? (
         <View style={styles.row}>
           <View style={[styles.inputShell, styles.priceShell]}>
             <TextInput
@@ -343,6 +416,7 @@ export function EditMaterialBottomSheet({
             <DropdownCaret />
           </Pressable>
         </View>
+        ) : null}
 
         <SheetPrimaryDeleteActions
           typography={typography}
@@ -431,6 +505,11 @@ const styles = StyleSheet.create({
     color: fg.primary,
     padding: 0,
     width: '100%',
+  },
+  breakdownToggle: {
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingHorizontal: space('Spacing/4'),
   },
   row: {
     flexDirection: 'row',

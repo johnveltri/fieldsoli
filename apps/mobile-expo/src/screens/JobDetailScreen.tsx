@@ -14,7 +14,7 @@ import {
   fieldsoloExpoFontAssets,
   fieldsoloLoadedFonts,
 } from '@fieldsolo/design-system/expo/loadFieldSoloFonts';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   Animated,
@@ -48,6 +48,7 @@ import {
   JobDetailJobHeader,
   JobDetailMetricTertiary,
   JobDetailSummaryCard,
+  LiveSessionStartTile,
   NewSessionBottomSheet,
   nextStatusAfterPrimaryAction,
   SessionCard,
@@ -2923,13 +2924,21 @@ export function JobDetailScreen({
         typography={typography}
         showAdd={!simplifiedView}
         onAddPress={openSessionChooser}
+        trailing={
+          simplifiedView &&
+          !liveSessionCtx.hasLiveSession &&
+          !job.inProgressSession ? (
+            <LiveSessionStartTile
+              typography={typography}
+              onPress={() => void onStartLiveSession()}
+            />
+          ) : null
+        }
       />
       <View style={styles.sessionList}>
         {visibleSessions.length === 0 ? (
           <SectionEmptyStateCard
-            message={
-              job.inProgressSession ? 'Live session in progress' : 'No sessions recorded'
-            }
+            message="No sessions recorded"
             typography={typography}
             onPress={
               simplifiedView
@@ -3764,17 +3773,19 @@ function OtherCostsConfirmedNoUseCard({
 
 // --- Section header (Figma `371:2179` Row) ---
 
-/** Section title; optional trailing ADD button when `showAdd` is true. */
+/** Section title; optional trailing ADD button or custom trailing control. */
 function SectionHeaderFigma({
   title,
   typography,
   showAdd,
   onAddPress,
+  trailing,
 }: {
   title: string;
   typography: TextStyles;
   showAdd: boolean;
   onAddPress?: () => void;
+  trailing?: ReactNode;
 }) {
   return (
     <View style={styles.sectionHeader}>
@@ -3783,7 +3794,9 @@ function SectionHeaderFigma({
           <Text style={typography.titleH3}>{title}</Text>
         </View>
       </View>
-      {showAdd ? (
+      {trailing != null ? (
+        trailing
+      ) : showAdd ? (
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`Add ${title}`}

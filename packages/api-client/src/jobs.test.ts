@@ -4,6 +4,7 @@ import { fetchJobDetail } from './jobDetail';
 import {
   createBlankJobForCurrentUser,
   createBlankJobForLiveSessionStart,
+  createJobForCurrentUser,
   countCompletedJobsForCurrentUser,
   deleteJobById,
   getEarningsSnapshotForCurrentUser,
@@ -118,6 +119,55 @@ describe('jobs api client', () => {
 
     await expect(
       createBlankJobForLiveSessionStart(client as never, { shortDescription: '   ' }),
+    ).rejects.toThrow('Short description is required.');
+  });
+
+  it('createJobForCurrentUser inserts with typed title and optional identity', async () => {
+    let inserted: unknown;
+    const client = makeClient({
+      authUserId: 'user-1',
+      buildersByTable: {
+        jobs: [
+          makeBuilder({
+            onInsert: (payload) => {
+              inserted = payload;
+            },
+            singleResult: { data: { id: 'job-named-1' }, error: null },
+          }),
+        ],
+      },
+    });
+
+    const id = await createJobForCurrentUser(client as never, {
+      shortDescription: '  Fence repair  ',
+      longDescription: ' Gate latch ',
+      customerName: ' Alice ',
+      serviceAddress: ' 12 Oak ',
+      revenueCents: 15000,
+    });
+
+    expect(id).toBe('job-named-1');
+    expect(inserted).toEqual({
+      user_id: 'user-1',
+      short_description: 'Fence repair',
+      long_description: 'Gate latch',
+      customer_name: 'Alice',
+      service_address: '12 Oak',
+      revenue_cents: 15000,
+      job_type: '',
+      created_via: 'add_job',
+      job_work_status: 'not_started',
+    });
+  });
+
+  it('createJobForCurrentUser rejects blank titles', async () => {
+    const client = makeClient({
+      authUserId: 'user-1',
+      buildersByTable: { jobs: [] },
+    });
+
+    await expect(
+      createJobForCurrentUser(client as never, { shortDescription: '   ' }),
     ).rejects.toThrow('Short description is required.');
   });
 

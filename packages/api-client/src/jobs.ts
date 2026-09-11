@@ -894,6 +894,59 @@ export async function createBlankJobForLiveSessionStart(
   return (data as { id: string }).id;
 }
 
+/**
+ * Creates a job with a required non-blank title (Phase 3 New Job composer).
+ * Optional identity fields are normalized the same way as `updateJobById`.
+ * Does not insert `Untitled Job` unless the caller passes that string.
+ */
+export type CreateJobForCurrentUserInput = {
+  shortDescription: string;
+  longDescription?: string;
+  customerName?: string;
+  serviceAddress?: string;
+  revenueCents?: number | null;
+};
+
+export async function createJobForCurrentUser(
+  client: FieldSoloSupabaseClient,
+  input: CreateJobForCurrentUserInput,
+): Promise<JobId> {
+  const { data: authData, error: authError } = await client.auth.getUser();
+  if (authError) throw authError;
+  const userId = authData.user?.id;
+  if (!userId) {
+    throw new Error('No authenticated user available to create a job.');
+  }
+
+  const normalized = normalizeEditableJobInput({
+    shortDescription: input.shortDescription,
+    longDescription: input.longDescription ?? '',
+    customerName: input.customerName ?? '',
+    serviceAddress: input.serviceAddress ?? '',
+    revenueCents: input.revenueCents ?? null,
+  });
+
+  const { data, error } = await client
+    .from('jobs')
+    .insert({
+      user_id: userId,
+      short_description: normalized.shortDescription,
+      long_description:
+        normalized.longDescription.length > 0 ? normalized.longDescription : null,
+      customer_name: normalized.customerName,
+      service_address: normalized.serviceAddress,
+      revenue_cents: normalized.revenueCents,
+      job_type: '',
+      created_via: 'add_job',
+      job_work_status: 'not_started',
+    })
+    .select('id')
+    .single();
+
+  if (error) throw error;
+  return (data as { id: string }).id;
+}
+
 export async function deleteJobById(
   client: FieldSoloSupabaseClient,
   id: JobId,

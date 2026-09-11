@@ -10,6 +10,7 @@
 | Live overlay nested Edit / Done returns | High | Medium | TEST-L08 |
 | Live identity requires Done | High | Medium | TEST-L04 |
 | Live capture not immediate | High | Medium | TEST-L05 |
+| End Session is tappable while entering an inline value | High | Medium | TEST-L07 |
 | Start tile visible during another live | Medium | Medium | TEST-L02 |
 | Material quick capture still requires qty+unit | Medium | High | TEST-Q02 |
 | Flag-off regression | High | Medium | TEST-F02 |
@@ -20,29 +21,29 @@
 | ID | Source rules | Scenario | Expected result | Layer | Auto/manual | Environment |
 |---|---|---|---|---|---|---|
 | TEST-F01 | REQ-F01 | Flag on: smoke each Phase 3 entry | New paths active | Integration | Auto | Jest + mocked flag |
-| TEST-F02 | REQ-F02 | Flag off: New Job, Inbox tap, Quick Material, live overlay | Legacy behavior unchanged | Component | Auto | Jest |
+| TEST-F02 | REQ-F02 | Flag off: New Job, Inbox tap, Quick Material, FAB Live Session, live overlay | Legacy UI behavior unchanged; FAB opens the job chooser; end opens Job View | Component | Auto | Jest |
 | TEST-N01 | REQ-N01 | Open composer | No `Untitled Job` prefill; Add Job disabled when empty | Component | Auto | Jest |
 | TEST-N02 | REQ-N02 | Type title; Add Job | `createJob*` with title; navigates Job View; not `initialEditOpen` | Integration | Auto | Jest |
 | TEST-N03 | REQ-N03 | Dismiss composer with text entered | No `createJob` call | Component | Auto | Jest |
-| TEST-N04 | REQ-N04 | Expand composer; add customer; Add Job | Job created with customer_name | Integration | Auto | Jest |
+| TEST-N04 | REQ-N04 | Tap **Add details** from a titled composer | Job created, then fullscreen Job Edit opens | Integration | Auto | Jest |
 | TEST-Q01 | REQ-Q01 | Quick Note save | `createNote` jobId null; no chooser shown | Integration | Auto | Jest |
-| TEST-Q02 | REQ-Q02 | Quick Material description+total only | Save succeeds; qty/unit not required | Component | Auto | Jest |
+| TEST-Q02 | REQ-Q02 | Quick Material description+total only | Save succeeds; qty/unit not required; reload remains total-only | Component | Auto | Jest |
 | TEST-I01 | REQ-I01 | Tap Inbox note | Edit sheet opens; `ChooseJobBottomSheet` not opened | Component | Auto | `InboxScreen.test` |
 | TEST-I02 | REQ-I02 | Add to job | `updateNote` with jobId; user stays Inbox; row removed | Component | Auto | Jest |
 | TEST-I03 | REQ-I03 | Swipe delete Inbox note | Confirm → `deleteNote` | Component | Auto | Jest |
 | TEST-L01 | REQ-L01 | Job View flag on, no live | Live start tile visible with UX-L01/L02 copy | Component | Auto | `JobDetailScreen.test` |
-| TEST-L02 | REQ-L02 | Global live active | Start tile hidden on all Job Views | Component | Auto | Jest |
+| TEST-L02 | REQ-L02 | Global live active on another job | Start tile hidden on all Job Views; an empty job still says `No sessions recorded` | Component | Auto | Jest |
 | TEST-L03 | REQ-L03 | Tap start tile | `startLiveSession`; job detail closes | Integration | Auto | Jest |
-| TEST-L04 | REQ-L04, DATA-L03 | Change customer on live overlay | `updateJobById` called; no Done; bar title updates | Integration | Auto | Jest |
-| TEST-L05 | REQ-L05 | Add note on overlay | `createNote` with live sessionId; list updates | Integration | Auto | Jest |
-| TEST-L06 | REQ-L06 | Overlay list | Flat rows; no chevron; tap opens edit | Component | Auto | Jest |
-| TEST-L07 | REQ-L07 | Tap started time | `updateLiveSessionStart`; no EditLiveSession sheet | Component | Auto | Jest |
-| TEST-L08 | REQ-L08 | Render live overlay flag on | No header EDIT; no EditJobBottomSheet trigger | Component | Auto | Jest |
+| TEST-L04 | REQ-L04, DATA-L03 | Change customer on live overlay (flag on) | `updateJobById` called; no Done; bar title updates | Integration | Auto | Jest |
+| TEST-L05 | REQ-L05 | Add note/material on overlay (flag on) | Persist with live sessionId; a failed write keeps the local draft for retry | Integration | Auto | Jest |
+| TEST-L06 | REQ-L06 | Overlay list (flag on) | Flat rows; no chevron; tap opens edit | Component | Auto | Jest |
+| TEST-L07 | REQ-L07 | Edit any inline value; change started time rapidly; end session | Focused text field scrolls above the software keyboard; End Session hides while focused and restores on blur; latest start value persists without overlapping writes; no EditLiveSession sheet; end opens Job View | Component + integration | Auto | Jest |
+| TEST-L08 | REQ-L08 | Render expanded live overlay (flag on) | No header EDIT; no EditJobBottomSheet trigger | Component | Auto | Jest |
 | TEST-S01 | REQ-S01 | Composer + quick sheets | Use shared Edit row testIDs/components | Component | Auto | Jest |
 | TEST-L09 | UX-L10 | Minimize live | Back minimizes; session continues | Component | Auto | Jest |
 | TEST-L10 | STATE-C04 | Blank title on live identity blur | Patch not sent; field reverts | Unit | Auto | Jest |
 | TEST-A11 | UX-C01–C02 | Composer keyboard + safe area | Title visible above keyboard | Manual | Manual | iOS device |
-| TEST-A12 | UX-L06 | End session flow | Session ended; job refresh | Manual | Manual | Device |
+| TEST-A12 | UX-L06 | End session flow | Session ended; its Job View opens | Manual | Manual | Device |
 
 ## Test layers and boundaries
 

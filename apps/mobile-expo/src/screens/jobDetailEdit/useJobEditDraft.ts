@@ -210,6 +210,24 @@ export function createJobEditDraft(job: JobDetailViewModel): JobEditDraft {
   };
 }
 
+/** Empty in-memory draft for the Phase 3 New Job composer (no Untitled Job prefill). */
+export function createEmptyJobEditDraft(): JobEditDraft {
+  return {
+    shortDescription: '',
+    longDescription: '',
+    customerName: '',
+    serviceAddress: '',
+    revenueCents: null,
+    noRevenueConfirmed: false,
+    noMaterialsConfirmed: false,
+    noOtherCostsConfirmed: false,
+    sessions: [],
+    notes: [],
+    materials: [],
+    otherCosts: [],
+  };
+}
+
 function rowsEqual<T>(a: T, b: T): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
 }
