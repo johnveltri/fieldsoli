@@ -291,6 +291,37 @@ begin
 end $$;
 
 do $$
+declare
+  request_id uuid;
+  current_year integer := extract(year from now() at time zone 'UTC')::integer;
+  export_row record;
+begin
+  update public.jobs
+  set
+    long_description = 'Replace the valve and recaulk.',
+    completed_at = make_timestamptz(current_year, 6, 15, 12, 0, 0, 'UTC')
+  where id = current_setting('fieldsoli.export_test_job_id')::uuid;
+
+  insert into public.job_export_requests (user_id, reporting_year, reporting_time_zone, recipient_email)
+  values (
+    current_setting('fieldsoli.export_test_user_id')::uuid,
+    current_year,
+    'UTC',
+    'export-test@example.com'
+  )
+  returning id into request_id;
+
+  select * into export_row
+  from public.job_export_rows(request_id)
+  where job_id = current_setting('fieldsoli.export_test_job_id')::uuid
+  limit 1;
+
+  if export_row.long_description is distinct from 'Replace the valve and recaulk.' then
+    raise exception 'job_export_rows must return long_description, got %', export_row.long_description;
+  end if;
+end $$;
+
+do $$
 begin
   if has_column_privilege('authenticated', 'public.jobs', 'completed_at', 'update')
     or has_column_privilege('authenticated', 'public.jobs', 'paid_at', 'update')
