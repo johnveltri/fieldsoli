@@ -399,18 +399,9 @@ export function AuthenticatedAppChrome({ children }: AuthenticatedAppChromeProps
 
   const onLiveSessionEnded = useCallback(
     (jobId: string) => {
-      if (jobDetailOpen && selectedJobId === jobId) {
-        setJobDetailLoadKey((k) => k + 1);
-        return;
-      }
-      if (jobDetailOpen) {
-        setJobDetailEntrySource('live_session_overlay');
-        setSelectedJobId(jobId);
-        setJobDetailInitialEditOpen(false);
-        setJobDetailLoadKey((k) => k + 1);
-      }
+      openJobDetail(jobId, { entrySource: 'live_session_overlay' });
     },
-    [jobDetailOpen, selectedJobId],
+    [openJobDetail],
   );
 
   const currentScreen = useMemo(() => {
@@ -624,7 +615,7 @@ export function AuthenticatedAppChrome({ children }: AuthenticatedAppChromeProps
         <QuickActionsFlowProvider
           onCreateJob={() => createJobAndOpen('primary_action')}
           onQuickCaptureSaved={onQuickCaptureSaved}
-          totalFirstMaterialCapture={phase3Enabled}
+          phase3Enabled={phase3Enabled}
         >
           <ShellAppContext.Provider value={shellContextValue}>
             <ShellOverlayProvider value={shellOverlayValue}>

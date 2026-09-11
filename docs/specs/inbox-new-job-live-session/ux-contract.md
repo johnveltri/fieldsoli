@@ -80,7 +80,7 @@
 
 ### Flag off
 
-- Legacy New Job (Untitled insert + Edit), Inbox tap-to-assign, legacy Quick Material validation, legacy live overlay — unchanged.
+- Legacy New Job (Untitled insert + Edit), Inbox tap-to-assign, legacy Quick Material validation, and legacy live overlay remain. Ending a session opens its Job View in either state.
 
 ## Navigation and continuity
 

@@ -20,6 +20,13 @@ let mockComposerProps: {
   }) => void;
 } | null = null;
 
+let mockLegacyQuickActionsProps: {
+  visible: boolean;
+  onStartNewSession: () => void;
+} | null = null;
+
+let mockLegacyMaterialProps: { visible: boolean } | null = null;
+
 const mockStartLiveSession = jest.fn<(...args: unknown[]) => Promise<unknown>>();
 const mockRefreshLiveSession = jest.fn<(...args: unknown[]) => Promise<unknown>>();
 
@@ -42,12 +49,26 @@ jest.mock('@fieldsolo/api-client', () => ({
   createMaterial: jest.fn(),
   createNote: jest.fn(),
   deleteJobById: jest.fn(),
+  listRecentJobsForCurrentUser: jest.fn(),
   tryBumpJobToInProgressIfNotStarted: jest.fn(),
 }));
 
 jest.mock('../components/ds', () => ({
   CaptureComposerSheet: (props: typeof mockComposerProps) => {
     mockComposerProps = props;
+    return null;
+  },
+  DropdownBottomSheet: () => null,
+  EditMaterialBottomSheet: (props: typeof mockLegacyMaterialProps) => {
+    mockLegacyMaterialProps = props;
+    return null;
+  },
+  EditNoteBottomSheet: () => null,
+}));
+
+jest.mock('../components/ds/QuickActionsBottomSheet', () => ({
+  QuickActionsBottomSheet: (props: typeof mockLegacyQuickActionsProps) => {
+    mockLegacyQuickActionsProps = props;
     return null;
   },
 }));
@@ -57,6 +78,7 @@ jest.mock('../context/JobsListInvalidationContext', () => ({
 }));
 
 jest.mock('../context/LiveSessionContext', () => ({
+  useHasLiveSession: () => false,
   useLiveSession: () => ({
     startLiveSession: (...args: unknown[]) => mockStartLiveSession(...args),
     refresh: (...args: unknown[]) => mockRefreshLiveSession(...args),
@@ -117,6 +139,8 @@ describe('QuickActionsFlowProvider', () => {
 
   beforeEach(() => {
     mockComposerProps = null;
+    mockLegacyQuickActionsProps = null;
+    mockLegacyMaterialProps = null;
     mockStartLiveSession.mockReset();
     mockRefreshLiveSession.mockReset();
     const apiClient = jest.requireMock('@fieldsolo/api-client') as any;
@@ -125,6 +149,7 @@ describe('QuickActionsFlowProvider', () => {
     apiClient.createMaterial.mockReset();
     apiClient.deleteJobById.mockReset();
     apiClient.tryBumpJobToInProgressIfNotStarted.mockReset();
+    apiClient.listRecentJobsForCurrentUser.mockReset();
     apiClient.tryBumpJobToInProgressIfNotStarted.mockResolvedValue(undefined);
     alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
   });
@@ -142,7 +167,7 @@ describe('QuickActionsFlowProvider', () => {
         }),
     );
     const screen = render(
-      <QuickActionsFlowProvider onCreateJob={onCreateJob}>
+      <QuickActionsFlowProvider phase3Enabled onCreateJob={onCreateJob}>
         <Harness />
       </QuickActionsFlowProvider>,
     );
@@ -162,7 +187,7 @@ describe('QuickActionsFlowProvider', () => {
   it('reports job creation failures and returns to idle', async () => {
     const onCreateJob = jest.fn<() => Promise<void>>().mockRejectedValue(new Error('Network down'));
     const screen = render(
-      <QuickActionsFlowProvider onCreateJob={onCreateJob}>
+      <QuickActionsFlowProvider phase3Enabled onCreateJob={onCreateJob}>
         <Harness />
       </QuickActionsFlowProvider>,
     );
@@ -181,7 +206,7 @@ describe('QuickActionsFlowProvider', () => {
     mockStartLiveSession.mockResolvedValue({ id: 'sess-1', jobId: 'job-live-1' });
 
     const screen = render(
-      <QuickActionsFlowProvider onCreateJob={async () => {}}>
+      <QuickActionsFlowProvider phase3Enabled onCreateJob={async () => {}}>
         <Harness />
       </QuickActionsFlowProvider>,
     );
@@ -208,7 +233,7 @@ describe('QuickActionsFlowProvider', () => {
     const onQuickCaptureSaved = jest.fn();
     const screen = render(
       <TestErrorBoundary>
-        <QuickActionsFlowProvider onCreateJob={async () => {}} onQuickCaptureSaved={onQuickCaptureSaved}>
+        <QuickActionsFlowProvider phase3Enabled onCreateJob={async () => {}} onQuickCaptureSaved={onQuickCaptureSaved}>
           <Harness />
         </QuickActionsFlowProvider>
       </TestErrorBoundary>,
@@ -240,7 +265,7 @@ describe('QuickActionsFlowProvider', () => {
     apiClient.createMaterial.mockResolvedValue('mat-1');
     const onQuickCaptureSaved = jest.fn();
     const screen = render(
-      <QuickActionsFlowProvider onCreateJob={async () => {}} onQuickCaptureSaved={onQuickCaptureSaved}>
+      <QuickActionsFlowProvider phase3Enabled onCreateJob={async () => {}} onQuickCaptureSaved={onQuickCaptureSaved}>
         <Harness />
       </QuickActionsFlowProvider>,
     );
@@ -269,9 +294,41 @@ describe('QuickActionsFlowProvider', () => {
           description: 'Wire nuts',
           quantity: 1,
           unitCostCents: 300,
+          quantityExplicit: false,
+          unitCostExplicit: false,
+          totalCostCents: 300,
         }),
       );
       expect(onQuickCaptureSaved).toHaveBeenCalledWith({ mode: 'inbox', jobId: null });
     });
+  });
+
+  it('TEST-F02 uses the legacy chooser instead of direct FAB start when Phase 3 is off', async () => {
+    const apiClient = jest.requireMock('@fieldsolo/api-client') as any;
+    apiClient.listRecentJobsForCurrentUser.mockResolvedValue([]);
+    const screen = render(
+      <QuickActionsFlowProvider onCreateJob={async () => {}}>
+        <Harness />
+      </QuickActionsFlowProvider>,
+    );
+
+    fireEvent.press(screen.getByRole('button', { name: 'Live session' }));
+
+    await waitFor(() => expect(mockLegacyQuickActionsProps?.visible).toBe(true));
+    expect(apiClient.createBlankJobForLiveSessionStart).not.toHaveBeenCalled();
+    expect(mockComposerProps).toBeNull();
+  });
+
+  it('TEST-F02 keeps the legacy Quick Material sheet when Phase 3 is off', async () => {
+    const screen = render(
+      <QuickActionsFlowProvider onCreateJob={async () => {}}>
+        <Harness />
+      </QuickActionsFlowProvider>,
+    );
+
+    fireEvent.press(screen.getByRole('button', { name: 'Quick material' }));
+
+    await waitFor(() => expect(mockLegacyMaterialProps?.visible).toBe(true));
+    expect(mockComposerProps).toBeNull();
   });
 });

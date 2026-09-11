@@ -434,17 +434,22 @@ export function InboxScreen({ loadKey = 0, onRequestClose }: InboxScreenProps) {
             quantity?: number;
             unit?: string;
             unitCostCents?: number;
+            quantityExplicit?: boolean;
+            unitCostExplicit?: boolean;
+            totalCostCents?: number;
           } = { sessionId: null, jobId };
           if (editingMaterialId === target.id && matDraft) {
-            const totalFirst = !(
-              matDraft.quantityExplicit && matDraft.unitCostExplicit
-            );
             patch.description = matDraft.description;
-            patch.quantity = totalFirst ? 1 : Math.max(1, matDraft.quantity);
+            patch.quantity = matDraft.quantityExplicit
+              ? Math.max(1, matDraft.quantity)
+              : 1;
             patch.unit = matDraft.unit || 'ea';
-            patch.unitCostCents = totalFirst
-              ? Math.max(0, matDraft.totalCostCents)
-              : Math.max(0, matDraft.unitCostCents);
+            patch.unitCostCents = matDraft.unitCostExplicit
+              ? Math.max(0, matDraft.unitCostCents)
+              : Math.max(0, matDraft.totalCostCents);
+            patch.quantityExplicit = matDraft.quantityExplicit;
+            patch.unitCostExplicit = matDraft.unitCostExplicit;
+            patch.totalCostCents = Math.max(0, matDraft.totalCostCents);
           }
           await updateMaterial(supabase, target.id, patch);
           setMaterials((prev) => prev.filter((m) => m.id !== target.id));
@@ -528,31 +533,33 @@ export function InboxScreen({ loadKey = 0, onRequestClose }: InboxScreenProps) {
       }
       setMaterialSaving(true);
       try {
-        const totalFirst = !(values.quantityExplicit && values.unitCostExplicit);
-        const quantity = totalFirst ? 1 : values.quantity;
-        const unitCostCents = totalFirst
-          ? Math.max(0, values.totalCostCents)
-          : values.unitCostCents;
+        const quantity = values.quantityExplicit ? values.quantity : 1;
+        const unitCostCents = values.unitCostExplicit
+          ? values.unitCostCents
+          : Math.max(0, values.totalCostCents);
         await updateMaterial(supabase, editingMaterialId, {
           description: values.description,
           quantity,
           unit: values.unit || 'ea',
           unitCostCents,
+          quantityExplicit: values.quantityExplicit,
+          unitCostExplicit: values.unitCostExplicit,
+          totalCostCents: Math.max(0, values.totalCostCents),
         });
         const savedId = editingMaterialId;
-        const totalCostCents = Math.round(unitCostCents * quantity);
+        const totalCostCents = Math.max(0, values.totalCostCents);
         setMaterials((prev) =>
           prev.map((m) =>
             m.id === savedId
               ? {
                   ...m,
                   name: values.description.trim() || 'Material',
-                  quantity,
+                  quantity: values.quantityExplicit ? quantity : null,
                   unit: values.unit || 'ea',
-                  unitCostCents,
+                  unitCostCents: values.unitCostExplicit ? unitCostCents : null,
                   totalCostCents,
-                  quantityExplicit: !totalFirst,
-                  unitCostExplicit: !totalFirst,
+                  quantityExplicit: values.quantityExplicit,
+                  unitCostExplicit: values.unitCostExplicit,
                 }
               : m,
           ),

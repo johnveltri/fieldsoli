@@ -40,6 +40,7 @@ import {
   type EditNoteBottomSheetValues,
   type EditLiveSessionSavePayload,
 } from './ds';
+import { LegacyLiveSessionBottomSheet } from './ds/LegacyLiveSessionBottomSheet';
 import {
   useHasRegisteredBottomSheet,
   useBottomSheetStackWriters,
@@ -486,10 +487,10 @@ export function LiveSessionOverlay({
           phase3Capture &&
           values.totalCostCents != null &&
           !(values.quantityExplicit && values.unitCostExplicit);
-        const quantity = totalFirst ? 1 : values.quantity;
-        const unitCostCents = totalFirst
-          ? Math.max(0, values.totalCostCents ?? 0)
-          : values.unitCostCents;
+        const quantity = values.quantityExplicit ? values.quantity : 1;
+        const unitCostCents = values.unitCostExplicit
+          ? values.unitCostCents
+          : Math.max(0, values.totalCostCents ?? 0);
         const materialId = await createMaterial(supabase, {
           jobId,
           sessionId: matDraftSessionId,
@@ -497,6 +498,11 @@ export function LiveSessionOverlay({
           quantity,
           unit: values.unit || 'ea',
           unitCostCents,
+          quantityExplicit: values.quantityExplicit,
+          unitCostExplicit: values.unitCostExplicit,
+          totalCostCents: totalFirst
+            ? Math.max(0, values.totalCostCents ?? 0)
+            : Math.round(quantity * unitCostCents),
         });
         await refetchJobDetail();
         closeMaterialFlow();
@@ -544,6 +550,9 @@ export function LiveSessionOverlay({
           quantity: values.quantity,
           unit: values.unit,
           unitCostCents: values.unitCostCents,
+          quantityExplicit: values.quantityExplicit,
+          unitCostExplicit: values.unitCostExplicit,
+          totalCostCents: values.totalCostCents,
           sessionId: matDraftSessionId,
           jobId: matDraftSessionId === null ? jobId : undefined,
         });
@@ -827,6 +836,7 @@ export function LiveSessionOverlay({
           'Update failed',
           formatErrorMessage(e) || "Couldn't update start time. Try again.",
         );
+        throw e;
       }
     },
     [formatErrorMessage, liveSession, phase3Capture, updateLiveSessionStartedAt],
@@ -1009,6 +1019,7 @@ export function LiveSessionOverlay({
           ...errorProperties(e),
         });
         Alert.alert('Save failed', formatErrorMessage(e) || 'Could not save note.');
+        throw e;
       }
     },
     [formatErrorMessage, jobId, liveSession, refetchJobDetail],
@@ -1049,6 +1060,9 @@ export function LiveSessionOverlay({
           quantity: 1,
           unit: 'ea',
           unitCostCents: Math.max(0, input.totalCostCents),
+          quantityExplicit: false,
+          unitCostExplicit: false,
+          totalCostCents: Math.max(0, input.totalCostCents),
         });
         await refetchJobDetail();
         analytics.capture('material_created', {
@@ -1071,6 +1085,7 @@ export function LiveSessionOverlay({
           ...errorProperties(e),
         });
         Alert.alert('Save failed', formatErrorMessage(e) || 'Could not save material.');
+        throw e;
       }
     },
     [formatErrorMessage, jobId, liveSession, refetchJobDetail],
@@ -1084,6 +1099,9 @@ export function LiveSessionOverlay({
           quantity: 1,
           unit: 'ea',
           unitCostCents: Math.max(0, input.totalCostCents),
+          quantityExplicit: false,
+          unitCostExplicit: false,
+          totalCostCents: Math.max(0, input.totalCostCents),
         });
         await refetchJobDetail();
       } catch (e) {
@@ -1115,50 +1133,63 @@ export function LiveSessionOverlay({
         Sheet stack: both BottomSheetShells stay mounted so they can play
         their slide-down animation — visibility flips drive the slide.
       */}
-      <LiveSessionBottomSheet
-        typography={typography}
-        visible={showLiveSessionMain}
-        jobShortDescription={liveSession.jobShortDescription}
-        startedAt={liveSession.startedAt}
-        attachments={liveAttachments}
-        phase3Capture={phase3Capture}
-        jobIdentity={phase3JobIdentity}
-        onJobIdentityChange={
+      {phase3Capture ? (
+        <LiveSessionBottomSheet
+          typography={typography}
+          visible={showLiveSessionMain}
+          jobShortDescription={liveSession.jobShortDescription}
+          startedAt={liveSession.startedAt}
+          attachments={liveAttachments}
           phase3Capture
-            ? (patch) => {
-                void onPhase3JobIdentityChange(patch);
-              }
-            : undefined
-        }
-        onChangeStartedAt={
-          phase3Capture
-            ? (iso) => {
-                void onPhase3ChangeStartedAt(iso);
-              }
-            : undefined
-        }
-        onAddNote={openAddNoteFromLive}
-        onAddMaterial={openAddMaterialFromLive}
-        onPressAttachment={({ kind, id }) => {
-          if (kind === 'note') {
-            openEditNote(id);
-          } else {
-            openEditMaterial(id);
-          }
-        }}
-        liveNotes={phase3LiveNotes}
-        liveMaterials={phase3LiveMaterials}
-        onCreateNote={phase3Capture ? onPhase3CreateNote : undefined}
-        onUpdateNote={phase3Capture ? onPhase3UpdateNote : undefined}
-        onDeleteNote={phase3Capture ? onPhase3DeleteNote : undefined}
-        onCreateMaterial={phase3Capture ? onPhase3CreateMaterial : undefined}
-        onUpdateMaterial={phase3Capture ? onPhase3UpdateMaterial : undefined}
-        onDeleteMaterial={phase3Capture ? onPhase3DeleteMaterial : undefined}
-        onMinimize={minimize}
-        onEditPress={phase3Capture ? undefined : openEditSheet}
-        onEditJobPress={phase3Capture ? undefined : openEditJob}
-        onEndSessionPress={() => void handleEndSession()}
-      />
+          jobIdentity={phase3JobIdentity}
+          onJobIdentityChange={(patch) => {
+            void onPhase3JobIdentityChange(patch);
+          }}
+          onChangeStartedAt={(iso) => {
+            void onPhase3ChangeStartedAt(iso);
+          }}
+          onAddNote={openAddNoteFromLive}
+          onAddMaterial={openAddMaterialFromLive}
+          onPressAttachment={({ kind, id }) => {
+            if (kind === 'note') {
+              openEditNote(id);
+            } else {
+              openEditMaterial(id);
+            }
+          }}
+          liveNotes={phase3LiveNotes}
+          liveMaterials={phase3LiveMaterials}
+          onCreateNote={onPhase3CreateNote}
+          onUpdateNote={onPhase3UpdateNote}
+          onDeleteNote={onPhase3DeleteNote}
+          onCreateMaterial={onPhase3CreateMaterial}
+          onUpdateMaterial={onPhase3UpdateMaterial}
+          onDeleteMaterial={onPhase3DeleteMaterial}
+          onMinimize={minimize}
+          onEndSessionPress={() => void handleEndSession()}
+        />
+      ) : (
+        <LegacyLiveSessionBottomSheet
+          typography={typography}
+          visible={showLiveSessionMain}
+          jobShortDescription={liveSession.jobShortDescription}
+          startedAt={liveSession.startedAt}
+          attachments={liveAttachments}
+          onAddNote={openAddNoteFromLive}
+          onAddMaterial={openAddMaterialFromLive}
+          onPressAttachment={({ kind, id }) => {
+            if (kind === 'note') {
+              openEditNote(id);
+            } else {
+              openEditMaterial(id);
+            }
+          }}
+          onMinimize={minimize}
+          onEditPress={openEditSheet}
+          onEditJobPress={openEditJob}
+          onEndSessionPress={() => void handleEndSession()}
+        />
+      )}
 
       {!phase3Capture ? (
       <EditLiveSessionBottomSheet

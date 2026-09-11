@@ -1588,7 +1588,7 @@ describe('JobDetailScreen simplified view (flag on)', () => {
     expect(screen.queryByText('No other costs recorded')).toBeNull();
   });
 
-  it('does not show No sessions recorded while a live session is in progress', async () => {
+  it('keeps No sessions recorded for an empty job while a live session is in progress', async () => {
     apiClient.fetchJobDetail.mockResolvedValue({
       ...incompleteJob,
       displaySessions: [],
@@ -1607,8 +1607,7 @@ describe('JobDetailScreen simplified view (flag on)', () => {
       },
     });
     const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
-    await waitFor(() => expect(screen.getByText('Live session in progress')).toBeTruthy());
-    expect(screen.queryByText('No sessions recorded')).toBeNull();
+    await waitFor(() => expect(screen.getByText('No sessions recorded')).toBeTruthy());
   });
 
   it('blocks Paid from the status sheet until financial completeness is met', async () => {
@@ -1993,7 +1992,7 @@ describe('JobDetailScreen simplified view (flag on)', () => {
     const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
     await waitFor(() => expect(screen.getByText('Sessions')).toBeTruthy());
     expect(screen.queryByLabelText('Start live session')).toBeNull();
-    expect(screen.getByText('Live session in progress')).toBeTruthy();
+    expect(screen.getByText('No sessions recorded')).toBeTruthy();
   });
 
   it('TEST-L03 starts live session from + LIVE and closes job detail', async () => {

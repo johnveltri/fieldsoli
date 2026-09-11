@@ -160,6 +160,20 @@ describe('BottomSheetShell accessibility', () => {
     expect(surfaceStyle.paddingBottom).toBe(0);
   });
 
+  it('clips a fullbleed live-session header into the standard rounded sheet top', () => {
+    render(
+      <BottomSheetShell visible variant="fullbleedDark">
+        <Text>Live session</Text>
+      </BottomSheetShell>,
+    );
+
+    const surfaceStyle = StyleSheet.flatten(screen.getByTestId('bottom-sheet-surface').props.style);
+    expect(surfaceStyle.borderTopLeftRadius).toBeGreaterThan(0);
+    expect(surfaceStyle.borderTopRightRadius).toBeGreaterThan(0);
+    expect(surfaceStyle.borderCurve).toBe('continuous');
+    expect(surfaceStyle.overflow).toBe('hidden');
+  });
+
   it('registers as active as soon as the sheet opens', async () => {
     render(
       <BottomSheetStackProvider>

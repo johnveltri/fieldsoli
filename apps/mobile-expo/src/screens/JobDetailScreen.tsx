@@ -2938,11 +2938,7 @@ export function JobDetailScreen({
       <View style={styles.sessionList}>
         {visibleSessions.length === 0 ? (
           <SectionEmptyStateCard
-            message={
-              job.inProgressSession || liveSessionCtx.hasLiveSession
-                ? 'Live session in progress'
-                : 'No sessions recorded'
-            }
+            message="No sessions recorded"
             typography={typography}
             onPress={
               simplifiedView

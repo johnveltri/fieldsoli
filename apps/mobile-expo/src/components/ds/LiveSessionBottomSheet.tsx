@@ -109,7 +109,7 @@ type LiveSessionBottomSheetProps = {
   phase3Capture?: boolean;
   jobIdentity?: LiveSessionJobIdentity;
   onJobIdentityChange?: (patch: LiveSessionJobIdentityPatch) => void;
-  onChangeStartedAt?: (iso: string) => void;
+  onChangeStartedAt?: (iso: string) => void | Promise<void>;
   /** Phase 3: persisted notes on the live session (inline edit). */
   liveNotes?: LiveSessionInlineNote[];
   /** Phase 3: persisted materials on the live session (inline edit). */
@@ -222,6 +222,9 @@ export function LiveSessionBottomSheet({
   const [activePicker, setActivePicker] = useState<'date' | 'startTime' | null>(null);
   const [startTimeError, setStartTimeError] = useState<string | null>(null);
   const persistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingStartedAt = useRef<string | null>(null);
+  const startTimeSaveInFlight = useRef(false);
+  const onChangeStartedAtRef = useRef(onChangeStartedAt);
   const lastPersistedTitle = useRef(jobIdentity?.shortDescription ?? jobShortDescription);
   const lastIdentityKey = useRef<string | null>(null);
   const draftRef = useRef({
@@ -388,6 +391,27 @@ export function LiveSessionBottomSheet({
     [],
   );
 
+  useEffect(() => {
+    onChangeStartedAtRef.current = onChangeStartedAt;
+  }, [onChangeStartedAt]);
+
+  const flushStartedAt = useCallback(async () => {
+    if (startTimeSaveInFlight.current) return;
+    const next = pendingStartedAt.current;
+    const save = onChangeStartedAtRef.current;
+    if (!next || !save) return;
+    pendingStartedAt.current = null;
+    startTimeSaveInFlight.current = true;
+    try {
+      await save(next);
+    } catch {
+      // The parent surfaces the persistence error. Keep a later picker value queued.
+    } finally {
+      startTimeSaveInFlight.current = false;
+      if (pendingStartedAt.current) void flushStartedAt();
+    }
+  }, []);
+
   const commitStartedAt = useCallback(
     (nextDate: Date, nextTime: Date) => {
       if (!onChangeStartedAt) return;
@@ -399,9 +423,10 @@ export function LiveSessionBottomSheet({
       setStartTimeError(null);
       const iso = combined.toISOString();
       if (iso === new Date(startedAt).toISOString()) return;
-      onChangeStartedAt(iso);
+      pendingStartedAt.current = iso;
+      void flushStartedAt();
     },
-    [onChangeStartedAt, startedAt],
+    [flushStartedAt, onChangeStartedAt, startedAt],
   );
 
   const openDatePicker = useCallback(() => {
@@ -463,7 +488,11 @@ export function LiveSessionBottomSheet({
         setComposerNotes((prev) => prev.filter((n) => n.localId !== localId));
         return;
       }
-      await onCreateNote(trimmed);
+      try {
+        await onCreateNote(trimmed);
+      } catch {
+        return;
+      }
       setComposerNotes((prev) => prev.filter((n) => n.localId !== localId));
     },
     [onCreateNote],
@@ -490,7 +519,11 @@ export function LiveSessionBottomSheet({
         }
         return;
       }
-      await onCreateMaterial({ description: desc, totalCostCents: cents });
+      try {
+        await onCreateMaterial({ description: desc, totalCostCents: cents });
+      } catch {
+        return;
+      }
       setComposerMaterials((prev) => prev.filter((m) => m.localId !== localId));
     },
     [onCreateMaterial],

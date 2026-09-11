@@ -75,6 +75,11 @@ export { EarningsSnapshotCard } from './EarningsSnapshotCard';
 export { RankedJobRowCard } from './RankedJobRowCard';
 export { NewSessionBottomSheet } from './NewSessionBottomSheet';
 export { PendingPaymentRowCard } from './PendingPaymentRowCard';
+export {
+  QuickActionsBottomSheet,
+  type QuickActionsRecentJob,
+  type QuickActionsStep,
+} from './QuickActionsBottomSheet';
 export { SessionAddToSessionTiles } from './SessionAddToSessionTiles';
 export { SessionAttachmentList } from './SessionAttachmentList';
 export { SessionCard } from './SessionCard';

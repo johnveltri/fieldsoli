@@ -653,11 +653,15 @@ const styles = StyleSheet.create({
     paddingBottom: space('Spacing/12'),
   },
   /**
-   * Fullbleed live-session surface: edge-to-edge modal (no sheet radius / handle).
-   * Cream fill so the sticky End Session gradient sits on canvas-warm instead of
+   * Fullbleed live-session surface: no outer cream chrome or drag handle, but
+   * keep the app’s rounded sheet top and clip the dark header into that shape.
+   * Cream fill keeps the sticky End Session gradient on canvas-warm instead of
    * flashing the dark header color under the FAB fade.
    */
   sheetFullbleed: {
+    borderTopLeftRadius: radius('Radius/32'),
+    borderTopRightRadius: radius('Radius/32'),
+    borderCurve: 'continuous',
     overflow: 'hidden',
     backgroundColor: bg.canvasWarm,
   },

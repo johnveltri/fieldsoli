@@ -125,6 +125,7 @@ export type AnalyticsEventName =
   | 'inbox_tab_changed'
   | 'inbox_item_selected'
   | 'inbox_assign_sheet_opened'
+  | 'inbox_assign_jobs_loaded'
   | 'inbox_assign_jobs_load_failed'
   | 'inbox_item_assigned_to_job'
   | 'inbox_item_assign_failed'
