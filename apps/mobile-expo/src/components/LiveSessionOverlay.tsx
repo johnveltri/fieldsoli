@@ -4,7 +4,8 @@ import {
   fieldsoloLoadedFonts,
 } from '@fieldsolo/design-system/expo/loadFieldSoloFonts';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Animated, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Alert, Animated, Modal, Platform, StyleSheet, useWindowDimensions } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
@@ -59,6 +60,11 @@ import {
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { contentColumnMetrics, createTextStyles } from '../theme/nativeTokens';
 import { shellLiveSessionBarBottom } from './platform/shellDockMetrics';
+import {
+  getAndroidLiveSessionBackAction,
+  type MaterialFlow,
+  type NoteFlow,
+} from './liveSessionBackNavigation';
 
 type LiveSessionOverlayProps = {
   /**
@@ -112,20 +118,12 @@ export function LiveSessionOverlay({
 
   const [jobDetail, setJobDetail] = useState<JobDetailViewModel | null>(null);
 
-  type NoteFlow = 'closed' | 'addNote' | 'editNote' | 'attachSession' | 'editSession';
   const [noteFlow, setNoteFlow] = useState<NoteFlow>('closed');
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [draftBody, setDraftBody] = useState('');
   const [draftSessionId, setDraftSessionId] = useState<string | null>(null);
   const [noteSaving, setNoteSaving] = useState(false);
 
-  type MaterialFlow =
-    | 'closed'
-    | 'addMaterial'
-    | 'editMaterial'
-    | 'attachSession'
-    | 'editSession'
-    | 'chooseUnit';
   const [materialFlow, setMaterialFlow] = useState<MaterialFlow>('closed');
   const [editingMaterialId, setEditingMaterialId] = useState<string | null>(null);
   const [matDraftDescription, setMatDraftDescription] = useState('');
@@ -945,6 +943,48 @@ export function LiveSessionOverlay({
     openSheet();
   }, [elapsedSeconds, liveSession, openSheet, sheetStackWriters, topmostSheet]);
 
+  const handleAndroidSheetRequestClose = useCallback(() => {
+    switch (
+      getAndroidLiveSessionBackAction({ mode, noteFlow, materialFlow, editJobOpen })
+    ) {
+      case 'closeEditSheet':
+        closeEditSheet();
+        return;
+      case 'closeEditJob':
+        closeEditJob();
+        return;
+      case 'returnToNoteSheet':
+        returnToNoteSheet();
+        return;
+      case 'closeNoteFlow':
+        closeNoteFlow();
+        return;
+      case 'returnToMaterialSheet':
+        returnToMaterialSheet();
+        return;
+      case 'closeMaterialFlow':
+        closeMaterialFlow();
+        return;
+      case 'minimize':
+        minimize();
+        return;
+      case 'none':
+        return;
+    }
+  }, [
+    closeEditJob,
+    closeEditSheet,
+    closeMaterialFlow,
+    closeNoteFlow,
+    editJobOpen,
+    materialFlow,
+    minimize,
+    mode,
+    noteFlow,
+    returnToMaterialSheet,
+    returnToNoteSheet,
+  ]);
+
   // The bar's anchor stays pinned above the floating shell dock.
   const fabSlotBottom = shellLiveSessionBarBottom(insets.bottom);
 
@@ -1126,8 +1166,9 @@ export function LiveSessionOverlay({
   if (!fontsLoaded || !liveSession) return null;
 
   const barVisible = mode === 'minimized' && !hasRegisteredSheet;
+  const liveSessionSheetHostOpen = mode === 'sheet' || mode === 'editSheet';
 
-  return (
+  const liveSessionSheets = (
     <>
       {/*
         Sheet stack: both BottomSheetShells stay mounted so they can play
@@ -1345,14 +1386,39 @@ export function LiveSessionOverlay({
       />
         </>
       ) : null}
+    </>
+  );
+
+  const androidSheetHost =
+    liveSessionSheetHostOpen ? (
+      <Modal
+        visible
+        transparent
+        animationType="none"
+        statusBarTranslucent
+        navigationBarTranslucent
+        onRequestClose={handleAndroidSheetRequestClose}
+      >
+        <GestureHandlerRootView collapsable={false} style={styles.androidSheetHost}>
+          {liveSessionSheets}
+        </GestureHandlerRootView>
+      </Modal>
+    ) : null;
+
+  return (
+    <>
+      {Platform.OS === 'android' ? androidSheetHost : liveSessionSheets}
 
       {/*
         Bar stays mounted whenever a live session exists, so the morph
         between full sheet ↔ bar is a smooth crossfade rather than a
         mount/unmount jolt. `visible` drives the bar's internal
         opacity/translate/scale animation.
+        Do not wrap this in a full-screen host — Android absoluteFill
+        overlays intercept Inbox taps even with pointerEvents="box-none".
       */}
       <Animated.View
+        collapsable={false}
         pointerEvents={hasRegisteredSheet ? 'none' : 'box-none'}
         style={[
           styles.minimizedAnchor,
@@ -1379,6 +1445,9 @@ export function LiveSessionOverlay({
 }
 
 const styles = StyleSheet.create({
+  androidSheetHost: {
+    flex: 1,
+  },
   minimizedAnchor: {
     position: 'absolute',
     left: 0,

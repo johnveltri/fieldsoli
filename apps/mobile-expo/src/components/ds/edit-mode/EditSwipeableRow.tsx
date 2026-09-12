@@ -1,5 +1,5 @@
-import { type ReactNode, useRef } from 'react';
-import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import { type ComponentProps, type ForwardRefExoticComponent, type ReactNode, type RefAttributes, useRef } from 'react';
+import { type AccessibilityProps, Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { color, radius, space } from '@fieldsolo/design-system/lib/tokens';
 
@@ -12,6 +12,19 @@ type EditSwipeableRowProps = {
   onDelete: () => void;
   accessibilityLabel: string;
 };
+
+type SwipeableAccessibilityProps = Pick<
+  AccessibilityProps,
+  'accessibilityActions' | 'onAccessibilityAction'
+>;
+
+type AccessibleSwipeableProps = ComponentProps<typeof Swipeable> & SwipeableAccessibilityProps;
+
+// Swipeable forwards unknown props to its gesture-handler host at runtime, but
+// its public type omits React Native accessibility-action props.
+const AccessibleSwipeable = Swipeable as unknown as ForwardRefExoticComponent<
+  AccessibleSwipeableProps & RefAttributes<Swipeable>
+>;
 
 export function EditSwipeableRow({
   typography,
@@ -48,7 +61,7 @@ export function EditSwipeableRow({
   };
 
   return (
-    <Swipeable
+    <AccessibleSwipeable
       ref={swipeRef}
       friction={2}
       overshootRight={false}
@@ -64,7 +77,7 @@ export function EditSwipeableRow({
       >
         {children}
       </View>
-    </Swipeable>
+    </AccessibleSwipeable>
   );
 }
 

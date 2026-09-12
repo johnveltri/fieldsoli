@@ -22,7 +22,8 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { Alert, Modal, Platform, StyleSheet, View } from 'react-native';
+import { Alert, Modal, Platform, StyleSheet } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import {
   CaptureComposerSheet,
@@ -649,13 +650,14 @@ export function QuickActionsFlowProvider({
           navigationBarTranslucent={Platform.OS === 'android'}
           onRequestClose={phase3Enabled ? closePhase3QuickActions : closeLegacyQuickActions}
         >
-          <View style={styles.modalHost}>
+          <GestureHandlerRootView collapsable={false} style={styles.modalHost}>
             {phase3Enabled ? (
               <CaptureComposerSheet
                 typography={typography}
                 visible={captureStep === 'noteEdit' || captureStep === 'materialEdit'}
                 kind={captureKind}
                 saving={captureSaving}
+                registerInGlobalStack={false}
                 onClose={closePhase3QuickActions}
                 onSaveNote={(values) => void saveCaptureNote(values)}
                 onSaveMaterial={(values) => void saveCaptureMaterial(values)}
@@ -734,7 +736,7 @@ export function QuickActionsFlowProvider({
                 />
               </>
             )}
-          </View>
+          </GestureHandlerRootView>
         </Modal>
       ) : null}
     </QuickActionsFlowContext.Provider>

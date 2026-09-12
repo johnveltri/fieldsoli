@@ -1,4 +1,4 @@
-import { useCallback, useState, type RefObject } from 'react';
+import { useCallback, useRef, useState, type RefObject } from 'react';
 import {
   Modal,
   PixelRatio,
@@ -56,10 +56,23 @@ export function PrimaryActionOverlay({ blurTargetRef }: PrimaryActionOverlayProp
   const closeMenu = useCallback(() => setMenuOpen(false), []);
   const openMenu = useCallback(() => setMenuOpen(true), []);
 
+  const pendingActionRef = useRef<PrimaryActionMenuItemId | null>(null);
   const onSelectItem = useCallback(
     (id: PrimaryActionMenuItemId) => {
+      pendingActionRef.current = id;
       setMenuOpen(false);
-      handlePrimaryAction(id);
+      if (Platform.OS !== 'android') {
+        pendingActionRef.current = null;
+        handlePrimaryAction(id);
+        return;
+      }
+      // The FAB menu is itself a Modal. Opening Quick Note immediately stacks
+      // a second Android Dialog and the sheet fights the keyboard (spasm).
+      setTimeout(() => {
+        const pending = pendingActionRef.current;
+        pendingActionRef.current = null;
+        if (pending) handlePrimaryAction(pending);
+      }, 80);
     },
     [handlePrimaryAction],
   );

@@ -58,7 +58,7 @@ describe('BottomSheetShell accessibility', () => {
     expect(screen.getByTestId('bottom-sheet-overlay').props.accessibilityViewIsModal).toBe(true);
   });
 
-  it('uses height avoidance on Android while preserving padding avoidance on iOS', () => {
+  it('does not use height avoidance on Android (it loops with the IME)', () => {
     const originalPlatformOS = Platform.OS;
 
     try {
@@ -68,7 +68,7 @@ describe('BottomSheetShell accessibility', () => {
           <Text>Android sheet content</Text>
         </BottomSheetShell>,
       );
-      expect(androidView.UNSAFE_getByType(KeyboardAvoidingView).props.behavior).toBe('height');
+      expect(androidView.UNSAFE_getByType(KeyboardAvoidingView).props.behavior).toBeUndefined();
       androidView.unmount();
 
       Object.defineProperty(Platform, 'OS', { configurable: true, value: 'ios' });
@@ -127,8 +127,10 @@ describe('BottomSheetShell accessibility', () => {
       act(() => {
         onKeyboardDidShow?.({ endCoordinates: { height: 320 } });
       });
-      expect(StyleSheet.flatten(surface.props.style).paddingBottom).toBe(0);
-      expect(StyleSheet.flatten(bottomFill.props.style).height).toBe(320);
+      expect(StyleSheet.flatten(screen.getByTestId('bottom-sheet-surface').props.style).paddingBottom).toBe(
+        320,
+      );
+      expect(StyleSheet.flatten(screen.getByTestId('bottom-sheet-bottom-fill').props.style).height).toBe(320);
       expect(addListenerSpy).toHaveBeenCalledTimes(4);
 
       act(() => {
@@ -140,7 +142,7 @@ describe('BottomSheetShell accessibility', () => {
       expect(
         StyleSheet.flatten(screen.getByTestId('bottom-sheet-bottom-fill').props.style).height,
       ).toBe(mockSheetInsets.bottom);
-      expect(addListenerSpy).toHaveBeenCalledTimes(6);
+      expect(addListenerSpy).toHaveBeenCalledTimes(4);
     } finally {
       Object.defineProperty(Platform, 'OS', {
         configurable: true,
