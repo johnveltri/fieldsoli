@@ -4,7 +4,7 @@ import {
   fieldsoloLoadedFonts,
 } from '@fieldsolo/design-system/expo/loadFieldSoloFonts';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Animated, Modal, Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Alert, Animated, Modal, Platform, StyleSheet, useWindowDimensions } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -1373,7 +1373,7 @@ export function LiveSessionOverlay({
     ) : null;
 
   return (
-    <View pointerEvents="box-none" collapsable={false} style={styles.overlayHost}>
+    <>
       {Platform.OS === 'android' ? androidSheetHost : liveSessionSheets}
 
       {/*
@@ -1381,8 +1381,11 @@ export function LiveSessionOverlay({
         between full sheet ↔ bar is a smooth crossfade rather than a
         mount/unmount jolt. `visible` drives the bar's internal
         opacity/translate/scale animation.
+        Do not wrap this in a full-screen host — Android absoluteFill
+        overlays intercept Inbox taps even with pointerEvents="box-none".
       */}
       <Animated.View
+        collapsable={false}
         pointerEvents={hasRegisteredSheet ? 'none' : 'box-none'}
         style={[
           styles.minimizedAnchor,
@@ -1404,18 +1407,11 @@ export function LiveSessionOverlay({
           onPress={handleBarPress}
         />
       </Animated.View>
-    </View>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
-  overlayHost: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0,
-  },
   androidSheetHost: {
     flex: 1,
   },

@@ -79,6 +79,11 @@ export type CaptureComposerSheetProps = {
   /** Edit kinds only — open job picker; receives current draft values. */
   onAddToJobNote?: (values: CaptureComposerNoteValues) => void;
   onAddToJobMaterial?: (values: CaptureComposerMaterialValues) => void;
+  /**
+   * Hosts already inside a Modal should pass false so NativeTabs stay mounted.
+   * @default true
+   */
+  registerInGlobalStack?: boolean;
 };
 
 /** Empty note field is one line by default; 6 lines so the sheet isn’t stubby. */
@@ -164,6 +169,7 @@ export function CaptureComposerSheet({
   initialMaterial = null,
   onAddToJobNote,
   onAddToJobMaterial,
+  registerInGlobalStack = true,
 }: CaptureComposerSheetProps) {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
@@ -348,7 +354,7 @@ export function CaptureComposerSheet({
         visible={visible}
         onClose={onClose}
         autoSizeUpToFraction={0.92}
-        registerInGlobalStack
+        registerInGlobalStack={registerInGlobalStack}
         accessibilityTitle={accessibilityTitleForKind(kind)}
       >
         <View style={styles.body}>

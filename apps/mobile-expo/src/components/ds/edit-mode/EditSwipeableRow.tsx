@@ -55,6 +55,7 @@ export function EditSwipeableRow({
       renderRightActions={renderRightActions}
     >
       <View
+        accessibilityRole="button"
         accessibilityLabel={accessibilityLabel}
         accessibilityActions={[{ name: 'delete', label: 'Delete' }]}
         onAccessibilityAction={(e) => {

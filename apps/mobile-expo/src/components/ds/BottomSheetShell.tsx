@@ -9,6 +9,7 @@ import {
 } from 'react';
 import {
   Animated,
+  Dimensions,
   Easing,
   Keyboard,
   KeyboardAvoidingView,
@@ -139,6 +140,13 @@ export function BottomSheetShell({
 }: BottomSheetShellProps) {
   const insets = useSafeAreaInsets();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  /**
+   * Android `adjustResize` shrinks `window` height when the IME is up. Sheets
+   * in a Modal do not shrink with it, so using window height made maxHeight
+   * and the open animation fight the keyboard. Screen height stays stable.
+   */
+  const layoutHeight =
+    Platform.OS === 'android' ? Dimensions.get('screen').height : windowHeight;
   const sheetGutter = contentGutter(windowWidth);
   const sheetStack = useBottomSheetStackWriters();
   const sheetId = useId();
@@ -164,7 +172,7 @@ export function BottomSheetShell({
   // sheet would still poke up above the bottom edge and visually cover the
   // footer / safe-area primary button of any sheet rendered below it in the
   // sibling stack.
-  const hiddenOffset = windowHeight;
+  const hiddenOffset = layoutHeight;
   const translateY = useRef(new Animated.Value(hiddenOffset)).current;
   const dragY = useRef(new Animated.Value(0)).current;
   const scrimOpacity = useRef(new Animated.Value(0)).current;
@@ -188,13 +196,6 @@ export function BottomSheetShell({
    */
   const [keyboardCoversSafeArea, setKeyboardCoversSafeArea] = useState(false);
   /**
-   * React Native's Android `KeyboardAvoidingView` treats keyboardDidHide's
-   * navigation-inset frame as a remaining keyboard height. Remount only after
-   * that event so its internal height state returns to zero without missing a
-   * real keyboardDidShow event.
-   */
-  const [androidKeyboardAvoidanceEpoch, setAndroidKeyboardAvoidanceEpoch] = useState(0);
-  /**
    * Some Android IMEs reserve a short bottom band for a floating toolbar.
    * Keep that band painted with the sheet surface rather than exposing the
    * dimmed screen below the modal.
@@ -209,6 +210,9 @@ export function BottomSheetShell({
   const [stackingElevated, setStackingElevated] = useState(visible);
   /** When true, swipe already carried the sheet off-screen — skip snap+slide on close. */
   const closingFromSwipeRef = useRef(false);
+
+  const hiddenOffsetRef = useRef(hiddenOffset);
+  hiddenOffsetRef.current = hiddenOffset;
 
   useEffect(() => {
     if (visible) {
@@ -232,10 +236,11 @@ export function BottomSheetShell({
       return;
     }
 
+    const offset = hiddenOffsetRef.current;
     if (closingFromSwipeRef.current) {
       closingFromSwipeRef.current = false;
       dragY.setValue(0);
-      translateY.setValue(hiddenOffset);
+      translateY.setValue(offset);
       scrimOpacity.setValue(0);
       setStackingElevated(false);
       onClosedRef.current?.();
@@ -249,7 +254,7 @@ export function BottomSheetShell({
     dragY.setValue(0);
     Animated.parallel([
       Animated.timing(translateY, {
-        toValue: hiddenOffset,
+        toValue: offset,
         duration: 210,
         easing: Easing.in(Easing.cubic),
         useNativeDriver: true,
@@ -264,7 +269,17 @@ export function BottomSheetShell({
       setStackingElevated(false);
       onClosedRef.current?.();
     });
-  }, [dragY, hiddenOffset, scrimOpacity, translateY, visible]);
+    // `hiddenOffset` is read from a ref so keyboard / NativeTabs inset changes
+    // do not restart the open animation (that loop looked like a spasming sheet).
+  }, [dragY, scrimOpacity, translateY, visible]);
+
+  const wasVisibleRef = useRef(visible);
+  useEffect(() => {
+    const becameHidden = wasVisibleRef.current && !visible;
+    wasVisibleRef.current = visible;
+    if (visible || becameHidden) return;
+    translateY.setValue(hiddenOffset);
+  }, [hiddenOffset, translateY, visible]);
 
   const prevVisibleRef = useRef(visible);
   useEffect(() => {
@@ -324,9 +339,6 @@ export function BottomSheetShell({
     const onHide = () => {
       setKeyboardReservedHeight(0);
       setKeyboardCoversSafeArea(false);
-      if (Platform.OS === 'android') {
-        setAndroidKeyboardAvoidanceEpoch((epoch) => epoch + 1);
-      }
     };
     const showEvent =
       Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
@@ -349,15 +361,21 @@ export function BottomSheetShell({
   // sheet's internal padding (see `paddingBottom` below) and is included in
   // the cap.
   const maxSheetHeight = isFullbleed
-    ? windowHeight + Math.max(0, insets.top)
+    ? layoutHeight + Math.max(0, insets.top)
     : autoSizeUpToFraction
-      ? Math.max(160, windowHeight * autoSizeUpToFraction)
+      ? Math.max(160, layoutHeight * autoSizeUpToFraction)
       : undefined;
 
   // A real software keyboard covers the home-indicator / safe-area region, so
   // collapse our own padding to keep the primary CTA flush above it. A
   // zero-height hardware-keyboard event retains the cream safe-area fill.
+  // Android cannot use KeyboardAvoidingView `height` here: it remounts on
+  // IME hide and fights adjustResize, which makes focused sheets spasm.
   const effectiveSafeBottom = keyboardCoversSafeArea ? 0 : insets.bottom;
+  const androidKeyboardPad =
+    Platform.OS === 'android' && keyboardReservedHeight > 0
+      ? keyboardReservedHeight
+      : 0;
 
   // The inner scrollview becomes height-locked when content overflows. We
   // approximate the available content height by subtracting the chrome we
@@ -365,7 +383,7 @@ export function BottomSheetShell({
   // `fullbleedDark`, so the only overhead there is the safe-area bottom.
   const shellBottomPadding = contentExtendsToBottomEdge
     ? 0
-    : effectiveSafeBottom + bottomPaddingExtra;
+    : androidKeyboardPad + effectiveSafeBottom + bottomPaddingExtra;
   // Fullbleed sticky footers overlay the scroll viewport (gradient FAB) so
   // chrome height stays zero for scroll sizing — content pads itself instead.
   const stickyOverlaysScroll = Boolean(stickyFooter && isFullbleed);
@@ -522,14 +540,12 @@ export function BottomSheetShell({
           },
         ]}
       />
-      {/* Keep the platform behavior explicit: the Android sheet must shrink
-          its viewport so focused fields and actions clear the keyboard. The
-          Android-only key discards React Native's stale navigation-inset
-          height after keyboardDidHide; iOS uses its original padding branch. */}
+      {/* iOS: padding avoidance. Android: no `height` avoidance — that mode
+          remounts on IME hide and loops with autoFocus. Keyboard offset is
+          applied as sheet padding instead. */}
       <KeyboardAvoidingView
-        key={Platform.OS === 'android' ? androidKeyboardAvoidanceEpoch : 'ios'}
         style={[styles.kav, isFullbleed ? styles.kavFullbleed : null]}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         pointerEvents="box-none"
       >
         <BottomSheetScrollProvider

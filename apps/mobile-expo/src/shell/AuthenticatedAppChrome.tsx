@@ -647,13 +647,37 @@ export function AuthenticatedAppChrome({ children }: AuthenticatedAppChromeProps
             />
 
             {fontsLoaded && phase3Enabled ? (
-              <CaptureComposerSheet
-                typography={typography}
-                visible={newJobComposerOpen}
-                kind="job"
-                onClose={() => setNewJobComposerOpen(false)}
-                onJobCreated={onNewJobCreated}
-              />
+              Platform.OS === 'android' ? (
+                newJobComposerOpen ? (
+                  <Modal
+                    visible
+                    transparent
+                    animationType="none"
+                    statusBarTranslucent
+                    navigationBarTranslucent
+                    onRequestClose={() => setNewJobComposerOpen(false)}
+                  >
+                    <GestureHandlerRootView collapsable={false} style={styles.androidSheetHost}>
+                      <CaptureComposerSheet
+                        typography={typography}
+                        visible
+                        kind="job"
+                        registerInGlobalStack={false}
+                        onClose={() => setNewJobComposerOpen(false)}
+                        onJobCreated={onNewJobCreated}
+                      />
+                    </GestureHandlerRootView>
+                  </Modal>
+                ) : null
+              ) : (
+                <CaptureComposerSheet
+                  typography={typography}
+                  visible={newJobComposerOpen}
+                  kind="job"
+                  onClose={() => setNewJobComposerOpen(false)}
+                  onJobCreated={onNewJobCreated}
+                />
+              )
             ) : null}
 
             {Platform.OS === 'android' && jobDetailMounted ? (
@@ -745,6 +769,9 @@ const styles = StyleSheet.create({
     flex: 1,
     width: '100%',
     minHeight: 0,
+  },
+  androidSheetHost: {
+    flex: 1,
   },
   jobDetailOverlayHost: {
     ...StyleSheet.absoluteFill,
