@@ -60,6 +60,11 @@ import {
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { contentColumnMetrics, createTextStyles } from '../theme/nativeTokens';
 import { shellLiveSessionBarBottom } from './platform/shellDockMetrics';
+import {
+  getAndroidLiveSessionBackAction,
+  type MaterialFlow,
+  type NoteFlow,
+} from './liveSessionBackNavigation';
 
 type LiveSessionOverlayProps = {
   /**
@@ -113,20 +118,12 @@ export function LiveSessionOverlay({
 
   const [jobDetail, setJobDetail] = useState<JobDetailViewModel | null>(null);
 
-  type NoteFlow = 'closed' | 'addNote' | 'editNote' | 'attachSession' | 'editSession';
   const [noteFlow, setNoteFlow] = useState<NoteFlow>('closed');
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [draftBody, setDraftBody] = useState('');
   const [draftSessionId, setDraftSessionId] = useState<string | null>(null);
   const [noteSaving, setNoteSaving] = useState(false);
 
-  type MaterialFlow =
-    | 'closed'
-    | 'addMaterial'
-    | 'editMaterial'
-    | 'attachSession'
-    | 'editSession'
-    | 'chooseUnit';
   const [materialFlow, setMaterialFlow] = useState<MaterialFlow>('closed');
   const [editingMaterialId, setEditingMaterialId] = useState<string | null>(null);
   const [matDraftDescription, setMatDraftDescription] = useState('');
@@ -946,6 +943,48 @@ export function LiveSessionOverlay({
     openSheet();
   }, [elapsedSeconds, liveSession, openSheet, sheetStackWriters, topmostSheet]);
 
+  const handleAndroidSheetRequestClose = useCallback(() => {
+    switch (
+      getAndroidLiveSessionBackAction({ mode, noteFlow, materialFlow, editJobOpen })
+    ) {
+      case 'closeEditSheet':
+        closeEditSheet();
+        return;
+      case 'closeEditJob':
+        closeEditJob();
+        return;
+      case 'returnToNoteSheet':
+        returnToNoteSheet();
+        return;
+      case 'closeNoteFlow':
+        closeNoteFlow();
+        return;
+      case 'returnToMaterialSheet':
+        returnToMaterialSheet();
+        return;
+      case 'closeMaterialFlow':
+        closeMaterialFlow();
+        return;
+      case 'minimize':
+        minimize();
+        return;
+      case 'none':
+        return;
+    }
+  }, [
+    closeEditJob,
+    closeEditSheet,
+    closeMaterialFlow,
+    closeNoteFlow,
+    editJobOpen,
+    materialFlow,
+    minimize,
+    mode,
+    noteFlow,
+    returnToMaterialSheet,
+    returnToNoteSheet,
+  ]);
+
   // The bar's anchor stays pinned above the floating shell dock.
   const fabSlotBottom = shellLiveSessionBarBottom(insets.bottom);
 
@@ -1358,13 +1397,7 @@ export function LiveSessionOverlay({
         animationType="none"
         statusBarTranslucent
         navigationBarTranslucent
-        onRequestClose={() => {
-          if (mode === 'editSheet') {
-            minimizeFromEdit();
-            return;
-          }
-          minimize();
-        }}
+        onRequestClose={handleAndroidSheetRequestClose}
       >
         <GestureHandlerRootView collapsable={false} style={styles.androidSheetHost}>
           {liveSessionSheets}

@@ -1,5 +1,5 @@
-import { type ReactNode, useRef } from 'react';
-import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import { type ComponentProps, type ForwardRefExoticComponent, type ReactNode, type RefAttributes, useRef } from 'react';
+import { type AccessibilityProps, Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { color, radius, space } from '@fieldsolo/design-system/lib/tokens';
 
@@ -12,6 +12,19 @@ type EditSwipeableRowProps = {
   onDelete: () => void;
   accessibilityLabel: string;
 };
+
+type SwipeableAccessibilityProps = Pick<
+  AccessibilityProps,
+  'accessibilityActions' | 'onAccessibilityAction'
+>;
+
+type AccessibleSwipeableProps = ComponentProps<typeof Swipeable> & SwipeableAccessibilityProps;
+
+// Swipeable forwards unknown props to its gesture-handler host at runtime, but
+// its public type omits React Native accessibility-action props.
+const AccessibleSwipeable = Swipeable as unknown as ForwardRefExoticComponent<
+  AccessibleSwipeableProps & RefAttributes<Swipeable>
+>;
 
 export function EditSwipeableRow({
   typography,
@@ -48,24 +61,23 @@ export function EditSwipeableRow({
   };
 
   return (
-    <Swipeable
+    <AccessibleSwipeable
       ref={swipeRef}
       friction={2}
       overshootRight={false}
       renderRightActions={renderRightActions}
+      accessibilityActions={[{ name: 'delete', label: 'Delete' }]}
+      onAccessibilityAction={(e) => {
+        if (e.nativeEvent.actionName === 'delete') onDelete();
+      }}
     >
       <View
-        accessibilityRole="button"
         accessibilityLabel={accessibilityLabel}
-        accessibilityActions={[{ name: 'delete', label: 'Delete' }]}
-        onAccessibilityAction={(e) => {
-          if (e.nativeEvent.actionName === 'delete') onDelete();
-        }}
         style={styles.row}
       >
         {children}
       </View>
-    </Swipeable>
+    </AccessibleSwipeable>
   );
 }
 
