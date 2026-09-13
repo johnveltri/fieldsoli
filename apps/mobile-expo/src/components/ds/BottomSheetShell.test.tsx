@@ -137,7 +137,7 @@ describe('BottomSheetShell accessibility', () => {
         onKeyboardDidShow?.({ endCoordinates: { height: 320 } });
       });
       expect(StyleSheet.flatten(screen.getByTestId('bottom-sheet-surface').props.style).paddingBottom).toBe(
-        266,
+        332,
       );
       expect(StyleSheet.flatten(screen.getByTestId('bottom-sheet-bottom-fill').props.style).height).toBe(0);
       expect(addListenerSpy).toHaveBeenCalledTimes(4);
@@ -192,10 +192,10 @@ describe('BottomSheetShell accessibility', () => {
         // screenY is shifted down by the status bar; overlap alone would be 300.
         onKeyboardDidShow?.({ endCoordinates: { height: 280, screenY: 600 } });
       });
-      // frameHeight(900) - (screenY(600) - insets.top(50)) = 350, then -54 nudge
+      // frameHeight(900) - (screenY(600) - insets.top(50)) = 350, plus 12 clearance
       expect(
         StyleSheet.flatten(screen.getByTestId('bottom-sheet-surface').props.style).paddingBottom,
-      ).toBe(296);
+      ).toBe(362);
     } finally {
       mockSheetInsets.top = 0;
       screenHeightSpy.mockRestore();
@@ -257,7 +257,7 @@ describe('BottomSheetShell accessibility', () => {
         onKeyboardDidShow?.({ endCoordinates: { height: 320 } });
       });
       expect(StyleSheet.flatten(screen.getByTestId('bottom-sheet-sticky-footer').props.style).bottom).toBe(
-        266,
+        332,
       );
       expect(
         StyleSheet.flatten(screen.getByTestId('bottom-sheet-surface').props.style).paddingBottom,
