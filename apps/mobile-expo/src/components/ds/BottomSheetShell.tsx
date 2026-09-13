@@ -23,11 +23,16 @@ import {
   View,
 } from 'react-native';
 
-/** Android: pull sticky CTAs ~54dp closer to Gboard after status-bar IME compensation. */
-const ANDROID_IME_CTA_NUDGE_DOWN = 54;
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CONTENT_COLUMN_MAX_WIDTH, contentGutter } from '@fieldsolo/design-system/lib/responsiveLayout';
 import { color, radius, space } from '@fieldsolo/design-system/lib/tokens';
+
+/**
+ * Extra lift above the measured IME on Android so SAVE / END SESSION clear
+ * Gboard’s candidate strip on physical devices (Galaxy S23). A prior downward
+ * “nudge” after status-bar compensation clipped those CTAs under the keyboard.
+ */
+const ANDROID_IME_CTA_CLEARANCE = space('Spacing/12');
 
 import { useBottomSheetStackWriters } from '../../context/BottomSheetStackContext';
 import { announceAccessibilityMessage } from '../../lib/accessibility';
@@ -360,11 +365,11 @@ export function BottomSheetShell({
       // Prefer the larger signal: one of height / screenY often under-counts
       // Gboard's candidate strip inside Android Modals.
       const visibleIme = Math.max(0, height, overlapFromScreenY);
-      // Status-bar compensation clears Gboard; nudge back down so Profile /
-      // End Session CTAs sit tight above the suggestion bar (~insets.top / 54dp).
+      // Keep CTAs fully above the IME (plus a small clearance). Do not subtract
+      // from visibleIme — that clipped Profile SAVE / End Session on S23.
       const reservedHeight =
         Platform.OS === 'android' && visibleIme > 0
-          ? Math.max(0, visibleIme - ANDROID_IME_CTA_NUDGE_DOWN)
+          ? visibleIme + ANDROID_IME_CTA_CLEARANCE
           : visibleIme;
       setKeyboardReservedHeight(reservedHeight);
       setKeyboardCoversSafeArea(reservedHeight > insets.bottom);
