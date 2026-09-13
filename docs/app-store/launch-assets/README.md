@@ -30,6 +30,4 @@ The editable alternative is the [`Free-first v1` section in Figma](https://www.f
 
 The editable campaign master is in [Figma](https://www.figma.com/design/EfbpybZzUJB2KjoMHYKMVi). It contains source imagery, locked brand controls, all six final frames, and two reusable masters on the **03 Buzz master templates** page. The exported campaign intentionally uses headline-only marketing copy and near-full-width product crops so it remains legible at App Store thumbnail size.
 
-For Buzz bulk creation, use [`buzz/fieldsoli-buzz-content-matrix.xlsx`](./buzz/fieldsoli-buzz-content-matrix.xlsx). It contains the exact approved copy, production notes, and embedded source images. In Figma Buzz, duplicate either master, keep the locked brand elements fixed, and map the editable text/image fields to the matching workbook columns.
-
 The final listing text and metadata are in [`app-store-copy.md`](./app-store-copy.md). Remaining human-owned account, privacy, and review materials are listed in [`app-review-handoff.md`](./app-review-handoff.md).

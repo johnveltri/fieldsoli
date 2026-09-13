@@ -472,7 +472,7 @@ export function CaptureComposerSheet({
                   quantity={
                     <EditFieldInput
                       typography={typography}
-                      placeholder="Quantity"
+                      placeholder="Qty"
                       accessibilityLabel="Quantity"
                       value={quantityText}
                       keyboardType="decimal-pad"
@@ -502,7 +502,7 @@ export function CaptureComposerSheet({
                   unitPrice={
                     <EditFieldInput
                       typography={typography}
-                      placeholder="Unit Price"
+                      placeholder="@ unit price"
                       accessibilityLabel="Unit price"
                       value={unitPriceText}
                       keyboardType="decimal-pad"
