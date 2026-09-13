@@ -318,6 +318,55 @@ describe('LiveSessionBottomSheet phase3Capture', () => {
     expect(screen.getByDisplayValue('Keep this draft')).toBeTruthy();
   });
 
+  it('flushes in-progress note drafts when Close minimizes without blur', async () => {
+    jest.useFakeTimers();
+    const onMinimize = jest.fn();
+    const onCreateNote = jest.fn<() => Promise<void>>().mockResolvedValue(undefined);
+    const onUpdateNote = jest.fn<() => Promise<void>>().mockResolvedValue(undefined);
+    const screen = render(
+      <LiveSessionBottomSheet
+        typography={typography}
+        visible
+        jobShortDescription="Panel upgrade"
+        startedAt={new Date().toISOString()}
+        attachments={[]}
+        phase3Capture
+        jobIdentity={identity}
+        liveNotes={[{ id: 'note-1', body: 'Old note' }]}
+        onCreateNote={onCreateNote}
+        onUpdateNote={onUpdateNote}
+        onAddNote={noop}
+        onAddMaterial={noop}
+        onPressAttachment={noop}
+        onMinimize={onMinimize}
+        onEndSessionPress={noop}
+      />,
+    );
+
+    act(() => {
+      jest.advanceTimersByTime(320);
+    });
+
+    fireEvent.changeText(screen.getByDisplayValue('Old note'), 'Updated note');
+    fireEvent.press(screen.getByText('Add note'));
+    const composerNote = screen.getAllByPlaceholderText('Note').find((node) => {
+      const value = node.props.value ?? node.props.defaultValue;
+      return value == null || value === '';
+    });
+    expect(composerNote).toBeTruthy();
+    fireEvent.changeText(composerNote!, 'Brand new note');
+    // No blur — keyboard dismiss can leave focus; Close must still persist.
+    fireEvent.press(screen.getByLabelText('Close'));
+
+    expect(onMinimize).toHaveBeenCalledTimes(1);
+    await waitFor(() => {
+      expect(onUpdateNote).toHaveBeenCalledWith('note-1', 'Updated note');
+      expect(onCreateNote).toHaveBeenCalledWith('Brand new note');
+    });
+    screen.unmount();
+    jest.useRealTimers();
+  });
+
   it('TEST-L05 keeps a new material visible when its save fails so it can be retried', async () => {
     const onCreateMaterial = jest.fn<() => Promise<void>>().mockRejectedValue(new Error('Offline'));
     const screen = render(
