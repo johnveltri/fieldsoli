@@ -2,6 +2,7 @@ import { act, render, screen, waitFor } from '@testing-library/react-native';
 import { describe, expect, it, jest } from '@jest/globals';
 import {
   Animated,
+  Dimensions,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
@@ -79,6 +80,14 @@ describe('BottomSheetShell accessibility', () => {
       );
       expect(iosView.UNSAFE_getByType(KeyboardAvoidingView).props.behavior).toBe('padding');
       iosView.unmount();
+
+      const iosFullbleed = render(
+        <BottomSheetShell visible variant="fullbleedDark" stickyFooter={<Text>END SESSION</Text>}>
+          <Text>Live session</Text>
+        </BottomSheetShell>,
+      );
+      expect(iosFullbleed.UNSAFE_getByType(KeyboardAvoidingView).props.behavior).toBeUndefined();
+      iosFullbleed.unmount();
     } finally {
       Object.defineProperty(Platform, 'OS', {
         configurable: true,
@@ -128,9 +137,9 @@ describe('BottomSheetShell accessibility', () => {
         onKeyboardDidShow?.({ endCoordinates: { height: 320 } });
       });
       expect(StyleSheet.flatten(screen.getByTestId('bottom-sheet-surface').props.style).paddingBottom).toBe(
-        320,
+        266,
       );
-      expect(StyleSheet.flatten(screen.getByTestId('bottom-sheet-bottom-fill').props.style).height).toBe(320);
+      expect(StyleSheet.flatten(screen.getByTestId('bottom-sheet-bottom-fill').props.style).height).toBe(0);
       expect(addListenerSpy).toHaveBeenCalledTimes(4);
 
       act(() => {
@@ -152,6 +161,52 @@ describe('BottomSheetShell accessibility', () => {
     }
   });
 
+  it('compensates Android Modal keyboard screenY by the status-bar inset', () => {
+    const originalPlatformOS = Platform.OS;
+    let onKeyboardDidShow: ((event: {
+      endCoordinates: { height: number; screenY?: number };
+    }) => void) | undefined;
+    const addListenerSpy = jest
+      .spyOn(Keyboard, 'addListener')
+      .mockImplementation((eventName, listener) => {
+        if (eventName === 'keyboardDidShow') {
+          onKeyboardDidShow = listener as typeof onKeyboardDidShow;
+        }
+        return { remove: jest.fn() } as never;
+      });
+    const screenHeightSpy = jest.spyOn(Dimensions, 'get').mockImplementation((dim) => {
+      if (dim === 'screen') return { width: 400, height: 900, scale: 1, fontScale: 1 };
+      return { width: 400, height: 800, scale: 1, fontScale: 1 };
+    });
+    mockSheetInsets.top = 50;
+
+    try {
+      Object.defineProperty(Platform, 'OS', { configurable: true, value: 'android' });
+      render(
+        <BottomSheetShell visible bottomPaddingExtra={0} onClose={jest.fn()}>
+          <Text>Profile sheet</Text>
+        </BottomSheetShell>,
+      );
+
+      act(() => {
+        // screenY is shifted down by the status bar; overlap alone would be 300.
+        onKeyboardDidShow?.({ endCoordinates: { height: 280, screenY: 600 } });
+      });
+      // frameHeight(900) - (screenY(600) - insets.top(50)) = 350, then -54 nudge
+      expect(
+        StyleSheet.flatten(screen.getByTestId('bottom-sheet-surface').props.style).paddingBottom,
+      ).toBe(296);
+    } finally {
+      mockSheetInsets.top = 0;
+      screenHeightSpy.mockRestore();
+      Object.defineProperty(Platform, 'OS', {
+        configurable: true,
+        value: originalPlatformOS,
+      });
+      addListenerSpy.mockRestore();
+    }
+  });
+
   it('lets edge-to-edge content own the bottom safe-area padding', () => {
     render(
       <BottomSheetShell visible contentExtendsToBottomEdge>
@@ -161,6 +216,123 @@ describe('BottomSheetShell accessibility', () => {
 
     const surfaceStyle = StyleSheet.flatten(screen.getByTestId('bottom-sheet-surface').props.style);
     expect(surfaceStyle.paddingBottom).toBe(0);
+  });
+
+  it('lifts a fullbleed sticky footer above the Android IME', () => {
+    const originalPlatformOS = Platform.OS;
+    let onKeyboardDidShow: ((event: { endCoordinates: { height: number } }) => void) | undefined;
+    let onKeyboardDidHide: (() => void) | undefined;
+    const addListenerSpy = jest
+      .spyOn(Keyboard, 'addListener')
+      .mockImplementation((eventName, listener) => {
+        if (eventName === 'keyboardDidShow') {
+          onKeyboardDidShow = listener as typeof onKeyboardDidShow;
+        }
+        if (eventName === 'keyboardDidHide') {
+          onKeyboardDidHide = listener as typeof onKeyboardDidHide;
+        }
+        return { remove: jest.fn() } as never;
+      });
+
+    try {
+      Object.defineProperty(Platform, 'OS', { configurable: true, value: 'android' });
+      render(
+        <BottomSheetShell
+          visible
+          variant="fullbleedDark"
+          stickyFooter={<Text>END SESSION</Text>}
+          onClose={jest.fn()}
+        >
+          <Text>Live session</Text>
+        </BottomSheetShell>,
+      );
+
+      const footer = screen.getByTestId('bottom-sheet-sticky-footer');
+      expect(StyleSheet.flatten(footer.props.style).bottom).toBe(0);
+      expect(
+        StyleSheet.flatten(screen.getByTestId('bottom-sheet-surface').props.style).paddingBottom,
+      ).toBe(0);
+
+      act(() => {
+        onKeyboardDidShow?.({ endCoordinates: { height: 320 } });
+      });
+      expect(StyleSheet.flatten(screen.getByTestId('bottom-sheet-sticky-footer').props.style).bottom).toBe(
+        266,
+      );
+      expect(
+        StyleSheet.flatten(screen.getByTestId('bottom-sheet-surface').props.style).paddingBottom,
+      ).toBe(0);
+
+      act(() => {
+        onKeyboardDidHide?.();
+      });
+      expect(StyleSheet.flatten(screen.getByTestId('bottom-sheet-sticky-footer').props.style).bottom).toBe(
+        0,
+      );
+    } finally {
+      Object.defineProperty(Platform, 'OS', {
+        configurable: true,
+        value: originalPlatformOS,
+      });
+      addListenerSpy.mockRestore();
+    }
+  });
+
+  it('lifts a fullbleed sticky footer above the iOS keyboard including QuickType', () => {
+    const originalPlatformOS = Platform.OS;
+    let onKeyboardWillShow: ((event: { endCoordinates: { height: number } }) => void) | undefined;
+    let onKeyboardWillChangeFrame:
+      | ((event: { endCoordinates: { height: number } }) => void)
+      | undefined;
+    const addListenerSpy = jest
+      .spyOn(Keyboard, 'addListener')
+      .mockImplementation((eventName, listener) => {
+        if (eventName === 'keyboardWillShow') {
+          onKeyboardWillShow = listener as typeof onKeyboardWillShow;
+        }
+        if (eventName === 'keyboardWillChangeFrame') {
+          onKeyboardWillChangeFrame = listener as typeof onKeyboardWillChangeFrame;
+        }
+        return { remove: jest.fn() } as never;
+      });
+
+    try {
+      Object.defineProperty(Platform, 'OS', { configurable: true, value: 'ios' });
+      render(
+        <BottomSheetShell
+          visible
+          variant="fullbleedDark"
+          stickyFooter={<Text>END SESSION</Text>}
+          onClose={jest.fn()}
+        >
+          <Text>Live session</Text>
+        </BottomSheetShell>,
+      );
+
+      expect(StyleSheet.flatten(screen.getByTestId('bottom-sheet-sticky-footer').props.style).bottom).toBe(
+        0,
+      );
+
+      act(() => {
+        onKeyboardWillShow?.({ endCoordinates: { height: 291 } });
+      });
+      expect(StyleSheet.flatten(screen.getByTestId('bottom-sheet-sticky-footer').props.style).bottom).toBe(
+        291,
+      );
+
+      act(() => {
+        onKeyboardWillChangeFrame?.({ endCoordinates: { height: 336 } });
+      });
+      expect(StyleSheet.flatten(screen.getByTestId('bottom-sheet-sticky-footer').props.style).bottom).toBe(
+        336,
+      );
+    } finally {
+      Object.defineProperty(Platform, 'OS', {
+        configurable: true,
+        value: originalPlatformOS,
+      });
+      addListenerSpy.mockRestore();
+    }
   });
 
   it('presents a fullbleed live session as a full-page overlay', () => {

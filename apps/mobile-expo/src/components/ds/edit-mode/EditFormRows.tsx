@@ -1,12 +1,14 @@
 import { Children, createContext, forwardRef, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import {
   Dimensions,
+  findNodeHandle,
   Keyboard,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
+  UIManager,
   View,
   Platform,
 } from 'react-native';
@@ -15,6 +17,9 @@ import { radius, space } from '@fieldsolo/design-system/lib/tokens';
 import { bg, border, fg } from '../../../theme/nativeTokens';
 import type { TextStyles } from '../../../theme/nativeTokens';
 import { JOB_SHORT_DESCRIPTION_MAX_LENGTH } from '@fieldsolo/shared-types';
+
+import { sanitizeSingleLineText } from '../../../lib/moneyInput';
+import { useSheetChrome } from '../sheetChromeContext';
 
 export const EDIT_ICON_SLOT = 28;
 
@@ -37,6 +42,15 @@ const EDIT_FIELD_INPUT_OPTICAL_NUDGE_Y = Platform.select({ ios: -1, default: 0 }
 
 /** Extra space below the focused field when the keyboard opens. */
 export const EDIT_KEYBOARD_SCROLL_OFFSET = 120;
+
+/** Breathing room between a focused field and a sticky overlay CTA. */
+const FOCUSED_FIELD_FOOTER_GAP = space('Spacing/12');
+
+function useFocusedFieldKeyboardOffset(base = EDIT_KEYBOARD_SCROLL_OFFSET): number {
+  const { stickyFooterHeight } = useSheetChrome();
+  if (stickyFooterHeight <= 0) return base;
+  return stickyFooterHeight + FOCUSED_FIELD_FOOTER_GAP;
+}
 
 /** Below-caret lead when a tall note cannot dock to the gray line. */
 const TALL_NOTE_CARET_LEAD_LINES = 3;
@@ -180,6 +194,9 @@ export function EditKeyboardScrollProvider({
   const suppressNativeKeyboardScrollRef = useRef(false);
   const entityDockScrollYRef = useRef<number | null>(null);
 
+  const pendingInputScrollRef = useRef<(() => void) | null>(null);
+  const inputScrollGenRef = useRef(0);
+
   const setSuppressNativeKeyboardScroll = useCallback((suppress: boolean) => {
     suppressNativeKeyboardScrollRef.current = suppress;
     if (!suppress) {
@@ -192,6 +209,7 @@ export function EditKeyboardScrollProvider({
     entityDockScrollYRef.current = null;
     pendingEntityScrollRef.current = null;
     pendingEntityDidShowScrollRef.current = null;
+    pendingInputScrollRef.current = null;
   }, []);
 
   useEffect(() => {
@@ -245,6 +263,7 @@ export function EditKeyboardScrollProvider({
       const pending = pendingEntityScrollRef.current;
       pendingEntityScrollRef.current = null;
       pending?.();
+      pendingInputScrollRef.current?.();
     });
     const didShowSub =
       Platform.OS === 'ios'
@@ -253,6 +272,15 @@ export function EditKeyboardScrollProvider({
             const pending = pendingEntityDidShowScrollRef.current;
             pendingEntityDidShowScrollRef.current = null;
             pending?.();
+            pendingInputScrollRef.current?.();
+          })
+        : null;
+    const changeSub =
+      Platform.OS === 'ios'
+        ? Keyboard.addListener('keyboardWillChangeFrame', (event) => {
+            keyboardScreenYRef.current = event.endCoordinates.screenY;
+            keyboardVisibleRef.current = event.endCoordinates.height > 0;
+            pendingInputScrollRef.current?.();
           })
         : null;
     const hideSub = Keyboard.addListener(hideEvent, () => {
@@ -260,11 +288,13 @@ export function EditKeyboardScrollProvider({
       keyboardVisibleRef.current = false;
       pendingEntityScrollRef.current = null;
       pendingEntityDidShowScrollRef.current = null;
+      pendingInputScrollRef.current = null;
     });
 
     return () => {
       showSub.remove();
       didShowSub?.remove();
+      changeSub?.remove();
       hideSub.remove();
     };
   }, [windowHeight]);
@@ -305,13 +335,32 @@ export function EditKeyboardScrollProvider({
   const scrollInputIntoView = useCallback<ScrollInputIntoView>(
     (nativeTarget, extraOffset = offset) => {
       if (nativeTarget == null || suppressNativeKeyboardScrollRef.current) return;
-      scrollViewRef.current?.scrollResponderScrollNativeHandleToKeyboard?.(
-        nativeTarget,
-        extraOffset,
-        true,
-      );
+      const run = () => {
+        if (suppressNativeKeyboardScrollRef.current) return;
+        const scrollView = scrollViewRef.current;
+        if (!scrollView) return;
+        const node =
+          typeof nativeTarget === 'number' ? nativeTarget : findNodeHandle(nativeTarget);
+        if (node == null) return;
+        // Keyboard willShow / didShow / QuickType change-frame all call this.
+        // Invalidate in-flight measures so we don't stack deltas (that pinned
+        // live-session materials under the status bar after Add → focus).
+        const gen = ++inputScrollGenRef.current;
+        UIManager.measureInWindow(node, (_x, y, _w, h) => {
+          if (gen !== inputScrollGenRef.current) return;
+          const limitY = keyboardScreenYRef.current - extraOffset;
+          const delta = y + h - limitY;
+          if (delta <= 4) return;
+          const targetY = Math.max(0, scrollYRef.current + delta);
+          scrollView.scrollTo({ y: targetY, animated: false });
+          scrollYRef.current = targetY;
+        });
+      };
+      pendingInputScrollRef.current = run;
+      if (!keyboardVisibleRef.current) return;
+      run();
     },
-    [offset, scrollViewRef],
+    [offset, scrollViewRef, scrollYRef],
   );
 
   const value = useMemo(
@@ -397,6 +446,7 @@ export function EditEntityBlockScope({
 }) {
   const blockRef = useRef<View>(null);
   const scroll = useContext(EditKeyboardScrollContext);
+  const { stickyFooterHeight } = useSheetChrome();
 
   const scrollBlockIntoView = useCallback<ScrollEntityBlock>(
     (waitForKeyboard = true, nativeTarget, caretScreenY) => {
@@ -407,7 +457,7 @@ export function EditEntityBlockScope({
         const dockTarget = dockRef?.current ?? block;
         if (!block || !dockTarget) return;
 
-        const keyboardScreenY = scroll.getKeyboardScreenY();
+        const keyboardScreenY = scroll.getKeyboardScreenY() - stickyFooterHeight;
 
         if (dockRef?.current && nativeTarget != null) {
           block.measureInWindow((_bx, blockScreenY) => {
@@ -454,7 +504,7 @@ export function EditEntityBlockScope({
       }
       scroll.requestEntityBlockScroll(run, waitForKeyboard);
     },
-    [dockRef, scroll],
+    [dockRef, scroll, stickyFooterHeight],
   );
 
   return (
@@ -485,6 +535,7 @@ export const EditTitleField = forwardRef<
   ref,
 ) {
   const scroll = useContext(EditKeyboardScrollContext);
+  const keyboardOffset = useFocusedFieldKeyboardOffset();
 
   return (
     // Outer inset + inner clip: iOS TextInput intrinsic width follows the full
@@ -500,10 +551,11 @@ export const EditTitleField = forwardRef<
           // set, so long titles stop early with empty trailing space until focused.
           // Clip matches the focused single-line edge (partial word visible).
           lineBreakModeIOS="clip"
+          multiline={false}
           numberOfLines={1}
           maxLength={maxLength}
           onFocus={(event) => {
-            scroll?.scrollInputIntoView(event.nativeEvent.target);
+            scroll?.scrollInputIntoView(event.nativeEvent.target, keyboardOffset);
             onFocus?.(event);
           }}
           {...props}
@@ -600,6 +652,7 @@ export function EditFieldInput({
   align = 'left',
   onFocus,
   onBlur,
+  onChangeText,
   multiline,
   style,
   opticalNudgeY,
@@ -614,6 +667,7 @@ export function EditFieldInput({
 }) {
   const scroll = useContext(EditKeyboardScrollContext);
   const scrollEntityBlock = useContext(EditEntityBlockContext);
+  const keyboardOffset = useFocusedFieldKeyboardOffset();
   const iosNudgeY = opticalNudgeY ?? EDIT_FIELD_INPUT_OPTICAL_NUDGE_Y;
 
   if (multiline) {
@@ -624,6 +678,7 @@ export function EditFieldInput({
         placeholder={placeholder}
         onFocus={onFocus}
         onBlur={onBlur}
+        onChangeText={onChangeText}
         style={style}
         {...props}
       />
@@ -647,12 +702,18 @@ export function EditFieldInput({
         if (scrollEntityBlock) {
           scrollEntityBlock(true, nativeTarget);
         } else {
-          scroll?.scrollInputIntoView(nativeTarget);
+          scroll?.scrollInputIntoView(nativeTarget, keyboardOffset);
         }
         onFocus?.(event);
       }}
       onBlur={onBlur}
       {...props}
+      multiline={false}
+      numberOfLines={1}
+      blurOnSubmit={props.blurOnSubmit ?? true}
+      onChangeText={(text) => {
+        onChangeText?.(sanitizeSingleLineText(text));
+      }}
     />
   );
 }
@@ -674,10 +735,15 @@ function EditMultilineField({
 }: Omit<React.ComponentProps<typeof TextInput>, 'multiline'> & { typography: TextStyles }) {
   const scroll = useContext(EditKeyboardScrollContext);
   const scrollEntityBlock = useContext(EditEntityBlockContext);
+  const keyboardOffset = useFocusedFieldKeyboardOffset();
   const caretScreenYRef = useRef<number | null>(null);
   const [sizerHeight, setSizerHeight] = useState(EDIT_BODY_LINE_HEIGHT);
   const [contentHeight, setContentHeight] = useState(EDIT_BODY_LINE_HEIGHT);
   const hasValue = typeof value === 'string' && value.length > 0;
+
+  useEffect(() => {
+    setContentHeight((prev) => (sizerHeight < prev ? sizerHeight : prev));
+  }, [sizerHeight]);
   const shown = hasValue ? value : placeholder && placeholder.length > 0 ? placeholder : ' ';
   const flatStyle = StyleSheet.flatten(style);
   const styleMinHeight =
@@ -732,7 +798,7 @@ function EditMultilineField({
           if (scrollEntityBlock) {
             scrollEntityBlock(true, nativeTarget, caretScreenYRef.current ?? undefined);
           } else {
-            scroll?.scrollInputIntoView(nativeTarget);
+            scroll?.scrollInputIntoView(nativeTarget, keyboardOffset);
           }
           onFocus?.(event);
         }}
@@ -758,9 +824,15 @@ export function EditMaterialBreakdownRow({
 }) {
   return (
     <View style={styles.materialBreakdownRow}>
-      <View style={styles.materialQtyCol}>{quantity}</View>
-      <View style={styles.materialUomCol}>{unit}</View>
-      <View style={styles.materialPriceCol}>{unitPrice}</View>
+      <View style={styles.materialQtyCol}>
+        <View style={styles.materialBreakdownCell}>{quantity}</View>
+      </View>
+      <View style={styles.materialUomCol}>
+        <View style={styles.materialBreakdownCell}>{unit}</View>
+      </View>
+      <View style={styles.materialPriceCol}>
+        <View style={styles.materialBreakdownCell}>{unitPrice}</View>
+      </View>
     </View>
   );
 }
@@ -877,7 +949,7 @@ export function EditTappableValue({
   variant?: 'body' | 'bodySmall' | 'metric';
   align?: 'left' | 'right';
   accessibilityLabel: string;
-  /** Vertical offset in px (positive = down). */
+  /** Override vertical offset (positive = down). Ignored on iOS `body` (uses TextInput metrics). */
   opticalNudgeY?: number;
 }) {
   const isEmpty = value.length === 0;
@@ -889,6 +961,9 @@ export function EditTappableValue({
       : variant === 'bodySmall'
         ? typography.bodySmall
         : typography.body;
+  // iOS `Text` and `TextInput` disagree on baseline — mirror EditFieldInput so UOM
+  // lines up with Quantity / Unit Price in both empty and filled states.
+  const mirrorFieldInput = Platform.OS === 'ios' && variant === 'body';
 
   return (
     <Pressable
@@ -900,23 +975,44 @@ export function EditTappableValue({
       }}
       style={[
         styles.tappableHit,
-        opticalNudgeY != null && { transform: [{ translateY: opticalNudgeY }] },
+        !mirrorFieldInput && opticalNudgeY != null && { transform: [{ translateY: opticalNudgeY }] },
       ]}
     >
-      <Text
-        style={[
-          textStyle,
-          editRowText,
-          {
-            color: isEmpty ? fg.secondary : fg.primary,
-            textAlign: align,
-            textTransform: variant === 'metric' ? 'none' : undefined,
-          },
-        ]}
-        numberOfLines={1}
-      >
-        {display}
-      </Text>
+      {mirrorFieldInput ? (
+        <TextInput
+          editable={false}
+          caretHidden
+          showSoftInputOnFocus={false}
+          value={isEmpty ? '' : value}
+          placeholder={placeholder}
+          placeholderTextColor={fg.secondary}
+          pointerEvents="none"
+          style={[
+            typography.body,
+            styles.fieldInput,
+            {
+              transform: [{ translateY: EDIT_FIELD_INPUT_OPTICAL_NUDGE_Y }],
+              color: isEmpty ? fg.secondary : fg.primary,
+            },
+            align === 'right' && styles.fieldInputRight,
+          ]}
+        />
+      ) : (
+        <Text
+          style={[
+            textStyle,
+            editRowText,
+            {
+              color: isEmpty ? fg.secondary : fg.primary,
+              textAlign: align,
+              textTransform: variant === 'metric' ? 'none' : undefined,
+            },
+          ]}
+          numberOfLines={1}
+        >
+          {display}
+        </Text>
+      )}
     </Pressable>
   );
 }
@@ -1096,6 +1192,7 @@ const styles = StyleSheet.create({
     padding: 0,
     margin: 0,
     width: '100%',
+    minHeight: EDIT_BODY_LINE_HEIGHT,
     includeFontPadding: false,
     ...(Platform.OS === 'android' ? { textAlignVertical: 'center' as const } : null),
   },
@@ -1167,6 +1264,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     alignSelf: 'stretch',
     minHeight: EDIT_BODY_LINE_HEIGHT,
+    gap: space('Spacing/8'),
+  },
+  /** Shared clip box so TextInput + Text placeholders share one vertical center on iOS. */
+  materialBreakdownCell: {
+    height: EDIT_BODY_LINE_HEIGHT,
+    justifyContent: 'center',
+    overflow: 'hidden',
   },
   materialQtyCol: {
     flex: 1,

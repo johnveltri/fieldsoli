@@ -22,6 +22,9 @@ import {
   type LayoutChangeEvent,
   View,
 } from 'react-native';
+
+/** Android: pull sticky CTAs ~54dp closer to Gboard after status-bar IME compensation. */
+const ANDROID_IME_CTA_NUDGE_DOWN = 54;
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CONTENT_COLUMN_MAX_WIDTH, contentGutter } from '@fieldsolo/design-system/lib/responsiveLayout';
 import { color, radius, space } from '@fieldsolo/design-system/lib/tokens';
@@ -29,6 +32,7 @@ import { color, radius, space } from '@fieldsolo/design-system/lib/tokens';
 import { useBottomSheetStackWriters } from '../../context/BottomSheetStackContext';
 import { announceAccessibilityMessage } from '../../lib/accessibility';
 import { bg, border } from '../../theme/nativeTokens';
+import { SheetChromeContext } from './sheetChromeContext';
 import {
   PanGestureHandler,
   State,
@@ -277,6 +281,11 @@ export function BottomSheetShell({
   useEffect(() => {
     const becameHidden = wasVisibleRef.current && !visible;
     wasVisibleRef.current = visible;
+    // Any close path (scrim, swipe, child Back) must drop the IME — not only
+    // dismissSheet. Otherwise Update Profile Back leaves the keyboard up.
+    if (becameHidden) {
+      Keyboard.dismiss();
+    }
     if (visible || becameHidden) return;
     translateY.setValue(hiddenOffset);
   }, [hiddenOffset, translateY, visible]);
@@ -325,16 +334,40 @@ export function BottomSheetShell({
     [registerInGlobalStack, sheetId, sheetStack, visible, windowHeight],
   );
 
-  // The `KeyboardAvoidingView` below owns the sheet's keyboard response on
-  // both platforms: iOS uses bottom padding and Android uses a reduced height
-  // so the flex-end sheet is anchored to the visible viewport. This listener
-  // tracks whether an on-screen keyboard actually covers the safe area, so
-  // hardware-keyboard focus keeps the sheet's solid bottom fill intact.
+  // Keyboard events (including iOS QuickType frame changes) are the single
+  // IME height source for overlay sticky footers. Standard iOS sheets still
+  // also use KeyboardAvoidingView padding; fullbleed overlays do not — KAV
+  // undercounts the suggestion bar and then fights this explicit lift.
   useEffect(() => {
-    const onShow = (event: KeyboardEvent) => {
-      const height = Math.max(0, event.endCoordinates.height);
-      setKeyboardReservedHeight(height);
-      setKeyboardCoversSafeArea(height > insets.bottom);
+    const onFrame = (event: KeyboardEvent) => {
+      // Off-screen keyboard frames still report a non-zero height on iOS.
+      // Prefer the overlap with the window so a dismissed IME does not keep
+      // the live-session header/footer shifted.
+      // Android Modal sheets do not shrink with adjustResize — compare against
+      // screen height so suggestion-bar IME is not under-counted.
+      const { height, screenY } = event.endCoordinates;
+      const frameHeight =
+        Platform.OS === 'android' ? Dimensions.get('screen').height : windowHeight;
+      // Inside Android Modals, keyboard `screenY` is often shifted down by the
+      // status-bar/cutout. Without compensating, pad lands short and CTAs sit
+      // under Gboard (measured ~insets.top on Pixel).
+      const screenYForOverlap =
+        typeof screenY === 'number'
+          ? screenY - (Platform.OS === 'android' ? insets.top : 0)
+          : null;
+      const overlapFromScreenY =
+        screenYForOverlap != null ? Math.max(0, frameHeight - screenYForOverlap) : 0;
+      // Prefer the larger signal: one of height / screenY often under-counts
+      // Gboard's candidate strip inside Android Modals.
+      const visibleIme = Math.max(0, height, overlapFromScreenY);
+      // Status-bar compensation clears Gboard; nudge back down so Profile /
+      // End Session CTAs sit tight above the suggestion bar (~insets.top / 54dp).
+      const reservedHeight =
+        Platform.OS === 'android' && visibleIme > 0
+          ? Math.max(0, visibleIme - ANDROID_IME_CTA_NUDGE_DOWN)
+          : visibleIme;
+      setKeyboardReservedHeight(reservedHeight);
+      setKeyboardCoversSafeArea(reservedHeight > insets.bottom);
     };
     const onHide = () => {
       setKeyboardReservedHeight(0);
@@ -344,13 +377,18 @@ export function BottomSheetShell({
       Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const hideEvent =
       Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-    const showSub = Keyboard.addListener(showEvent, onShow);
+    const showSub = Keyboard.addListener(showEvent, onFrame);
     const hideSub = Keyboard.addListener(hideEvent, onHide);
+    const changeSub =
+      Platform.OS === 'ios'
+        ? Keyboard.addListener('keyboardWillChangeFrame', onFrame)
+        : null;
     return () => {
       showSub.remove();
       hideSub.remove();
+      changeSub?.remove();
     };
-  }, [insets.bottom]);
+  }, [insets.bottom, insets.top, windowHeight]);
 
   const isFullbleed = variant === 'fullbleedDark';
 
@@ -376,6 +414,12 @@ export function BottomSheetShell({
     Platform.OS === 'android' && keyboardReservedHeight > 0
       ? keyboardReservedHeight
       : 0;
+  // Overlay footers pin to the IME on both platforms (Android cannot use KAV
+  // `height`; iOS KAV misses QuickType). Standard sheets keep iOS KAV padding.
+  const overlayKeyboardPad =
+    stickyFooter && variant === 'fullbleedDark' && keyboardReservedHeight > 0
+      ? keyboardReservedHeight
+      : 0;
 
   // The inner scrollview becomes height-locked when content overflows. We
   // approximate the available content height by subtracting the chrome we
@@ -389,8 +433,8 @@ export function BottomSheetShell({
   const stickyOverlaysScroll = Boolean(stickyFooter && isFullbleed);
   const sheetChromeHeight = isFullbleed
     ? stickyOverlaysScroll
-      ? 0
-      : (stickyFooter ? stickyFooterHeight : effectiveSafeBottom) + bottomPaddingExtra
+      ? overlayKeyboardPad
+      : (stickyFooter ? stickyFooterHeight : effectiveSafeBottom) + bottomPaddingExtra + androidKeyboardPad
     : space('Spacing/12') /* paddingTop */ +
       space('Spacing/12') /* handleHitArea paddingBottom */ +
       6 /* handle h */ +
@@ -401,6 +445,7 @@ export function BottomSheetShell({
     maxSheetHeight != null ? Math.max(0, maxSheetHeight - sheetChromeHeight) : undefined;
 
   const dismissSheet = useCallback(() => {
+    Keyboard.dismiss();
     onCloseRef.current?.();
   }, []);
 
@@ -491,6 +536,15 @@ export function BottomSheetShell({
   // animation can play, but taps must pass through to whatever is behind us —
   // otherwise stacking two sheets (e.g. chooser + edit) swallows the active sheet's
   // taps via the inactive sheet's scrim Pressable.
+  const sheetChrome = useMemo(
+    () => ({
+      keyboardCoversSafeArea,
+      keyboardReservedHeight,
+      stickyFooterHeight,
+    }),
+    [keyboardCoversSafeArea, keyboardReservedHeight, stickyFooterHeight],
+  );
+
   const interactive = visible && interactionEnabled;
   // `absoluteFill` sets top/right/bottom/left, which ignores width/height on
   // Android — so a "collapsed" overlay still filled the window and ate Inbox taps.
@@ -519,7 +573,7 @@ export function BottomSheetShell({
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Close bottom sheet"
-        onPress={onClose}
+        onPress={dismissSheet}
         style={[absoluteFill, isFullbleed ? null : overlayBleedStyle]}
         pointerEvents={interactive ? 'auto' : 'none'}
       >
@@ -535,19 +589,22 @@ export function BottomSheetShell({
         style={[
           styles.bottomFill,
           {
-            height: visible ? Math.max(insets.bottom, keyboardReservedHeight) : 0,
+            // Sheet padding owns the Android IME lift; painting the full keyboard
+            // height here stacks a cream band above the IME.
+            height: visible && !keyboardCoversSafeArea ? insets.bottom : 0,
             backgroundColor: bg.canvasWarm,
           },
         ]}
       />
-      {/* iOS: padding avoidance. Android: no `height` avoidance — that mode
-          remounts on IME hide and loops with autoFocus. Keyboard offset is
-          applied as sheet padding instead. */}
+      {/* Standard iOS sheets: KAV padding. Fullbleed overlay footers lift with
+          keyboardReservedHeight instead — KAV misses the QuickType bar.
+          Android never uses KAV `height` (remount/autoFocus loop). */}
       <KeyboardAvoidingView
         style={[styles.kav, isFullbleed ? styles.kavFullbleed : null]}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' && !isFullbleed ? 'padding' : undefined}
         pointerEvents="box-none"
       >
+        <SheetChromeContext.Provider value={sheetChrome}>
         <BottomSheetScrollProvider
           onDismiss={dismissSheet}
           scrollOffsetYRef={scrollOffsetY}
@@ -599,11 +656,15 @@ export function BottomSheetShell({
                   style={{ maxHeight: scrollViewMaxHeight }}
                   contentContainerStyle={[
                     isFullbleed ? null : styles.contentContainer,
-                    stickyOverlaysScroll && stickyFooterHeight > 0
-                      ? { paddingBottom: stickyFooterHeight }
+                    stickyOverlaysScroll && stickyFooterHeight + overlayKeyboardPad > 0
+                      ? { paddingBottom: stickyFooterHeight + overlayKeyboardPad }
                       : null,
                   ]}
-                  scrollEnabled={contentOverflow || Platform.OS === 'android'}
+                  scrollEnabled={
+                    contentOverflow ||
+                    overlayKeyboardPad > 0 ||
+                    Platform.OS === 'android'
+                  }
                   showsVerticalScrollIndicator={contentOverflow}
                   scrollEventThrottle={16}
                   nestedScrollEnabled
@@ -621,12 +682,20 @@ export function BottomSheetShell({
               )}
               {stickyFooter ? (
                 <View
+                  testID="bottom-sheet-sticky-footer"
                   pointerEvents="box-none"
                   onLayout={(event) => {
                     const next = Math.ceil(event.nativeEvent.layout.height);
                     setStickyFooterHeight((prev) => (prev === next ? prev : next));
                   }}
-                  style={stickyOverlaysScroll ? styles.stickyFooterOverlay : undefined}
+                  style={
+                    stickyOverlaysScroll
+                      ? [
+                          styles.stickyFooterOverlay,
+                          overlayKeyboardPad > 0 ? { bottom: overlayKeyboardPad } : null,
+                        ]
+                      : undefined
+                  }
                 >
                   {stickyFooter}
                 </View>
@@ -634,6 +703,7 @@ export function BottomSheetShell({
             </Animated.View>
           </PanGestureHandler>
         </BottomSheetScrollProvider>
+        </SheetChromeContext.Provider>
       </KeyboardAvoidingView>
     </View>
   );

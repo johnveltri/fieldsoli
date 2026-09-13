@@ -1,6 +1,8 @@
 import React from 'react';
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
+import { StyleSheet } from 'react-native';
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { color } from '@fieldsolo/design-system/lib/tokens';
 
 import { HomeScreen } from './HomeScreen';
 
@@ -308,6 +310,31 @@ describe('HomeScreen quick session', () => {
 
     fireEvent.press(screen.getByText('Replace ceiling fan'));
     expect(onOpenJobDetail).toHaveBeenCalledWith('job-recent-1');
+  });
+
+  it('renders negative weekly net earnings in red', async () => {
+    mockGetWeeklyNetEarningsCentsForCurrentUser.mockResolvedValue({
+      netEarningsCents: -5000,
+      jobCount: 1,
+    });
+    mockListJobsForCurrentUserPage.mockResolvedValue({
+      items: [job({ id: 'job-open-1', shortDescription: 'Open job' })],
+      hasMore: false,
+    });
+    mockListRecentDetailedJobsForCurrentUser.mockResolvedValue([]);
+
+    const screen = render(
+      <HomeScreen
+        onOpenProfile={() => undefined}
+        onOpenJobDetail={() => undefined}
+        onOpenEarnings={() => undefined}
+        onOpenJobsOpenTab={() => undefined}
+      />,
+    );
+
+    const value = await screen.findByText('-$50.00');
+    const flatStyle = StyleSheet.flatten(value.props.style);
+    expect(flatStyle.color).toBe(color('Semantic/Financial/Negative'));
   });
 
   it('shows an In Progress summary for financially complete in-progress open jobs', async () => {

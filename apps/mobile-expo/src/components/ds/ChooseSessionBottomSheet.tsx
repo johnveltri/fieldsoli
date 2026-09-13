@@ -104,10 +104,10 @@ export function ChooseSessionBottomSheet({
 
         <View style={styles.listContent}>
           {mode === 'edit' ? (
-            <>
-              <RemoveFromSessionRow typography={typography} onPress={onRemove} />
-              <DividerWithLabel label="ATTACH TO DIFFERENT SESSION" typography={typography} />
-            </>
+            <RemoveFromSessionRow typography={typography} onPress={onRemove} />
+          ) : null}
+          {mode === 'edit' && list.length > 0 ? (
+            <DividerWithLabel label="ATTACH TO DIFFERENT SESSION" typography={typography} />
           ) : null}
           {list.map((s) => (
             <SessionRow

@@ -17,6 +17,8 @@ import {
 } from 'react-native';
 import { ScrollView } from 'react-native-gesture-handler';
 
+import { EditKeyboardScrollContext } from './edit-mode/EditFormRows';
+
 type BottomSheetScrollContextValue = {
   scrollOffsetYRef: MutableRefObject<number>;
   onScrollOffsetChange?: (offsetY: number) => void;
@@ -85,6 +87,7 @@ export function BottomSheetScrollView({
   ...rest
 }: BottomSheetScrollViewProps) {
   const ctx = useContext(BottomSheetScrollContext);
+  const editScroll = useContext(EditKeyboardScrollContext);
   const localScrollOffsetY = useRef(0);
   const scrollOffsetYRef = ctx?.scrollOffsetYRef ?? localScrollOffsetY;
 
@@ -98,6 +101,10 @@ export function BottomSheetScrollView({
         const y = event.nativeEvent.contentOffset.y;
         scrollOffsetYRef.current = y;
         localScrollOffsetY.current = y;
+        if (editScroll) {
+          editScroll.scrollYRef.current = y;
+          editScroll.guardEntityDockScroll(y);
+        }
         ctx?.onScrollOffsetChange?.(y);
         onScroll?.(event);
       }}
