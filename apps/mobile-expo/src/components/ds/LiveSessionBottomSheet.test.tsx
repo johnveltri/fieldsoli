@@ -222,7 +222,7 @@ describe('LiveSessionBottomSheet phase3Capture', () => {
     jest.useRealTimers();
   });
 
-  it('hides End Session while an inline field is focused and restores it on blur', () => {
+  it('keeps End Session visible while an inline field is focused', () => {
     jest.useFakeTimers();
     const screen = render(
       <LiveSessionBottomSheet
@@ -244,18 +244,47 @@ describe('LiveSessionBottomSheet phase3Capture', () => {
     const title = screen.getByLabelText('Job title');
     expect(screen.getByLabelText('End session')).toBeTruthy();
 
-    fireEvent(title, 'focus', { nativeEvent: { target: 1 } });
-    expect(screen.getByLabelText('End session')).toBeTruthy();
-
     act(() => {
       jest.advanceTimersByTime(320);
     });
 
     fireEvent(title, 'focus', { nativeEvent: { target: 1 } });
-    expect(screen.queryByLabelText('End session')).toBeNull();
+    expect(screen.getByLabelText('End session')).toBeTruthy();
 
     fireEvent(title, 'blur');
     expect(screen.getByLabelText('End session')).toBeTruthy();
+    screen.unmount();
+    jest.useRealTimers();
+  });
+
+  it('does not restore a cleared title during debounced persist', () => {
+    jest.useFakeTimers();
+    const onJobIdentityChange = jest.fn();
+    const screen = render(
+      <LiveSessionBottomSheet
+        typography={typography}
+        visible
+        jobShortDescription="Panel upgrade"
+        startedAt={new Date().toISOString()}
+        attachments={[]}
+        phase3Capture
+        jobIdentity={identity}
+        onJobIdentityChange={onJobIdentityChange}
+        onAddNote={noop}
+        onAddMaterial={noop}
+        onPressAttachment={noop}
+        onMinimize={noop}
+        onEndSessionPress={noop}
+      />,
+    );
+
+    const title = screen.getByLabelText('Job title');
+    fireEvent.changeText(title, '');
+    act(() => {
+      jest.advanceTimersByTime(500);
+    });
+    expect(screen.getByLabelText('Job title').props.value).toBe('');
+    expect(onJobIdentityChange).not.toHaveBeenCalled();
     screen.unmount();
     jest.useRealTimers();
   });
@@ -485,6 +514,34 @@ describe('LiveSessionBottomSheet phase3Capture', () => {
 
     fireEvent.press(screen.getByText('Started'));
     expect(screen.queryByTestId('datetime-picker')).toBeNull();
+  });
+
+  it('collapses address newlines and rejects a second decimal in revenue', () => {
+    const screen = render(
+      <LiveSessionBottomSheet
+        typography={typography}
+        visible
+        jobShortDescription="Panel upgrade"
+        startedAt={new Date().toISOString()}
+        attachments={[]}
+        phase3Capture
+        jobIdentity={identity}
+        onAddNote={noop}
+        onAddMaterial={noop}
+        onPressAttachment={noop}
+        onMinimize={noop}
+        onEndSessionPress={noop}
+      />,
+    );
+
+    const address = screen.getByPlaceholderText('Address');
+    fireEvent.changeText(address, '42 Oak\nStreet');
+    expect(address.props.value).toBe('42 Oak Street');
+    expect(address.props.multiline).toBe(false);
+
+    const revenue = screen.getByPlaceholderText('Revenue');
+    fireEvent.changeText(revenue, '12.3.4');
+    expect(revenue.props.value).toBe('12.34');
   });
 
   it('TEST-F02 keeps the complete legacy live-session sheet when the flag is off', () => {

@@ -46,6 +46,7 @@ import {
   platformHeaderRowStyle,
   platformHeaderTitleSlotStyle,
 } from '../components/platform/platformHeaderMetrics';
+import { earningsSuccessNegativeColor } from '../lib/financialColors';
 import { shellBottomNavOuterHeight } from '../components/shell/ShellBottomNav';
 import { useJobsListInvalidation } from '../context/JobsListInvalidationContext';
 import {
@@ -389,6 +390,7 @@ export function HomeScreen({
                     : undefined
                 }
                 valueTone="success"
+                valueColor={earningsSuccessNegativeColor(weeklyNetCents)}
                 typography={typography}
                 onPress={onOpenEarnings}
               />

@@ -13,6 +13,8 @@ export type MetricSnapshotCardProps = {
   value: string;
   helperText?: string;
   valueTone: 'success' | 'neutral';
+  /** When set, overrides `valueTone` for the metric value color. */
+  valueColor?: string;
   typography: TextStyles;
   /** When provided, the card becomes a button that navigates on press. */
   onPress?: () => void;
@@ -26,12 +28,16 @@ export function MetricSnapshotCard({
   value,
   helperText,
   valueTone,
+  valueColor: valueColorProp,
   typography,
   onPress,
 }: MetricSnapshotCardProps) {
   const { fontScale } = useWindowDimensions();
   const valueColor =
-    valueTone === 'success' ? color('Semantic/Status/Success/Text') : color('Foundation/Text/Primary');
+    valueColorProp ??
+    (valueTone === 'success'
+      ? color('Semantic/Status/Success/Text')
+      : color('Foundation/Text/Primary'));
 
   const labelSize = typography.labelCaps.fontSize ?? 12;
   const labelStyle = dynamicTypeTextStyle(typography.labelCaps, fontScale, {

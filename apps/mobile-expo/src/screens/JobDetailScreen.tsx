@@ -525,9 +525,14 @@ export function JobDetailScreen({
   }, [loadKey, jobId, modeProgress]);
 
   useEffect(() => {
+    // Android: opacity crossfade + card elevation paints solid gray “rectangle”
+    // shells over Other Costs / Notes while opening edit from Materials. Snap the
+    // transition instead of compositing two elevated trees.
+    const duration =
+      reduceMotion || Platform.OS === 'android' ? 0 : 500;
     Animated.timing(modeProgress, {
       toValue: detailMode === 'edit' ? 1 : 0,
-      duration: reduceMotion ? 0 : 500,
+      duration,
       easing: Easing.out(Easing.cubic),
       // JS driver: native-driver opacity on the body wrappers prevented Yoga
       // from laying out ScrollView children (blank body on device).
@@ -3605,23 +3610,33 @@ function SectionEmptyStateCard({
   typography: TextStyles;
   onPress?: () => void;
 }) {
-  const inner = (
-    <View style={[styles.viewCardBorder, cardShadowRn, styles.sectionEmptyCardPad]}>
-      <Text style={[typography.body, { color: fg.secondary, textAlign: 'center' }]}>{message}</Text>
-    </View>
+  const label = (
+    <Text style={[typography.body, { color: fg.secondary, textAlign: 'center' }]}>{message}</Text>
   );
   return (
     <View style={styles.viewCardOuter}>
       {onPress ? (
-        <Pressable
-          accessibilityRole="button"
-          onPress={onPress}
-          style={({ pressed }) => [pressed && styles.pressed]}
-        >
-          {inner}
-        </Pressable>
+        // Elevation stays on the outer lift — Android paints a gray slab when
+        // opacity/ripple is applied to the same view that owns elevation.
+        <View style={[styles.sectionEmptyCardLift, cardShadowRn]}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={onPress}
+            android_ripple={{
+              color: colorWithAlpha('Foundation/Text/Primary', 0.08),
+              borderless: false,
+            }}
+            style={({ pressed }) => [
+              styles.viewCardBorder,
+              styles.sectionEmptyCardPad,
+              Platform.OS === 'ios' && pressed && styles.pressed,
+            ]}
+          >
+            {label}
+          </Pressable>
+        </View>
       ) : (
-        inner
+        <View style={[styles.viewCardBorder, cardShadowRn, styles.sectionEmptyCardPad]}>{label}</View>
       )}
     </View>
   );
@@ -3920,13 +3935,18 @@ const styles = StyleSheet.create({
   bodyHost: {
     flex: 1,
     position: 'relative',
+    overflow: 'hidden',
   },
   bodyInFlow: {
     flex: 1,
+    zIndex: 2,
+    ...(Platform.OS === 'android' ? { elevation: 2 } : null),
   },
   /** Inactive crossfade pane — overlay so it does not stack and split height. */
   bodyInactive: {
     ...StyleSheet.absoluteFill,
+    elevation: 0,
+    zIndex: 0,
   },
   doneButton: {
     minHeight: 44,
@@ -4034,6 +4054,12 @@ const styles = StyleSheet.create({
   viewCardOuter: {
     width: '100%',
     paddingBottom: space('Spacing/8'),
+  },
+  /** Owns card elevation so Pressable opacity/ripple never sit on an elevated surface. */
+  sectionEmptyCardLift: {
+    width: '100%',
+    borderRadius: radius('Radius/16'),
+    backgroundColor: bg.surfaceWhite,
   },
   /** Single surface: rounded rect, clip children so bucket headers respect corner radius. */
   viewCardBorder: {

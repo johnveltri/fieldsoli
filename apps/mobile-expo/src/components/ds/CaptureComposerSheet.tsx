@@ -12,6 +12,7 @@ import { createJobForCurrentUser } from '@fieldsolo/api-client';
 import { JOB_SHORT_DESCRIPTION_MAX_LENGTH } from '@fieldsolo/shared-types';
 
 import { formatUsdCombined } from '../../lib/formatUsd';
+import { sanitizeDecimalInput } from '../../lib/moneyInput';
 import { isSupabaseConfigured, supabase } from '../../lib/supabase';
 import { bg, cardShadowRn, fg } from '../../theme/nativeTokens';
 import type { TextStyles } from '../../theme/nativeTokens';
@@ -358,6 +359,8 @@ export function CaptureComposerSheet({
         accessibilityTitle={accessibilityTitleForKind(kind)}
       >
         <View style={styles.body}>
+          {visible ? (
+          <>
           {kind === 'note-edit' || kind === 'material-edit' ? (
             <View style={styles.header}>
               <Text
@@ -453,8 +456,9 @@ export function CaptureComposerSheet({
                   }}
                   onChangeText={(text) => {
                     if (hasCompleteBreakdown) return;
-                    setTotalText(text);
-                    const cents = parseMoneyToCents(text);
+                    const sanitized = sanitizeDecimalInput(text);
+                    setTotalText(sanitized);
+                    const cents = parseMoneyToCents(sanitized);
                     setTotalCents(cents != null && cents > 0 ? cents : 0);
                   }}
                   onBlur={() => {
@@ -492,7 +496,6 @@ export function CaptureComposerSheet({
                       value={unit}
                       placeholder="UOM"
                       accessibilityLabel="Unit of measure"
-                      opticalNudgeY={2}
                       onPress={() => setUnitPickerVisible(true)}
                     />
                   }
@@ -510,9 +513,10 @@ export function CaptureComposerSheet({
                         }
                       }}
                       onChangeText={(text) => {
-                        setUnitPriceText(text);
-                        const cents = parseMoneyToCents(text);
-                        const explicit = text.trim().length > 0;
+                        const sanitized = sanitizeDecimalInput(text);
+                        setUnitPriceText(sanitized);
+                        const cents = parseMoneyToCents(sanitized);
+                        const explicit = sanitized.trim().length > 0;
                         setUnitCostCents(cents ?? 0);
                         setUnitCostExplicit(explicit);
                       }}
@@ -589,6 +593,8 @@ export function CaptureComposerSheet({
               </Text>
             )}
           </Pressable>
+          </>
+          ) : null}
         </View>
       </BottomSheetShell>
 

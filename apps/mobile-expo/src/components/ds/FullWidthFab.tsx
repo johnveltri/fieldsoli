@@ -4,6 +4,7 @@ import { color, radius, space } from '@fieldsolo/design-system/lib/tokens';
 
 import { cardShadowRn } from '../../theme/nativeTokens';
 import type { TextStyles } from '../../theme/nativeTokens';
+import { useSheetChrome } from './sheetChromeContext';
 
 export type FullWidthFabProps = {
   typography: TextStyles;
@@ -39,13 +40,21 @@ export function FullWidthFab({
   labelColor = color('Foundation/Surface/White'),
 }: FullWidthFabProps) {
   const insets = useSafeAreaInsets();
-  const bottomPad = includeSafeArea
-    ? Math.max(insets.bottom, space('Spacing/12'))
-    : space('Spacing/12');
+  const { keyboardCoversSafeArea } = useSheetChrome();
+  // Home-indicator padding when the IME is down. While the keyboard covers
+  // that inset, drop the compact pad so End Session sits on the IME edge
+  // (shell already reserved keyboard height).
+  const bottomPad =
+    includeSafeArea && !keyboardCoversSafeArea
+      ? Math.max(insets.bottom, space('Spacing/12'))
+      : keyboardCoversSafeArea
+        ? 0
+        : space('Spacing/12');
 
   return (
     <View
       pointerEvents="box-none"
+      testID="full-width-fab"
       style={[
         styles.wrap,
         {

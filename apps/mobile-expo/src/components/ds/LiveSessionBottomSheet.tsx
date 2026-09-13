@@ -22,6 +22,7 @@ import { JOB_SHORT_DESCRIPTION_MAX_LENGTH } from '@fieldsolo/shared-types';
 import { bg, cardShadowRn, fg } from '../../theme/nativeTokens';
 import type { TextStyles } from '../../theme/nativeTokens';
 import { formatUsdCombined } from '../../lib/formatUsd';
+import { sanitizeDecimalInput, sanitizeSingleLineText } from '../../lib/moneyInput';
 import {
   LiveSessionActiveDotIcon,
   JobDetailIconSectionMaterials,
@@ -38,6 +39,7 @@ import {
   EditFieldInput,
   EditIconGroup,
   EditIconRow,
+  EDIT_KEYBOARD_BOTTOM_CLEARANCE,
   EditKeyboardScrollProvider,
   EditSheet,
   EditTappableValue,
@@ -225,8 +227,10 @@ export function LiveSessionBottomSheet({
   const [pickerDate, setPickerDate] = useState(() => startOfDay(startedDate));
   const [pickerTime, setPickerTime] = useState(() => startedDate);
   const [activePicker, setActivePicker] = useState<'date' | 'startTime' | null>(null);
-  const [inlineFieldFocused, setInlineFieldFocused] = useState(false);
   const acceptInlineFocusRef = useRef(false);
+  const focusedFieldRef = useRef<
+    'title' | 'longDescription' | 'customerName' | 'serviceAddress' | 'revenue' | null
+  >(null);
   const titleInputRef = useRef<TextInput>(null);
   const sheetScrollRef = useRef<ScrollView | null>(null);
   const sheetScrollContentRef = useRef<View | null>(null);
@@ -262,7 +266,7 @@ export function LiveSessionBottomSheet({
       setNoteDrafts({});
       setMaterialDrafts({});
       acceptInlineFocusRef.current = false;
-      setInlineFieldFocused(false);
+      focusedFieldRef.current = null;
       Keyboard.dismiss();
     }
   }, [visible]);
@@ -272,7 +276,7 @@ export function LiveSessionBottomSheet({
     // Android grants first-TextInput focus when the overlay appears, which
     // hides END SESSION. Ignore that until the open animation settles.
     acceptInlineFocusRef.current = false;
-    setInlineFieldFocused(false);
+    focusedFieldRef.current = null;
     Keyboard.dismiss();
     titleInputRef.current?.blur();
     const settle = setTimeout(() => {
@@ -352,23 +356,43 @@ export function LiveSessionBottomSheet({
     ].join('\u0001');
     if (key === lastIdentityKey.current) return;
     lastIdentityKey.current = key;
-    setTitle(jobIdentity.shortDescription);
-    setLongDescription(jobIdentity.longDescription);
-    setCustomerName(jobIdentity.customerName);
-    setServiceAddress(jobIdentity.serviceAddress);
+    const focused = focusedFieldRef.current;
     const nextRevenueText =
       jobIdentity.revenueCents != null && jobIdentity.revenueCents > 0
         ? formatUsdCombined(jobIdentity.revenueCents)
         : '';
-    setRevenueText(nextRevenueText);
+    if (focused !== 'title') {
+      setTitle(jobIdentity.shortDescription);
+    }
+    if (focused !== 'longDescription') {
+      setLongDescription(jobIdentity.longDescription);
+    }
+    if (focused !== 'customerName') {
+      setCustomerName(jobIdentity.customerName);
+    }
+    if (focused !== 'serviceAddress') {
+      setServiceAddress(jobIdentity.serviceAddress);
+    }
+    if (focused !== 'revenue') {
+      setRevenueText(nextRevenueText);
+    }
     draftRef.current = {
-      title: jobIdentity.shortDescription,
-      longDescription: jobIdentity.longDescription,
-      customerName: jobIdentity.customerName,
-      serviceAddress: jobIdentity.serviceAddress,
-      revenueText: nextRevenueText,
+      title: focused === 'title' ? draftRef.current.title : jobIdentity.shortDescription,
+      longDescription:
+        focused === 'longDescription'
+          ? draftRef.current.longDescription
+          : jobIdentity.longDescription,
+      customerName:
+        focused === 'customerName' ? draftRef.current.customerName : jobIdentity.customerName,
+      serviceAddress:
+        focused === 'serviceAddress'
+          ? draftRef.current.serviceAddress
+          : jobIdentity.serviceAddress,
+      revenueText: focused === 'revenue' ? draftRef.current.revenueText : nextRevenueText,
     };
-    lastPersistedTitle.current = jobIdentity.shortDescription;
+    if (focused !== 'title') {
+      lastPersistedTitle.current = jobIdentity.shortDescription;
+    }
   }, [jobIdentity, visible]);
 
   const flushIdentity = useCallback(
@@ -381,8 +405,7 @@ export function LiveSessionBottomSheet({
       const draft = draftRef.current;
       const nextTitle = (next?.shortDescription ?? draft.title).trim();
       if (!nextTitle) {
-        setTitle(lastPersistedTitle.current);
-        draftRef.current = { ...draft, title: lastPersistedTitle.current };
+        // Defer empty-title persist until blur; do not restore text mid-edit.
         const { shortDescription: _drop, ...rest } = next ?? {};
         if (Object.keys(rest).length === 0) return;
         onJobIdentityChange(rest);
@@ -581,24 +604,45 @@ export function LiveSessionBottomSheet({
     setActivePicker(null);
   }, []);
 
-  const hideEndSessionWhileEditing = useCallback(() => {
-    setActivePicker(null);
-    if (!acceptInlineFocusRef.current) {
-      titleInputRef.current?.blur();
-      Keyboard.dismiss();
-      return;
-    }
-    setInlineFieldFocused(true);
-  }, []);
+  const onInlineFieldFocus = useCallback(
+    (field: NonNullable<typeof focusedFieldRef.current>) => {
+      setActivePicker(null);
+      if (!acceptInlineFocusRef.current) {
+        titleInputRef.current?.blur();
+        Keyboard.dismiss();
+        return;
+      }
+      focusedFieldRef.current = field;
+    },
+    [],
+  );
 
-  const restoreEndSessionAfterEditing = useCallback(() => {
-    setInlineFieldFocused(false);
+  const onInlineFieldBlur = useCallback(
+    (field: NonNullable<typeof focusedFieldRef.current>) => {
+      if (focusedFieldRef.current === field) {
+        focusedFieldRef.current = null;
+      }
+    },
+    [],
+  );
+
+  const dismissInlineEditing = useCallback(() => {
+    setActivePicker(null);
+    focusedFieldRef.current = null;
+    titleInputRef.current?.blur();
+    const focused = TextInput.State.currentlyFocusedInput();
+    if (focused) {
+      TextInput.State.blurTextInput(focused);
+    }
+    Keyboard.dismiss();
   }, []);
 
   const statusBarTop =
     Platform.OS === 'android'
       ? Math.max(insets.top, StatusBar.currentHeight ?? 0)
       : insets.top;
+  // Keep Close / ACTIVE SESSION below the status bar at rest. The dark slab
+  // still scrolls away with the form — do not pin it.
   const headerTopPad = Math.max(statusBarTop, 0);
 
   return (
@@ -622,7 +666,7 @@ export function LiveSessionBottomSheet({
       // manager state".
       registerInGlobalStack={false}
       stickyFooter={
-        phase3Capture && !inlineFieldFocused ? (
+        phase3Capture ? (
           <FullWidthFab
             typography={typography}
             label="END SESSION"
@@ -636,7 +680,7 @@ export function LiveSessionBottomSheet({
       <View
         style={[
           styles.dark,
-          // Match Job Detail modal: slight pull under status bar, no drag chrome.
+          // Keep Close / ACTIVE SESSION below the status bar at rest; they scroll away.
           { paddingTop: headerTopPad + space('Spacing/8') },
         ]}
       >
@@ -686,7 +730,10 @@ export function LiveSessionBottomSheet({
 
           <Pressable
             accessible={false}
-            onPress={dismissStartedPickers}
+            onPress={() => {
+              dismissStartedPickers();
+              dismissInlineEditing();
+            }}
             style={styles.timerWrap}
           >
             <Text style={styles.timer}>{formatTimer(elapsed)}</Text>
@@ -694,7 +741,17 @@ export function LiveSessionBottomSheet({
         </View>
       </View>
 
-      <View ref={sheetScrollContentRef} style={styles.body}>
+      <View
+        ref={sheetScrollContentRef}
+        style={[
+          styles.body,
+          // Same scroll runway as Job Detail edit — last fields can rise above the IME.
+          {
+            paddingBottom:
+              space('Spacing/32') + insets.bottom + EDIT_KEYBOARD_BOTTOM_CLEARANCE,
+          },
+        ]}
+      >
         {phase3Capture && activePicker != null ? (
           <Pressable
             accessibilityRole="button"
@@ -720,9 +777,9 @@ export function LiveSessionBottomSheet({
                   draftRef.current = { ...draftRef.current, title: next };
                   schedulePersist();
                 }}
-                onFocus={hideEndSessionWhileEditing}
+                onFocus={() => onInlineFieldFocus('title')}
                 onBlur={() => {
-                  restoreEndSessionAfterEditing();
+                  onInlineFieldBlur('title');
                   flushIdentity();
                 }}
               />
@@ -736,9 +793,9 @@ export function LiveSessionBottomSheet({
                   draftRef.current = { ...draftRef.current, longDescription: t };
                   schedulePersist();
                 }}
-                onFocus={hideEndSessionWhileEditing}
+                onFocus={() => onInlineFieldFocus('longDescription')}
                 onBlur={() => {
-                  restoreEndSessionAfterEditing();
+                  onInlineFieldBlur('longDescription');
                   flushIdentity();
                 }}
               />
@@ -820,9 +877,9 @@ export function LiveSessionBottomSheet({
                     draftRef.current = { ...draftRef.current, customerName: t };
                     schedulePersist();
                   }}
-                  onFocus={hideEndSessionWhileEditing}
+                  onFocus={() => onInlineFieldFocus('customerName')}
                   onBlur={() => {
-                    restoreEndSessionAfterEditing();
+                    onInlineFieldBlur('customerName');
                     flushIdentity();
                   }}
                 />
@@ -832,15 +889,17 @@ export function LiveSessionBottomSheet({
                   typography={typography}
                   placeholder="Address"
                   value={serviceAddress}
-                  multiline
+                  returnKeyType="done"
+                  blurOnSubmit
                   onChangeText={(t) => {
-                    setServiceAddress(t);
-                    draftRef.current = { ...draftRef.current, serviceAddress: t };
+                    const next = sanitizeSingleLineText(t);
+                    setServiceAddress(next);
+                    draftRef.current = { ...draftRef.current, serviceAddress: next };
                     schedulePersist();
                   }}
-                  onFocus={hideEndSessionWhileEditing}
+                  onFocus={() => onInlineFieldFocus('serviceAddress')}
                   onBlur={() => {
-                    restoreEndSessionAfterEditing();
+                    onInlineFieldBlur('serviceAddress');
                     flushIdentity();
                   }}
                 />
@@ -856,12 +915,13 @@ export function LiveSessionBottomSheet({
                   keyboardType="decimal-pad"
                   inputMode="decimal"
                   onChangeText={(t) => {
-                    setRevenueText(t);
-                    draftRef.current = { ...draftRef.current, revenueText: t };
+                    const next = sanitizeDecimalInput(t);
+                    setRevenueText(next);
+                    draftRef.current = { ...draftRef.current, revenueText: next };
                   }}
-                  onFocus={hideEndSessionWhileEditing}
+                  onFocus={() => onInlineFieldFocus('revenue')}
                   onBlur={() => {
-                    restoreEndSessionAfterEditing();
+                    onInlineFieldBlur('revenue');
                     const cents = parseMoneyToCents(draftRef.current.revenueText);
                     const formatted =
                       cents != null && cents > 0 ? formatUsdCombined(cents) : '';
@@ -905,9 +965,14 @@ export function LiveSessionBottomSheet({
                             }))
                           }
                           placeholder="Description"
-                          onFocus={hideEndSessionWhileEditing}
+                          onFocus={() => {
+                            setActivePicker(null);
+                            if (!acceptInlineFocusRef.current) {
+                              titleInputRef.current?.blur();
+                              Keyboard.dismiss();
+                            }
+                          }}
                           onBlur={() => {
-                            restoreEndSessionAfterEditing();
                             void persistExistingMaterial(
                               material.id,
                               draft.description,
@@ -918,17 +983,23 @@ export function LiveSessionBottomSheet({
                         <EditFieldInput
                           typography={typography}
                           value={draft.totalText}
-                          onChangeText={(totalText) =>
+                          onChangeText={(totalText) => {
+                            const sanitized = sanitizeDecimalInput(totalText);
                             setMaterialDrafts((prev) => ({
                               ...prev,
-                              [material.id]: { ...draft, totalText },
-                            }))
-                          }
+                              [material.id]: { ...draft, totalText: sanitized },
+                            }));
+                          }}
                           placeholder="Total"
                           keyboardType="decimal-pad"
-                          onFocus={hideEndSessionWhileEditing}
+                          onFocus={() => {
+                            setActivePicker(null);
+                            if (!acceptInlineFocusRef.current) {
+                              titleInputRef.current?.blur();
+                              Keyboard.dismiss();
+                            }
+                          }}
                           onBlur={() => {
-                            restoreEndSessionAfterEditing();
                             const cents = parseMoneyToCents(draft.totalText);
                             const formatted =
                               cents != null && cents > 0
@@ -984,9 +1055,14 @@ export function LiveSessionBottomSheet({
                           )
                         }
                         placeholder="Description"
-                        onFocus={hideEndSessionWhileEditing}
+                        onFocus={() => {
+                            setActivePicker(null);
+                            if (!acceptInlineFocusRef.current) {
+                              titleInputRef.current?.blur();
+                              Keyboard.dismiss();
+                            }
+                          }}
                         onBlur={() => {
-                          restoreEndSessionAfterEditing();
                           void persistNewMaterial(
                             material.localId,
                             material.description,
@@ -997,20 +1073,26 @@ export function LiveSessionBottomSheet({
                       <EditFieldInput
                         typography={typography}
                         value={material.totalText}
-                        onChangeText={(totalText) =>
+                        onChangeText={(totalText) => {
+                          const sanitized = sanitizeDecimalInput(totalText);
                           setComposerMaterials((prev) =>
                             prev.map((m) =>
                               m.localId === material.localId
-                                ? { ...m, totalText }
+                                ? { ...m, totalText: sanitized }
                                 : m,
                             ),
-                          )
-                        }
+                          );
+                        }}
                         placeholder="Total"
                         keyboardType="decimal-pad"
-                        onFocus={hideEndSessionWhileEditing}
+                        onFocus={() => {
+                            setActivePicker(null);
+                            if (!acceptInlineFocusRef.current) {
+                              titleInputRef.current?.blur();
+                              Keyboard.dismiss();
+                            }
+                          }}
                         onBlur={() => {
-                          restoreEndSessionAfterEditing();
                           void persistNewMaterial(
                             material.localId,
                             material.description,
@@ -1053,9 +1135,14 @@ export function LiveSessionBottomSheet({
                         }
                         placeholder="Note"
                         multiline
-                        onFocus={hideEndSessionWhileEditing}
+                        onFocus={() => {
+                            setActivePicker(null);
+                            if (!acceptInlineFocusRef.current) {
+                              titleInputRef.current?.blur();
+                              Keyboard.dismiss();
+                            }
+                          }}
                         onBlur={() => {
-                          restoreEndSessionAfterEditing();
                           void persistExistingNote(
                             note.id,
                             noteDrafts[note.id] ?? note.body,
@@ -1099,9 +1186,14 @@ export function LiveSessionBottomSheet({
                         }
                         placeholder="Note"
                         multiline
-                        onFocus={hideEndSessionWhileEditing}
+                        onFocus={() => {
+                            setActivePicker(null);
+                            if (!acceptInlineFocusRef.current) {
+                              titleInputRef.current?.blur();
+                              Keyboard.dismiss();
+                            }
+                          }}
                         onBlur={() => {
-                          restoreEndSessionAfterEditing();
                           void persistNewNote(note.localId, note.body);
                         }}
                       />
@@ -1252,7 +1344,6 @@ const styles = StyleSheet.create({
     backgroundColor: bg.canvasWarm,
     paddingHorizontal: space('Spacing/20'),
     paddingTop: space('Spacing/12'),
-    paddingBottom: space('Spacing/32'),
     gap: space('Spacing/12'),
   },
   startedContent: {

@@ -3,7 +3,6 @@ import {
   ActivityIndicator,
   Alert,
   Keyboard,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -490,8 +489,11 @@ export function JobDetailEditMode({
                 typography={typography}
                 placeholder="Address"
                 value={draft.serviceAddress}
-                onChangeText={(t) => updateDraft({ serviceAddress: t })}
-                multiline
+                onChangeText={(t) =>
+                  updateDraft({ serviceAddress: t.replace(/[\r\n]+/g, ' ') })
+                }
+                returnKeyType="done"
+                blurOnSubmit
               />
             </EditIconRow>
           </EditSheet>
@@ -1012,7 +1014,6 @@ function MaterialEditBlock({
               value={row.unit}
               placeholder="UOM"
               accessibilityLabel="Unit of measure"
-              opticalNudgeY={2}
               onPress={() => onOpenPicker({ kind: 'materialUnit', materialId: row.id })}
             />
           }
