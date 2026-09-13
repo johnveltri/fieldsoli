@@ -812,7 +812,7 @@ function EditMultilineField({
   );
 }
 
-/** Quantity | UOM | unit price — 25 / 25 / 50 on one row. */
+/** Quantity | UOM | unit price — 25 / 25 / 50; Qty/UOM keep a 44pt floor so empty placeholders don’t eat the gap. */
 export function EditMaterialBreakdownRow({
   unitPrice,
   quantity,
@@ -1272,14 +1272,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     overflow: 'hidden',
   },
+  /** Floor so empty `Qty` / `UOM` placeholders keep the row gap on ~360dp phones. */
   materialQtyCol: {
     flex: 1,
-    minWidth: 0,
+    minWidth: 44,
+    flexShrink: 0,
     justifyContent: 'center',
   },
   materialUomCol: {
     flex: 1,
-    minWidth: 0,
+    minWidth: 44,
+    flexShrink: 0,
     justifyContent: 'center',
   },
   materialPriceCol: {
