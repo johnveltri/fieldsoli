@@ -258,6 +258,18 @@ export function LiveSessionBottomSheet({
   const [materialDrafts, setMaterialDrafts] = useState<
     Record<string, { description: string; totalText: string }>
   >({});
+  const liveNotesRef = useRef(liveNotes);
+  const liveMaterialsRef = useRef(liveMaterials);
+  const noteDraftsRef = useRef(noteDrafts);
+  const materialDraftsRef = useRef(materialDrafts);
+  const composerNotesRef = useRef(composerNotes);
+  const composerMaterialsRef = useRef(composerMaterials);
+  liveNotesRef.current = liveNotes;
+  liveMaterialsRef.current = liveMaterials;
+  noteDraftsRef.current = noteDrafts;
+  materialDraftsRef.current = materialDrafts;
+  composerNotesRef.current = composerNotes;
+  composerMaterialsRef.current = composerMaterials;
 
   useEffect(() => {
     if (!visible) {
@@ -637,6 +649,41 @@ export function LiveSessionBottomSheet({
     Keyboard.dismiss();
   }, []);
 
+  const flushPendingEdits = useCallback(() => {
+    flushIdentity();
+    for (const note of liveNotesRef.current) {
+      void persistExistingNote(note.id, noteDraftsRef.current[note.id] ?? note.body);
+    }
+    for (const note of composerNotesRef.current) {
+      void persistNewNote(note.localId, note.body);
+    }
+    for (const material of liveMaterialsRef.current) {
+      const draft = materialDraftsRef.current[material.id];
+      void persistExistingMaterial(
+        material.id,
+        draft?.description ?? material.description,
+        draft?.totalText ??
+          (material.totalCostCents > 0 ? formatUsdCombined(material.totalCostCents) : ''),
+      );
+    }
+    for (const material of composerMaterialsRef.current) {
+      void persistNewMaterial(material.localId, material.description, material.totalText);
+    }
+  }, [
+    flushIdentity,
+    persistExistingMaterial,
+    persistExistingNote,
+    persistNewMaterial,
+    persistNewNote,
+  ]);
+
+  /** Blur + persist drafts before minimizing so X / swipe does not drop in-progress edits. */
+  const handleMinimize = useCallback(() => {
+    flushPendingEdits();
+    dismissInlineEditing();
+    onMinimize();
+  }, [dismissInlineEditing, flushPendingEdits, onMinimize]);
+
   const statusBarTop =
     Platform.OS === 'android'
       ? Math.max(insets.top, StatusBar.currentHeight ?? 0)
@@ -655,7 +702,7 @@ export function LiveSessionBottomSheet({
     <BottomSheetShell
       visible={visible}
       scrollViewRef={sheetScrollRef}
-      onClose={onMinimize}
+      onClose={handleMinimize}
       onClosed={onClosed}
       variant="fullbleedDark"
       autoSizeUpToFraction={1}
@@ -694,7 +741,7 @@ export function LiveSessionBottomSheet({
             <View style={styles.closeChrome}>
               <PlatformHeaderAction
                 accessibilityLabel="Close"
-                onPress={onMinimize}
+                onPress={handleMinimize}
                 useFloatingChrome={false}
               >
                 <JobDetailIconTopClose color={fg.primary} />

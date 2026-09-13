@@ -137,7 +137,7 @@ describe('BottomSheetShell accessibility', () => {
         onKeyboardDidShow?.({ endCoordinates: { height: 320 } });
       });
       expect(StyleSheet.flatten(screen.getByTestId('bottom-sheet-surface').props.style).paddingBottom).toBe(
-        332,
+        320,
       );
       expect(StyleSheet.flatten(screen.getByTestId('bottom-sheet-bottom-fill').props.style).height).toBe(0);
       expect(addListenerSpy).toHaveBeenCalledTimes(4);
@@ -161,7 +161,7 @@ describe('BottomSheetShell accessibility', () => {
     }
   });
 
-  it('compensates Android Modal keyboard screenY by the status-bar inset', () => {
+  it('uses Android keyboard height and raw screenY overlap without status-bar boost', () => {
     const originalPlatformOS = Platform.OS;
     let onKeyboardDidShow: ((event: {
       endCoordinates: { height: number; screenY?: number };
@@ -189,13 +189,13 @@ describe('BottomSheetShell accessibility', () => {
       );
 
       act(() => {
-        // screenY is shifted down by the status bar; overlap alone would be 300.
+        // Prefer max(height, screenHeight - screenY) — no insets.top boost.
         onKeyboardDidShow?.({ endCoordinates: { height: 280, screenY: 600 } });
       });
-      // frameHeight(900) - (screenY(600) - insets.top(50)) = 350, plus 12 clearance
+      // max(280, 900 - 600) = 300
       expect(
         StyleSheet.flatten(screen.getByTestId('bottom-sheet-surface').props.style).paddingBottom,
-      ).toBe(362);
+      ).toBe(300);
     } finally {
       mockSheetInsets.top = 0;
       screenHeightSpy.mockRestore();
@@ -257,7 +257,7 @@ describe('BottomSheetShell accessibility', () => {
         onKeyboardDidShow?.({ endCoordinates: { height: 320 } });
       });
       expect(StyleSheet.flatten(screen.getByTestId('bottom-sheet-sticky-footer').props.style).bottom).toBe(
-        332,
+        320,
       );
       expect(
         StyleSheet.flatten(screen.getByTestId('bottom-sheet-surface').props.style).paddingBottom,

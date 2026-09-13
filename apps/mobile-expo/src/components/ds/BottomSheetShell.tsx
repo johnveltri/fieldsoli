@@ -27,13 +27,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CONTENT_COLUMN_MAX_WIDTH, contentGutter } from '@fieldsolo/design-system/lib/responsiveLayout';
 import { color, radius, space } from '@fieldsolo/design-system/lib/tokens';
 
-/**
- * Extra lift above the measured IME on Android so SAVE / END SESSION clear
- * Gboard’s candidate strip on physical devices (Galaxy S23). A prior downward
- * “nudge” after status-bar compensation clipped those CTAs under the keyboard.
- */
-const ANDROID_IME_CTA_CLEARANCE = space('Spacing/12');
-
 import { useBottomSheetStackWriters } from '../../context/BottomSheetStackContext';
 import { announceAccessibilityMessage } from '../../lib/accessibility';
 import { bg, border } from '../../theme/nativeTokens';
@@ -353,26 +346,14 @@ export function BottomSheetShell({
       const { height, screenY } = event.endCoordinates;
       const frameHeight =
         Platform.OS === 'android' ? Dimensions.get('screen').height : windowHeight;
-      // Inside Android Modals, keyboard `screenY` is often shifted down by the
-      // status-bar/cutout. Without compensating, pad lands short and CTAs sit
-      // under Gboard (measured ~insets.top on Pixel).
-      const screenYForOverlap =
-        typeof screenY === 'number'
-          ? screenY - (Platform.OS === 'android' ? insets.top : 0)
-          : null;
+      // Use raw screen overlap. Status-bar compensation (screenY - insets.top)
+      // fixed some Pixel Modal under-counts but pushed SAVE / END SESSION too
+      // high on Galaxy S23; event `height` plus raw overlap is the stable floor.
       const overlapFromScreenY =
-        screenYForOverlap != null ? Math.max(0, frameHeight - screenYForOverlap) : 0;
-      // Prefer the larger signal: one of height / screenY often under-counts
-      // Gboard's candidate strip inside Android Modals.
+        typeof screenY === 'number' ? Math.max(0, frameHeight - screenY) : 0;
       const visibleIme = Math.max(0, height, overlapFromScreenY);
-      // Keep CTAs fully above the IME (plus a small clearance). Do not subtract
-      // from visibleIme — that clipped Profile SAVE / End Session on S23.
-      const reservedHeight =
-        Platform.OS === 'android' && visibleIme > 0
-          ? visibleIme + ANDROID_IME_CTA_CLEARANCE
-          : visibleIme;
-      setKeyboardReservedHeight(reservedHeight);
-      setKeyboardCoversSafeArea(reservedHeight > insets.bottom);
+      setKeyboardReservedHeight(visibleIme);
+      setKeyboardCoversSafeArea(visibleIme > insets.bottom);
     };
     const onHide = () => {
       setKeyboardReservedHeight(0);
@@ -393,7 +374,7 @@ export function BottomSheetShell({
       hideSub.remove();
       changeSub?.remove();
     };
-  }, [insets.bottom, insets.top, windowHeight]);
+  }, [insets.bottom, windowHeight]);
 
   const isFullbleed = variant === 'fullbleedDark';
 
