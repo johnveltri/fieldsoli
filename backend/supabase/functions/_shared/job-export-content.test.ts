@@ -13,6 +13,8 @@ function row(overrides: Partial<JobExportRow> = {}): JobExportRow {
     job_description: 'Repair sink',
     long_description: null,
     customer_name: 'José',
+    customer_phone: '+13125550198',
+    customer_email: 'jose@example.com',
     service_address: '1 Main St',
     work_status: 'completed',
     payment_status: 'paid',
@@ -33,7 +35,7 @@ function row(overrides: Partial<JobExportRow> = {}): JobExportRow {
 }
 
 describe('Job Summary CSV contract', () => {
-  it('emits the exact 21 columns, BOM, CRLF, nulls, costs, and formula protection', async () => {
+  it('emits the exact 23 columns, BOM, CRLF, nulls, costs, and formula protection', async () => {
     const fetchPage = vi.fn().mockResolvedValueOnce([row({
       job_description: '=SUM(1,1)\n"quoted"',
       long_description: '@cmd injection',
@@ -43,7 +45,7 @@ describe('Job Summary CSV contract', () => {
 
     const bytes = await buildJobExportCsv('America/Chicago', fetchPage);
     const text = new TextDecoder().decode(bytes);
-    expect(JOB_EXPORT_HEADERS).toHaveLength(21);
+    expect(JOB_EXPORT_HEADERS).toHaveLength(23);
     expect(Array.from(bytes.slice(0, 3))).toEqual([0xef, 0xbb, 0xbf]);
     expect(text.startsWith(`${JOB_EXPORT_HEADERS.join(',')}\r\n`)).toBe(true);
     expect(text.replaceAll('\r\n', '')).not.toContain('\n');

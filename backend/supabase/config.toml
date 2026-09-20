@@ -398,6 +398,9 @@ verify_jwt = false
 [functions.cleanup-job-exports]
 verify_jwt = false
 
+[functions.address-autocomplete]
+verify_jwt = true
+
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
 

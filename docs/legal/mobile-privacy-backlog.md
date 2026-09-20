@@ -16,7 +16,7 @@ This document records the bidirectional audit between the FieldSoli mobile app (
 | --- | --- | --- |
 | Profile data | Name, email, trades, account ID | Collected via signup and `profiles` table |
 | Job records | Descriptions, customers, addresses, notes, materials, sessions, payment/revenue | Stored in `jobs`, `sessions`, `notes`, `materials` |
-| Permissions | No camera, mic, location, calendar, notifications, contacts | No permission requests in `app.json` or code |
+| Permissions | No camera, mic, location, calendar, notifications; contacts read-only on explicit Job import | `expo-contacts` configured with least-privilege picker copy; no bulk sync |
 | Account deletion | In-app Delete account control | Profile → Delete account → `delete-account` edge function |
 | Analytics provider | PostHog optional product analytics | PostHog adapter when env configured |
 | Sensitive field minimization | Coarse categories, not raw content | Production sanitizer strips email, customer names, job descriptions, error text when `debugRichEnabled=false` |

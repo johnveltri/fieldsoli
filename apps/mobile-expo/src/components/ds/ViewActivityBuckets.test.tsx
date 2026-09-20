@@ -19,6 +19,8 @@ describe('Job Detail readable row accessibility', () => {
         title="Paint fence"
         longDescription="Two coats on the west side"
         customerName="Ada Lovelace"
+        customerPhone=""
+        customerEmail=""
         serviceAddress="1 Main St"
         lastWorkedLabel="Worked today"
         workStatus="notStarted"
@@ -33,7 +35,7 @@ describe('Job Detail readable row accessibility', () => {
       'Opens job title and description editing',
     );
     expect(
-      screen.getByLabelText('Ada Lovelace • 1 Main St • Worked today'),
+      screen.getByLabelText('Ada Lovelace · 1 Main St · Worked today'),
     ).toHaveProp('accessibilityHint', 'Opens customer and address editing');
   });
 

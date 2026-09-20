@@ -68,6 +68,9 @@ export type JobEditDraft = {
   shortDescription: string;
   longDescription: string;
   customerName: string;
+  customerPhone: string;
+  customerEmail: string;
+  customerId: string | null;
   serviceAddress: string;
   revenueCents: number | null;
   /** Job-level “no revenue” confirmation (persisted with revenue_cents = 0). */
@@ -198,6 +201,9 @@ export function createJobEditDraft(job: JobDetailViewModel): JobEditDraft {
     shortDescription: clampShortDescription(job.shortDescription),
     longDescription: job.longDescription ?? '',
     customerName: job.customerName,
+    customerPhone: job.customerPhone,
+    customerEmail: job.customerEmail,
+    customerId: job.customerId,
     serviceAddress: job.serviceAddress,
     revenueCents: job.earnings.revenueCents,
     noRevenueConfirmed: job.noRevenueConfirmed ?? false,
@@ -216,6 +222,9 @@ export function createEmptyJobEditDraft(): JobEditDraft {
     shortDescription: '',
     longDescription: '',
     customerName: '',
+    customerPhone: '',
+    customerEmail: '',
+    customerId: null,
     serviceAddress: '',
     revenueCents: null,
     noRevenueConfirmed: false,
@@ -448,6 +457,9 @@ export function buildApplyJobDetailEditPayload(
       shortDescription: clampShortDescription(draft.shortDescription.trim()),
       longDescription: draft.longDescription.trim(),
       customerName: draft.customerName.trim(),
+      customerPhone: (draft.customerPhone ?? '').trim() || null,
+      customerEmail: (draft.customerEmail ?? '').trim() || null,
+      customerId: draft.customerId,
       serviceAddress: draft.serviceAddress.trim(),
       revenueCents: draft.revenueCents,
       noRevenueConfirmed: draft.noRevenueConfirmed,

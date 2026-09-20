@@ -5,7 +5,7 @@ import {
 } from "./marketing-content";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-export const PRIVACY_POLICY_VERSION = "2026-08-30";
+export const PRIVACY_POLICY_VERSION = "2026-09-20";
 export const TERMS_VERSION = "2026-08-30";
 
 function allowedValues(options: { value: string }[]) {

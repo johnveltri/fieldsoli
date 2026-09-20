@@ -7,6 +7,9 @@ export type ApplyJobDetailEditJobPatch = {
   shortDescription: string;
   longDescription: string;
   customerName: string;
+  customerPhone: string | null;
+  customerEmail: string | null;
+  customerId: string | null;
   serviceAddress: string;
   revenueCents: number | null;
   noRevenueConfirmed: boolean;
@@ -114,6 +117,9 @@ function toRpcPayload(payload: ApplyJobDetailEditPayload): Record<string, unknow
       shortDescription: payload.job.shortDescription,
       longDescription: payload.job.longDescription,
       customerName: payload.job.customerName,
+      customerPhone: payload.job.customerPhone,
+      customerEmail: payload.job.customerEmail,
+      customerId: payload.job.customerId,
       serviceAddress: payload.job.serviceAddress,
       revenueCents: payload.job.revenueCents,
       noRevenueConfirmed: payload.job.noRevenueConfirmed,

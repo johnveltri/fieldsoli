@@ -9,16 +9,19 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
+  applyJobDetailEdit,
   createMaterial,
   createNote,
   deleteJobById,
   deleteMaterial,
   deleteNote,
   fetchJobDetail,
+  saveJobCustomer,
   updateJobById,
   updateMaterial,
   updateNote,
 } from '@fieldsolo/api-client';
+import type { CustomerDraft } from './ds/customer/types';
 import type {
   JobDetailMaterialLine,
   JobDetailNote,
@@ -705,6 +708,9 @@ export function LiveSessionOverlay({
         shortDescription: liveSession.jobShortDescription || '',
         longDescription: '',
         customerName: '',
+        customerPhone: '',
+        customerEmail: '',
+        customerId: null,
         serviceAddress: '',
         revenue: '',
       };
@@ -720,6 +726,9 @@ export function LiveSessionOverlay({
       shortDescription: jobDetail.shortDescription,
       longDescription: jobDetail.longDescription ?? '',
       customerName: jobDetail.customerName,
+      customerPhone: jobDetail.customerPhone,
+      customerEmail: jobDetail.customerEmail,
+      customerId: jobDetail.customerId,
       serviceAddress: jobDetail.serviceAddress,
       revenue,
     };
@@ -742,6 +751,9 @@ export function LiveSessionOverlay({
         shortDescription: jobDetail.shortDescription,
         longDescription: jobDetail.longDescription ?? '',
         customerName: jobDetail.customerName ?? '',
+        customerPhone: jobDetail.customerPhone ?? '',
+        customerEmail: jobDetail.customerEmail ?? '',
+        customerId: jobDetail.customerId ?? null,
         serviceAddress: jobDetail.serviceAddress ?? '',
         revenueCents: jobDetail.earnings.revenueCents ?? null,
       };
@@ -751,6 +763,9 @@ export function LiveSessionOverlay({
       shortDescription: liveSession.jobShortDescription || '',
       longDescription: '',
       customerName: '',
+      customerPhone: '',
+      customerEmail: '',
+      customerId: null,
       serviceAddress: '',
       revenueCents: null as number | null,
     };
@@ -760,8 +775,6 @@ export function LiveSessionOverlay({
     async (patch: {
       shortDescription?: string;
       longDescription?: string;
-      customerName?: string;
-      serviceAddress?: string;
       revenueCents?: number | null;
     }) => {
       if (!liveSession || !phase3Capture) return;
@@ -769,14 +782,15 @@ export function LiveSessionOverlay({
         shortDescription: liveSession.jobShortDescription || '',
         longDescription: '',
         customerName: '',
+        customerPhone: '',
+        customerEmail: '',
+        customerId: null,
         serviceAddress: '',
         revenueCents: null as number | null,
       };
       const next = {
         shortDescription: patch.shortDescription ?? base.shortDescription,
         longDescription: patch.longDescription ?? base.longDescription,
-        customerName: patch.customerName ?? base.customerName,
-        serviceAddress: patch.serviceAddress ?? base.serviceAddress,
         revenueCents:
           patch.revenueCents !== undefined ? patch.revenueCents : base.revenueCents,
       };
@@ -786,8 +800,8 @@ export function LiveSessionOverlay({
         await updateJobById(supabase, liveSession.jobId, {
           shortDescription: title,
           longDescription: next.longDescription,
-          customerName: next.customerName.trim(),
-          serviceAddress: next.serviceAddress.trim(),
+          customerName: base.customerName.trim(),
+          serviceAddress: base.serviceAddress.trim(),
           revenueCents: next.revenueCents,
         });
         if (patch.shortDescription !== undefined) {
@@ -840,24 +854,61 @@ export function LiveSessionOverlay({
     [formatErrorMessage, liveSession, phase3Capture, updateLiveSessionStartedAt],
   );
 
+  const onPhase3CustomerSnapshotSave = useCallback(
+    async (draft: CustomerDraft) => {
+      if (!liveSession || !phase3Capture) return;
+      try {
+        await saveJobCustomer(supabase, liveSession.jobId, {
+          customerId: draft.customerId,
+          customerName: draft.customerName.trim(),
+          customerPhone: draft.customerPhone.trim() || null,
+          customerEmail: draft.customerEmail.trim() || null,
+          serviceAddress: draft.serviceAddress.trim() || null,
+        });
+        await refetchJobDetail();
+        invalidateJobsList();
+      } catch {
+        Alert.alert(
+          "Couldn't save customer details. Try again.",
+          undefined,
+          [{ text: 'Try again' }],
+        );
+        throw new Error('customer_save_failed');
+      }
+    },
+    [invalidateJobsList, liveSession, phase3Capture, refetchJobDetail],
+  );
+
   const closeEditJob = useCallback(() => {
     setEditJobOpen(false);
   }, []);
 
   const onSaveEditJob = useCallback(
     async (values: EditJobBottomSheetValues) => {
-      if (!liveSession || jobSaving) return;
+      if (!liveSession || jobSaving || !jobDetail) return;
       const trimmedRevenue = values.revenue.trim().replace(/[$,\s]/g, '');
       const revenueCents =
         trimmedRevenue.length === 0 ? null : Math.round(Number(trimmedRevenue) * 100);
       setJobSaving(true);
       try {
-        await updateJobById(supabase, liveSession.jobId, {
-          shortDescription: values.shortDescription,
-          longDescription: values.longDescription,
-          customerName: values.customerName.trim(),
-          serviceAddress: values.serviceAddress.trim(),
-          revenueCents,
+        await applyJobDetailEdit(supabase, liveSession.jobId, {
+          job: {
+            shortDescription: values.shortDescription.trim(),
+            longDescription: values.longDescription,
+            customerName: values.customerName.trim(),
+            customerPhone: values.customerPhone.trim() || null,
+            customerEmail: values.customerEmail.trim() || null,
+            customerId: values.customerId ?? null,
+            serviceAddress: values.serviceAddress.trim(),
+            revenueCents,
+            noRevenueConfirmed: jobDetail.noRevenueConfirmed,
+            noMaterialsConfirmed: jobDetail.noMaterialsConfirmed,
+            noOtherCostsConfirmed: jobDetail.noOtherCostsConfirmed,
+          },
+          sessions: { create: [], update: [], deleteIds: [] },
+          notes: { create: [], update: [], deleteIds: [] },
+          materials: { create: [], update: [], deleteIds: [] },
+          otherCosts: { create: [], update: [], deleteIds: [] },
         });
         updateLiveSessionJobShortDescription({
           jobId: liveSession.jobId,
@@ -885,6 +936,7 @@ export function LiveSessionOverlay({
     [
       formatErrorMessage,
       invalidateJobsList,
+      jobDetail,
       jobSaving,
       liveSession,
       refetchJobDetail,
@@ -1186,6 +1238,8 @@ export function LiveSessionOverlay({
           onJobIdentityChange={(patch) => {
             void onPhase3JobIdentityChange(patch);
           }}
+          onCustomerSnapshotSave={(draft) => onPhase3CustomerSnapshotSave(draft)}
+          supabase={supabase}
           onChangeStartedAt={(iso) => {
             void onPhase3ChangeStartedAt(iso);
           }}
@@ -1250,6 +1304,7 @@ export function LiveSessionOverlay({
         <EditJobBottomSheet
           typography={typography}
           values={editJobValues}
+          supabase={supabase}
           visible={editJobOpen && mode === 'sheet'}
           registerInGlobalStack={false}
           onClose={closeEditJob}

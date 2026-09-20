@@ -6,10 +6,32 @@ import type { TextStyles } from '../../theme/nativeTokens';
 import { screenHeaderA11y } from '../../lib/accessibility';
 import { JobDetailStatusPill } from './JobDetailStatusPill';
 
+function buildCustomerSubtitleLabel(input: {
+  customerName: string;
+  customerPhone: string;
+  customerEmail: string;
+  serviceAddress: string;
+  lastWorkedLabel: string;
+}): string {
+  const segments: string[] = [];
+  const name = input.customerName.trim();
+  segments.push(name.length > 0 ? name : 'No Customer');
+  const phone = input.customerPhone.trim();
+  if (phone.length > 0) segments.push(phone);
+  const email = input.customerEmail.trim();
+  if (email.length > 0) segments.push(email);
+  const address = input.serviceAddress.trim().replace(/\s*\n\s*/g, ', ');
+  segments.push(address.length > 0 ? address : 'No Address');
+  segments.push(input.lastWorkedLabel);
+  return segments.join(' · ');
+}
+
 export function JobDetailJobHeader({
   title,
   longDescription,
   customerName,
+  customerPhone,
+  customerEmail,
   serviceAddress,
   lastWorkedLabel,
   workStatus,
@@ -20,6 +42,8 @@ export function JobDetailJobHeader({
   title: string;
   longDescription?: string;
   customerName: string;
+  customerPhone: string;
+  customerEmail: string;
   serviceAddress: string;
   lastWorkedLabel: string;
   workStatus: JobDetailWorkStatus;
@@ -27,12 +51,13 @@ export function JobDetailJobHeader({
   onTitlePress?: () => void;
   onCustomerPress?: () => void;
 }) {
-  const customerLabel = customerName.trim().length > 0 ? customerName.trim() : 'No Customer';
-  const addressLabel =
-    serviceAddress.trim().length > 0
-      ? serviceAddress.trim().replace(/\s*\n\s*/g, ', ')
-      : 'No Address';
-  const subtitleLabel = `${customerLabel} • ${addressLabel} • ${lastWorkedLabel}`;
+  const subtitleLabel = buildCustomerSubtitleLabel({
+    customerName,
+    customerPhone,
+    customerEmail,
+    serviceAddress,
+    lastWorkedLabel,
+  });
   const description = longDescription?.trim() ?? '';
 
   const titleStyle = [typography.displayH1, styles.jobTitle];

@@ -8,6 +8,39 @@ export {
   type ApplyJobDetailEditErrorCode,
 } from './applyJobDetailEdit';
 export {
+  isCustomerEligible,
+  isMeaningfulServiceAddress,
+  isValidCustomerEmail,
+  isValidCustomerPhone,
+  normalizeCustomerEmail,
+  normalizeCustomerName,
+  normalizePhoneE164,
+} from './customerNormalization';
+export {
+  buildCustomerContactActions,
+  type CustomerContactAction,
+  type CustomerContactActionItem,
+} from './customerContactActions';
+export {
+  saveJobCustomer,
+  SaveJobCustomerError,
+  parseSaveJobCustomerError,
+  type JobCustomerSnapshot,
+  type SaveJobCustomerInput,
+  type SaveJobCustomerResult,
+  type SaveJobCustomerErrorCode,
+} from './saveJobCustomer';
+export {
+  listCustomerSuggestions,
+  type CustomerSuggestion,
+} from './customerSuggestions';
+export {
+  fetchAddressSuggestions,
+  type AddressSuggestion,
+  type AddressAutocompleteErrorCode,
+  type AddressAutocompleteResult,
+} from './addressAutocomplete';
+export {
   createDefaultSessionDraft,
   deviceIanaTimeZone,
   durationHoursBetween,

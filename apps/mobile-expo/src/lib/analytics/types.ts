@@ -142,7 +142,8 @@ export type AnalyticsEventName =
   | 'supabase_not_configured_seen'
   | 'stale_auth_session_detected'
   | 'unexpected_error_seen'
-  | 'analytics_event_dropped';
+  | 'analytics_event_dropped'
+  | 'customer_picker_event';
 
 export type AnalyticsEventPayloads = {
   [Name in AnalyticsEventName]: AnalyticsProperties;

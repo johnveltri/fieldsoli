@@ -52,6 +52,29 @@ jest.mock('../platform/PlatformHeaderAction', () => {
   };
 });
 
+jest.mock('./customer/useCustomerSuggestions', () => ({
+  useCustomerSuggestions: () => ({
+    suggestions: [],
+    loading: false,
+    error: null,
+    reload: jest.fn(),
+  }),
+}));
+
+jest.mock('./customer/useAddressAutocomplete', () => ({
+  useAddressAutocomplete: () => ({
+    suggestions: [],
+    loading: false,
+    unavailable: false,
+    noMatches: false,
+    meetsThreshold: false,
+  }),
+}));
+
+jest.mock('./customer/CustomerPickerBottomSheet', () => ({
+  CustomerPickerBottomSheet: () => null,
+}));
+
 jest.mock('./BottomSheetShell', () => {
   const { View, Text } = require('react-native');
   return {
@@ -128,10 +151,14 @@ const identity = {
   shortDescription: 'Panel upgrade',
   longDescription: '',
   customerName: 'Acme',
+  customerPhone: '',
+  customerEmail: '',
+  customerId: null as string | null,
   serviceAddress: '1 Main',
   revenueCents: null as number | null,
 };
 
+const supabase = {} as never;
 const noop = () => undefined;
 
 describe('LiveSessionBottomSheet phase3Capture', () => {
@@ -141,6 +168,7 @@ describe('LiveSessionBottomSheet phase3Capture', () => {
         typography={typography}
         visible
         phase3Capture
+        supabase={supabase}
         jobShortDescription="Panel upgrade"
         startedAt="2026-01-01T12:00:00.000Z"
         attachments={[]}
@@ -167,6 +195,7 @@ describe('LiveSessionBottomSheet phase3Capture', () => {
         startedAt={new Date().toISOString()}
         attachments={[]}
         phase3Capture
+        supabase={supabase}
         jobIdentity={identity}
         onJobIdentityChange={onJobIdentityChange}
         onAddNote={onAddNote}
@@ -191,9 +220,10 @@ describe('LiveSessionBottomSheet phase3Capture', () => {
     expect(screen.getByLabelText('End session')).toBeTruthy();
   });
 
-  it('TEST-L04 persists customer changes without a Done action', () => {
+  it('TEST-16 persists customer changes on blur, not per keystroke', () => {
     jest.useFakeTimers({ advanceTimers: true });
     const onJobIdentityChange = jest.fn();
+    const onCustomerSnapshotSave = jest.fn();
     const screen = render(
       <LiveSessionBottomSheet
         typography={typography}
@@ -202,8 +232,11 @@ describe('LiveSessionBottomSheet phase3Capture', () => {
         startedAt={new Date().toISOString()}
         attachments={[]}
         phase3Capture
+        supabase={supabase}
         jobIdentity={identity}
+        supabase={supabase}
         onJobIdentityChange={onJobIdentityChange}
+        onCustomerSnapshotSave={onCustomerSnapshotSave}
         onAddNote={noop}
         onAddMaterial={noop}
         onPressAttachment={noop}
@@ -212,9 +245,13 @@ describe('LiveSessionBottomSheet phase3Capture', () => {
       />,
     );
 
-    fireEvent.changeText(screen.getByPlaceholderText('Customer'), 'Beta Electric');
+    const customer = screen.getByPlaceholderText('Customer');
+    fireEvent.changeText(customer, 'Beta Electric');
     jest.advanceTimersByTime(500);
-    expect(onJobIdentityChange).toHaveBeenCalledWith(
+    expect(onJobIdentityChange).not.toHaveBeenCalled();
+    expect(onCustomerSnapshotSave).not.toHaveBeenCalled();
+    fireEvent(customer, 'blur');
+    expect(onCustomerSnapshotSave).toHaveBeenCalledWith(
       expect.objectContaining({ customerName: 'Beta Electric' }),
     );
     expect(screen.queryByLabelText('Done')).toBeNull();
@@ -232,6 +269,7 @@ describe('LiveSessionBottomSheet phase3Capture', () => {
         startedAt={new Date().toISOString()}
         attachments={[]}
         phase3Capture
+        supabase={supabase}
         jobIdentity={identity}
         onAddNote={noop}
         onAddMaterial={noop}
@@ -268,6 +306,7 @@ describe('LiveSessionBottomSheet phase3Capture', () => {
         startedAt={new Date().toISOString()}
         attachments={[]}
         phase3Capture
+        supabase={supabase}
         jobIdentity={identity}
         onJobIdentityChange={onJobIdentityChange}
         onAddNote={noop}
@@ -299,6 +338,7 @@ describe('LiveSessionBottomSheet phase3Capture', () => {
         startedAt={new Date().toISOString()}
         attachments={[]}
         phase3Capture
+        supabase={supabase}
         jobIdentity={identity}
         onCreateNote={onCreateNote}
         onAddNote={noop}
@@ -331,6 +371,7 @@ describe('LiveSessionBottomSheet phase3Capture', () => {
         startedAt={new Date().toISOString()}
         attachments={[]}
         phase3Capture
+        supabase={supabase}
         jobIdentity={identity}
         liveNotes={[{ id: 'note-1', body: 'Old note' }]}
         onCreateNote={onCreateNote}
@@ -377,6 +418,7 @@ describe('LiveSessionBottomSheet phase3Capture', () => {
         startedAt={new Date().toISOString()}
         attachments={[]}
         phase3Capture
+        supabase={supabase}
         jobIdentity={identity}
         onCreateMaterial={onCreateMaterial}
         onAddNote={noop}
@@ -421,6 +463,7 @@ describe('LiveSessionBottomSheet phase3Capture', () => {
         startedAt={startedAt}
         attachments={[]}
         phase3Capture
+        supabase={supabase}
         jobIdentity={identity}
         onChangeStartedAt={onChangeStartedAt}
         onAddNote={noop}
@@ -458,6 +501,7 @@ describe('LiveSessionBottomSheet phase3Capture', () => {
         startedAt={new Date().toISOString()}
         attachments={[]}
         phase3Capture
+        supabase={supabase}
         jobIdentity={identity}
         onAddNote={noop}
         onAddMaterial={noop}
@@ -485,6 +529,7 @@ describe('LiveSessionBottomSheet phase3Capture', () => {
         startedAt={new Date().toISOString()}
         attachments={[]}
         phase3Capture
+        supabase={supabase}
         jobIdentity={identity}
         onAddNote={noop}
         onAddMaterial={noop}
@@ -512,6 +557,7 @@ describe('LiveSessionBottomSheet phase3Capture', () => {
         startedAt={new Date().toISOString()}
         attachments={[]}
         phase3Capture
+        supabase={supabase}
         jobIdentity={identity}
         onAddNote={noop}
         onAddMaterial={noop}
@@ -543,6 +589,7 @@ describe('LiveSessionBottomSheet phase3Capture', () => {
         startedAt={new Date().toISOString()}
         attachments={[]}
         phase3Capture
+        supabase={supabase}
         jobIdentity={identity}
         onAddNote={noop}
         onAddMaterial={noop}
@@ -574,6 +621,7 @@ describe('LiveSessionBottomSheet phase3Capture', () => {
         startedAt={new Date().toISOString()}
         attachments={[]}
         phase3Capture
+        supabase={supabase}
         jobIdentity={identity}
         onAddNote={noop}
         onAddMaterial={noop}

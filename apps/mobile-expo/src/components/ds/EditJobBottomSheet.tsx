@@ -2,10 +2,12 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { TextStyles } from '../../theme/nativeTokens';
 import { fg, border, space } from '../../theme/nativeTokens';
 import { color } from '@fieldsolo/design-system/lib/tokens';
+import type { FieldSoloSupabaseClient } from '@fieldsolo/api-client';
 import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -17,11 +19,16 @@ import { BottomSheetShell } from './BottomSheetShell';
 import { SheetPrimaryDeleteActions } from './SheetPrimaryDeleteActions';
 import { screenHeaderA11y } from '../../lib/accessibility';
 import { JOB_SHORT_DESCRIPTION_MAX_LENGTH } from '@fieldsolo/shared-types';
+import { CustomerFieldsBlock } from './customer/CustomerFieldsBlock';
+import type { CustomerDraft } from './customer/types';
 
 export type EditJobBottomSheetValues = {
   shortDescription: string;
   longDescription: string;
   customerName: string;
+  customerPhone: string;
+  customerEmail: string;
+  customerId: string | null;
   serviceAddress: string;
   revenue: string;
 };
@@ -29,6 +36,7 @@ export type EditJobBottomSheetValues = {
 type EditJobBottomSheetProps = {
   typography: TextStyles;
   values?: Partial<EditJobBottomSheetValues>;
+  supabase: FieldSoloSupabaseClient;
   visible: boolean;
   /** Shown under the revenue field (e.g. mark-complete wizard). */
   revenueError?: string;
@@ -51,6 +59,9 @@ const DEFAULT_VALUES: EditJobBottomSheetValues = {
   shortDescription: 'Bathroom Remodel Phase 1',
   longDescription: '',
   customerName: 'Andrew G',
+  customerPhone: '',
+  customerEmail: '',
+  customerId: null,
   serviceAddress: '123 Main Street, Perrysburg, OH 43551',
   revenue: '5,678.87',
 };
@@ -81,9 +92,20 @@ function InputShell({
   );
 }
 
+function valuesToCustomerDraft(values: EditJobBottomSheetValues): CustomerDraft {
+  return {
+    customerName: values.customerName,
+    customerPhone: values.customerPhone,
+    customerEmail: values.customerEmail,
+    customerId: values.customerId,
+    serviceAddress: values.serviceAddress,
+  };
+}
+
 export function EditJobBottomSheet({
   typography,
   values,
+  supabase,
   visible,
   revenueError,
   onClose,
@@ -95,21 +117,38 @@ export function EditJobBottomSheet({
   const v = { ...DEFAULT_VALUES, ...values };
   const [shortDescription, setShortDescription] = useState(v.shortDescription);
   const [longDescription, setLongDescription] = useState(v.longDescription);
-  const [customerName, setCustomerName] = useState(v.customerName);
-  const [serviceAddress, setServiceAddress] = useState(v.serviceAddress);
+  const [customerDraft, setCustomerDraft] = useState<CustomerDraft>(valuesToCustomerDraft(v));
   const [revenue, setRevenue] = useState(v.revenue);
   const shortDescriptionRef = useRef<TextInput>(null);
-  const customerNameRef = useRef<TextInput>(null);
-  const serviceAddressRef = useRef<TextInput>(null);
   const revenueRef = useRef<TextInput>(null);
 
   useEffect(() => {
     setShortDescription(v.shortDescription);
     setLongDescription(v.longDescription);
-    setCustomerName(v.customerName);
-    setServiceAddress(v.serviceAddress);
+    setCustomerDraft(valuesToCustomerDraft(v));
     setRevenue(v.revenue);
-  }, [v.customerName, v.shortDescription, v.longDescription, v.revenue, v.serviceAddress, visible]);
+  }, [
+    v.customerEmail,
+    v.customerId,
+    v.customerName,
+    v.customerPhone,
+    v.shortDescription,
+    v.longDescription,
+    v.revenue,
+    v.serviceAddress,
+    visible,
+  ]);
+
+  const saveValues = (): EditJobBottomSheetValues => ({
+    shortDescription,
+    longDescription,
+    customerName: customerDraft.customerName,
+    customerPhone: customerDraft.customerPhone,
+    customerEmail: customerDraft.customerEmail,
+    customerId: customerDraft.customerId,
+    serviceAddress: customerDraft.serviceAddress,
+    revenue,
+  });
 
   return (
     <BottomSheetShell
@@ -122,6 +161,7 @@ export function EditJobBottomSheet({
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
+      <ScrollView keyboardShouldPersistTaps="handled">
       <View style={styles.body}>
         <Pressable
           accessibilityRole="button"
@@ -174,30 +214,14 @@ export function EditJobBottomSheet({
               style={[typography.body, styles.inputText, styles.descriptionInput]}
             />
           </View>
-          <InputShell>
-            <TextInput
-              ref={customerNameRef}
-              value={customerName}
-              onChangeText={setCustomerName}
-              placeholder="Customer name"
-              placeholderTextColor={fg.secondary}
-              editable
-              showSoftInputOnFocus
-              style={[typography.body, styles.inputText]}
-            />
-          </InputShell>
-          <InputShell>
-            <TextInput
-              ref={serviceAddressRef}
-              value={serviceAddress}
-              onChangeText={setServiceAddress}
-              placeholder="Service address"
-              placeholderTextColor={fg.secondary}
-              editable
-              showSoftInputOnFocus
-              style={[typography.body, styles.inputText]}
-            />
-          </InputShell>
+          <CustomerFieldsBlock
+            typography={typography}
+            iconColor={fg.secondary}
+            draft={customerDraft}
+            onChange={(patch) => setCustomerDraft((prev) => ({ ...prev, ...patch }))}
+            surface="job_edit"
+            supabase={supabase}
+          />
           <InputShell>
             <View style={styles.revenueRow}>
               <Text style={[typography.bodyBold, { color: fg.primary }]}>$</Text>
@@ -229,18 +253,11 @@ export function EditJobBottomSheet({
         <SheetPrimaryDeleteActions
           typography={typography}
           primaryLabel="SAVE CHANGES"
-          onPrimaryPress={() =>
-            onSavePress?.({
-              shortDescription,
-              longDescription,
-              customerName,
-              serviceAddress,
-              revenue,
-            })
-          }
+          onPrimaryPress={() => onSavePress?.(saveValues())}
           onDeletePress={onDeletePress}
         />
       </View>
+      </ScrollView>
       </KeyboardAvoidingView>
     </BottomSheetShell>
   );
@@ -280,52 +297,37 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     paddingHorizontal: 13,
     paddingVertical: 9,
-    justifyContent: 'flex-start',
-    overflow: 'hidden',
   },
   descriptionShell: {
-    minHeight: 66,
+    minHeight: 44,
     borderWidth: 1,
     borderColor: border.subtle,
     borderRadius: 8,
     backgroundColor: '#FFFFFF',
     paddingHorizontal: 13,
     paddingVertical: 9,
-    justifyContent: 'flex-start',
-    overflow: 'hidden',
   },
   inputText: {
     color: fg.primary,
     padding: 0,
-    width: '100%',
+    margin: 0,
+    includeFontPadding: false,
   },
   titleInput: {
-    width: '100%',
-    maxWidth: '100%',
-    alignSelf: 'stretch',
-    flexShrink: 1,
-    minHeight: 25,
-    height: undefined,
-    textAlignVertical: 'top',
+    minHeight: 28,
   },
   descriptionInput: {
-    width: '100%',
-    maxWidth: '100%',
-    alignSelf: 'stretch',
-    flexShrink: 1,
-    minHeight: 66,
-    height: undefined,
-    textAlignVertical: 'top',
+    minHeight: 44,
   },
   revenueRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: space('Spacing/4'),
   },
   revenueInput: {
     flex: 1,
   },
   pressed: {
-    opacity: 0.75,
+    opacity: 0.7,
   },
 });
