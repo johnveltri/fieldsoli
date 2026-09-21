@@ -1,5 +1,7 @@
 import type { FieldSoloSupabaseClient } from './client';
 
+export const CUSTOMER_SUGGESTION_LIMIT = 3;
+
 export type CustomerSuggestion = {
   customerId: string;
   displayName: string;
@@ -27,5 +29,7 @@ export async function listCustomerSuggestions(
   });
   if (error) throw error;
   if (!Array.isArray(data)) return [];
-  return data.map((row) => mapSuggestion(row as Record<string, unknown>));
+  return data
+    .slice(0, CUSTOMER_SUGGESTION_LIMIT)
+    .map((row) => mapSuggestion(row as Record<string, unknown>));
 }

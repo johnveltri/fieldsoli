@@ -2832,14 +2832,12 @@ export function JobDetailScreen({
   );
   const contactCustomerButton =
     customerContactActions.length > 0 ? (
-      <Pressable
-        accessibilityRole="button"
+      <PlatformHeaderAction
         accessibilityLabel="Contact customer"
         onPress={() => showCustomerContactMenu(job.customerPhone, job.customerEmail)}
-        style={({ pressed }) => [styles.contactButton, pressed && styles.pressed]}
       >
         <EditIconPerson color={fg.primary} />
-      </Pressable>
+      </PlatformHeaderAction>
     ) : null;
 
   const sharedTopHeader = (
@@ -3966,13 +3964,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: space('Spacing/8'),
-  },
-  contactButton: {
-    minHeight: 44,
-    minWidth: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: space('Spacing/8'),
   },
   sharedTopHeader: {
     flexDirection: 'row',

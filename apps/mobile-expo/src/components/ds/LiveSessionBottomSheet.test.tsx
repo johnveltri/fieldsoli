@@ -52,13 +52,23 @@ jest.mock('../platform/PlatformHeaderAction', () => {
   };
 });
 
+const mockCustomerSuggestionsState = {
+  suggestions: [] as Array<{
+    customerId: string;
+    displayName: string;
+    phone: string | null;
+    email: string | null;
+    serviceAddress: string | null;
+  }>,
+  suggestionsQuery: '' as string | null,
+  loading: false,
+  error: false,
+  reload: jest.fn(),
+};
+
 jest.mock('./customer/useCustomerSuggestions', () => ({
-  useCustomerSuggestions: () => ({
-    suggestions: [],
-    loading: false,
-    error: null,
-    reload: jest.fn(),
-  }),
+  ...jest.requireActual('./customer/useCustomerSuggestions'),
+  useCustomerSuggestions: () => mockCustomerSuggestionsState,
 }));
 
 jest.mock('./customer/useAddressAutocomplete', () => ({
@@ -69,10 +79,6 @@ jest.mock('./customer/useAddressAutocomplete', () => ({
     noMatches: false,
     meetsThreshold: false,
   }),
-}));
-
-jest.mock('./customer/CustomerPickerBottomSheet', () => ({
-  CustomerPickerBottomSheet: () => null,
 }));
 
 jest.mock('./BottomSheetShell', () => {
@@ -255,6 +261,54 @@ describe('LiveSessionBottomSheet phase3Capture', () => {
       expect.objectContaining({ customerName: 'Beta Electric' }),
     );
     expect(screen.queryByLabelText('Done')).toBeNull();
+    screen.unmount();
+    jest.useRealTimers();
+  });
+
+  it('restores End Session after selecting a customer suggestion', () => {
+    jest.useFakeTimers();
+    mockCustomerSuggestionsState.suggestions = [
+      {
+        customerId: 'customer-1',
+        displayName: 'Beta Electric',
+        phone: null,
+        email: null,
+        serviceAddress: null,
+      },
+    ];
+    mockCustomerSuggestionsState.suggestionsQuery = '';
+
+    const screen = render(
+      <LiveSessionBottomSheet
+        typography={typography}
+        visible
+        jobShortDescription="Panel upgrade"
+        startedAt={new Date().toISOString()}
+        attachments={[]}
+        phase3Capture
+        supabase={supabase}
+        jobIdentity={{ ...identity, customerName: '' }}
+        onAddNote={noop}
+        onAddMaterial={noop}
+        onPressAttachment={noop}
+        onMinimize={noop}
+        onEndSessionPress={noop}
+      />,
+    );
+
+    act(() => {
+      jest.advanceTimersByTime(320);
+    });
+
+    const customer = screen.getByPlaceholderText('Customer');
+    fireEvent(customer, 'focus', { nativeEvent: { target: 1 } });
+    expect(screen.queryByLabelText('End session')).toBeNull();
+
+    fireEvent.press(screen.getByLabelText('Beta Electric'));
+    expect(screen.getByLabelText('End session')).toBeTruthy();
+
+    mockCustomerSuggestionsState.suggestions = [];
+    mockCustomerSuggestionsState.suggestionsQuery = '';
     screen.unmount();
     jest.useRealTimers();
   });

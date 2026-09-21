@@ -178,8 +178,8 @@ begin
   -- TEST-08: recents and search
   suggestions := public.list_customer_suggestions('');
   suggestion_count := jsonb_array_length(suggestions);
-  if suggestion_count < 1 or suggestion_count > 4 then
-    raise exception 'TEST-08 failed: expected 1-4 recents, got %', suggestion_count;
+  if suggestion_count < 1 or suggestion_count > 3 then
+    raise exception 'TEST-08 failed: expected 1-3 recents, got %', suggestion_count;
   end if;
 
   suggestions := public.list_customer_suggestions('Jordan');
@@ -229,6 +229,11 @@ begin
   suggestions := public.list_customer_suggestions('');
   if jsonb_array_length(suggestions) <> 0 then
     raise exception 'TEST-06 failed: deleted customer still appears in recents';
+  end if;
+
+  suggestions := public.list_customer_suggestions('Jordan');
+  if jsonb_array_length(suggestions) <> 0 then
+    raise exception 'TEST-06 failed: deleted customer still appears in search';
   end if;
 
   update public.jobs set deleted_at = null where id = job_b;

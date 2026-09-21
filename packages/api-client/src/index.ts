@@ -15,6 +15,7 @@ export {
   normalizeCustomerEmail,
   normalizeCustomerName,
   normalizePhoneE164,
+  formatCustomerPhoneDisplay,
 } from './customerNormalization';
 export {
   buildCustomerContactActions,

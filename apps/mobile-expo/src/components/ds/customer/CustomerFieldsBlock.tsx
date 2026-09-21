@@ -1,25 +1,40 @@
 import { useCallback, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { space } from '@fieldsolo/design-system/lib/tokens';
+import { Keyboard, StyleSheet, View } from 'react-native';
 import type { CustomerSuggestion } from '@fieldsolo/api-client';
 import type { FieldSoloSupabaseClient } from '@fieldsolo/api-client';
 
-import { fg } from '../../../theme/nativeTokens';
 import type { TextStyles } from '../../../theme/nativeTokens';
+import { EditSwipeableRow } from '../edit-mode/EditSwipeableRow';
 import {
+  EditAddRow,
   EditFieldInput,
+  EditIconGroup,
   EditIconRow,
   EditSheet,
 } from '../edit-mode/EditFormRows';
-import { EditIconLocation, EditIconPerson } from '../edit-mode/EditModeIcons';
+import {
+  EditIconContactBook,
+  EditIconEmail,
+  EditIconLocation,
+  EditIconPerson,
+  EditIconPhone,
+} from '../edit-mode/EditModeIcons';
 import { AddressSuggestionPanel } from './AddressSuggestionPanel';
-import { CustomerPickerBottomSheet } from './CustomerPickerBottomSheet';
+import { CustomerSuggestionPanel } from './CustomerSuggestionPanel';
 import { confirmCustomerReplacement, customerFieldsWouldReplace } from './confirmCustomerReplacement';
 import { trackCustomerPickerEvent } from './customerAnalytics';
 import { importDeviceContact } from './importDeviceContact';
 import { useAddressAutocomplete } from './useAddressAutocomplete';
-import { useCustomerSuggestions } from './useCustomerSuggestions';
-import type { CustomerDraft, CustomerSurface } from './types';
+import {
+  useCustomerSuggestions,
+  visibleCustomerSuggestions,
+} from './useCustomerSuggestions';
+import {
+  emptyCustomerDraft,
+  isCustomerContactSwipeable,
+  type CustomerDraft,
+  type CustomerSurface,
+} from './types';
 
 type CustomerFieldsBlockProps = {
   typography: TextStyles;
@@ -54,10 +69,10 @@ export function CustomerFieldsBlock({
   onCustomerCommit,
   onFocusChange,
 }: CustomerFieldsBlockProps) {
-  const [pickerVisible, setPickerVisible] = useState(false);
-  const [pickerQuery, setPickerQuery] = useState(draft.customerName);
+  const [customerFocused, setCustomerFocused] = useState(false);
   const [addressFocused, setAddressFocused] = useState(false);
-  const { suggestions, loading, error, reload } = useCustomerSuggestions(supabase);
+  const { suggestions, suggestionsQuery, loading, error, reload } =
+    useCustomerSuggestions(supabase);
   const addressLookup = useAddressAutocomplete(supabase, draft.serviceAddress, addressFocused);
 
   const applyDraft = useCallback(
@@ -68,6 +83,13 @@ export function CustomerFieldsBlock({
     },
     [onChange, onCustomerCommit, surface],
   );
+
+  const releaseInlineFocus = useCallback(() => {
+    setCustomerFocused(false);
+    setAddressFocused(false);
+    onFocusChange?.(false);
+    Keyboard.dismiss();
+  }, [onFocusChange]);
 
   const maybeReplaceDraft = useCallback(
     (next: CustomerDraft, source: 'recent' | 'search' | 'device_contact') => {
@@ -80,34 +102,13 @@ export function CustomerFieldsBlock({
     [applyDraft, draft],
   );
 
-  const openPicker = useCallback(() => {
-    setPickerQuery(draft.customerName);
-    setPickerVisible(true);
-    void reload(draft.customerName.trim());
-    onFocusChange?.(true);
-  }, [draft.customerName, onFocusChange, reload]);
-
-  const closePicker = useCallback(() => {
-    setPickerVisible(false);
-    onFocusChange?.(false);
-  }, [onFocusChange]);
-
-  const handlePickerQueryChange = useCallback(
-    (query: string) => {
-      setPickerQuery(query);
-      onChange({ customerName: query });
-      void reload(query.trim());
-    },
-    [onChange, reload],
-  );
-
   const handleSuggestionSelect = useCallback(
     (suggestion: CustomerSuggestion) => {
       const next = suggestionToDraft(suggestion);
-      closePicker();
-      maybeReplaceDraft(next, pickerQuery.trim() ? 'search' : 'recent');
+      releaseInlineFocus();
+      maybeReplaceDraft(next, draft.customerName.trim() ? 'search' : 'recent');
     },
-    [closePicker, maybeReplaceDraft, pickerQuery],
+    [draft.customerName, maybeReplaceDraft, releaseInlineFocus],
   );
 
   const handleContactsImport = useCallback(async () => {
@@ -131,127 +132,177 @@ export function CustomerFieldsBlock({
     maybeReplaceDraft(next, 'device_contact');
   }, [draft, maybeReplaceDraft, surface]);
 
-  return (
+  const hasCustomerName = draft.customerName.trim().length > 0;
+  const contactSwipeable = isCustomerContactSwipeable(draft, customerFocused);
+  const trimmedCustomerQuery = draft.customerName.trim();
+  const visibleSuggestions = visibleCustomerSuggestions(
+    suggestions,
+    suggestionsQuery,
+    draft.customerName,
+    loading,
+  );
+  const showSuggestionPanel =
+    customerFocused &&
+    (error ||
+      trimmedCustomerQuery.length === 0 ||
+      loading ||
+      visibleSuggestions.length > 0);
+  const showContactDetailFields = hasCustomerName && !customerFocused;
+  const showAddressSuggestionPanel = addressFocused && addressLookup.meetsThreshold;
+
+  const handleDeleteContact = useCallback(() => {
+    releaseInlineFocus();
+    const cleared = emptyCustomerDraft();
+    onChange(cleared);
+    onCustomerCommit?.(cleared);
+  }, [onChange, onCustomerCommit, releaseInlineFocus]);
+
+  const customerIcon = <EditIconPerson color={iconColor} />;
+  const customerInput = (
+    <EditFieldInput
+      typography={typography}
+      placeholder="Customer"
+      accessibilityLabel="Customer"
+      value={draft.customerName}
+      onFocus={() => {
+        setCustomerFocused(true);
+        void reload(draft.customerName.trim());
+        onFocusChange?.(true);
+      }}
+      onChangeText={(text) => {
+        onChange({ customerName: text });
+        void reload(text.trim());
+      }}
+      onBlur={() => {
+        setCustomerFocused(false);
+        onCustomerFieldBlur?.();
+        onFocusChange?.(false);
+      }}
+    />
+  );
+
+  const contactFields = (
     <>
-      <EditSheet>
-        <EditIconRow icon={<EditIconPerson color={iconColor} />}>
-          <EditFieldInput
-            typography={typography}
-            placeholder="Customer"
-            accessibilityLabel="Customer"
-            value={draft.customerName}
-            opticalNudgeY={-3}
-            onFocus={openPicker}
-            onChangeText={(text) => onChange({ customerName: text })}
-            onBlur={() => {
-              onCustomerFieldBlur?.();
-              onFocusChange?.(false);
-            }}
-          />
-        </EditIconRow>
-        <EditIconRow icon={<EditIconPerson color={iconColor} />}>
-          <EditFieldInput
-            typography={typography}
-            placeholder="Phone"
-            accessibilityLabel="Phone"
-            value={draft.customerPhone}
-            keyboardType="phone-pad"
-            onChangeText={(text) => onChange({ customerPhone: text })}
-            onBlur={() => {
-              onCustomerFieldBlur?.();
-              onFocusChange?.(false);
-            }}
-            onFocus={() => onFocusChange?.(true)}
-          />
-        </EditIconRow>
-        <EditIconRow icon={<EditIconPerson color={iconColor} />}>
-          <EditFieldInput
-            typography={typography}
-            placeholder="Email"
-            accessibilityLabel="Email"
-            value={draft.customerEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoCorrect={false}
-            onChangeText={(text) => onChange({ customerEmail: text })}
-            onBlur={() => {
-              onCustomerFieldBlur?.();
-              onFocusChange?.(false);
-            }}
-            onFocus={() => onFocusChange?.(true)}
-          />
-        </EditIconRow>
-        <EditIconRow icon={<EditIconLocation color={iconColor} />}>
-          <View style={styles.addressColumn}>
+      <EditIconGroup icon={customerIcon} iconAlign={showSuggestionPanel ? 'top' : 'center'}>
+        <View style={styles.customerColumn}>
+          {customerInput}
+          {showSuggestionPanel ? (
+            <CustomerSuggestionPanel
+              typography={typography}
+              suggestions={visibleSuggestions}
+              loading={loading}
+              error={error}
+              query={draft.customerName}
+              onRetry={() => void reload(trimmedCustomerQuery)}
+              onSelect={handleSuggestionSelect}
+            />
+          ) : null}
+        </View>
+      </EditIconGroup>
+      {showContactDetailFields ? (
+        <>
+          <EditIconRow icon={<EditIconPhone color={iconColor} />}>
             <EditFieldInput
               typography={typography}
-              placeholder="Address"
-              accessibilityLabel="Address"
-              value={draft.serviceAddress}
-              onChangeText={(text) =>
-                onChange({ serviceAddress: text.replace(/[\r\n]+/g, ' ') })
-              }
-              onFocus={() => {
-                setAddressFocused(true);
-                onFocusChange?.(true);
-              }}
+              placeholder="Phone"
+              accessibilityLabel="Phone"
+              value={draft.customerPhone}
+              keyboardType="phone-pad"
+              onChangeText={(text) => onChange({ customerPhone: text })}
               onBlur={() => {
-                setAddressFocused(false);
                 onCustomerFieldBlur?.();
                 onFocusChange?.(false);
               }}
-              returnKeyType="done"
-              blurOnSubmit
+              onFocus={() => onFocusChange?.(true)}
             />
-            <AddressSuggestionPanel
+          </EditIconRow>
+          <EditIconRow icon={<EditIconEmail color={iconColor} />}>
+            <EditFieldInput
               typography={typography}
-              suggestions={addressLookup.suggestions}
-              loading={addressLookup.loading}
-              unavailable={addressLookup.unavailable}
-              noMatches={addressLookup.noMatches}
-              meetsThreshold={addressLookup.meetsThreshold && addressFocused}
-              onSelect={(suggestion) => {
-                onChange({ serviceAddress: suggestion.displayAddress });
-                onCustomerCommit?.({ ...draft, serviceAddress: suggestion.displayAddress });
+              placeholder="Email"
+              accessibilityLabel="Email"
+              value={draft.customerEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+              onChangeText={(text) => onChange({ customerEmail: text })}
+              onBlur={() => {
+                onCustomerFieldBlur?.();
+                onFocusChange?.(false);
               }}
+              onFocus={() => onFocusChange?.(true)}
             />
-          </View>
-        </EditIconRow>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Add from Contacts"
-          onPress={() => void handleContactsImport()}
-          style={({ pressed }) => [styles.contactsRow, pressed && styles.pressed]}
-        >
-          <Text style={[typography.bodyBold, { color: fg.primary }]}>Add from Contacts</Text>
-        </Pressable>
-      </EditSheet>
-
-      <CustomerPickerBottomSheet
-        typography={typography}
-        visible={pickerVisible}
-        query={pickerQuery}
-        suggestions={suggestions}
-        loading={loading}
-        error={error}
-        onQueryChange={handlePickerQueryChange}
-        onRetry={() => void reload(pickerQuery.trim())}
-        onSelect={handleSuggestionSelect}
-        onClose={closePicker}
-      />
+          </EditIconRow>
+          <EditIconGroup
+            icon={<EditIconLocation color={iconColor} />}
+            iconAlign={showAddressSuggestionPanel ? 'top' : 'center'}
+          >
+            <View style={styles.addressColumn}>
+              <EditFieldInput
+                typography={typography}
+                placeholder="Address"
+                accessibilityLabel="Address"
+                value={draft.serviceAddress}
+                onChangeText={(text) =>
+                  onChange({ serviceAddress: text.replace(/[\r\n]+/g, ' ') })
+                }
+                onFocus={() => {
+                  setAddressFocused(true);
+                  onFocusChange?.(true);
+                }}
+                onBlur={() => {
+                  setAddressFocused(false);
+                  onCustomerFieldBlur?.();
+                  onFocusChange?.(false);
+                }}
+                returnKeyType="done"
+                blurOnSubmit
+              />
+              <AddressSuggestionPanel
+                typography={typography}
+                suggestions={addressLookup.suggestions}
+                loading={addressLookup.loading}
+                unavailable={addressLookup.unavailable}
+                noMatches={addressLookup.noMatches}
+                meetsThreshold={showAddressSuggestionPanel}
+                onSelect={(suggestion) => {
+                  onChange({ serviceAddress: suggestion.displayAddress });
+                  onCustomerCommit?.({ ...draft, serviceAddress: suggestion.displayAddress });
+                }}
+              />
+            </View>
+          </EditIconGroup>
+        </>
+      ) : null}
     </>
+  );
+
+  return (
+    <EditSheet>
+      <EditSwipeableRow
+        typography={typography}
+        accessibilityLabel="Customer"
+        enabled={contactSwipeable}
+        onDelete={handleDeleteContact}
+      >
+        {contactFields}
+      </EditSwipeableRow>
+      <EditAddRow
+        typography={typography}
+        label="Add from Contacts"
+        icon={<EditIconContactBook color={iconColor} />}
+        onPress={() => void handleContactsImport()}
+        showTopBorder
+      />
+    </EditSheet>
   );
 }
 
 const styles = StyleSheet.create({
-  addressColumn: {
+  customerColumn: {
     flex: 1,
   },
-  contactsRow: {
-    paddingVertical: space('Spacing/12'),
-    paddingHorizontal: space('Spacing/16'),
-  },
-  pressed: {
-    opacity: 0.7,
+  addressColumn: {
+    flex: 1,
   },
 });

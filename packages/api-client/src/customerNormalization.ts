@@ -12,6 +12,28 @@ export function normalizePhoneE164(value: string | null | undefined): string | n
   return parsed.number;
 }
 
+/** US-first display format for picker metadata, e.g. `(419) 708-4470`. */
+export function formatCustomerPhoneDisplay(value: string | null | undefined): string | null {
+  const trimmed = (value ?? '').trim();
+  if (!trimmed) return null;
+
+  const parsed = parsePhoneNumberFromString(trimmed, 'US');
+  if (parsed?.isValid()) {
+    return parsed.formatNational();
+  }
+
+  const digits = trimmed.replace(/\D/g, '');
+  if (digits.length === 10) {
+    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+  }
+  if (digits.length === 11 && digits.startsWith('1')) {
+    const local = digits.slice(1);
+    return `(${local.slice(0, 3)}) ${local.slice(3, 6)}-${local.slice(6)}`;
+  }
+
+  return trimmed;
+}
+
 export function isValidCustomerPhone(value: string | null | undefined): boolean {
   return normalizePhoneE164(value) != null;
 }

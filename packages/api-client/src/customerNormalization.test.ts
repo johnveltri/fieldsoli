@@ -5,6 +5,7 @@ import {
   isMeaningfulServiceAddress,
   isValidCustomerEmail,
   isValidCustomerPhone,
+  formatCustomerPhoneDisplay,
   normalizeCustomerEmail,
   normalizeCustomerName,
   normalizePhoneE164,
@@ -19,6 +20,13 @@ describe('customerNormalization', () => {
     expect(normalizePhoneE164('(312) 555-0198')).toBe('+13125550198');
     expect(normalizePhoneE164('+44 20 7946 0958')).toBe('+442079460958');
     expect(isValidCustomerPhone('bad')).toBe(false);
+  });
+
+  it('formats customer phone display for picker metadata', () => {
+    expect(formatCustomerPhoneDisplay('4197084470')).toBe('(419) 708-4470');
+    expect(formatCustomerPhoneDisplay('(312) 555-0198')).toBe('(312) 555-0198');
+    expect(formatCustomerPhoneDisplay('+13125550198')).toBe('(312) 555-0198');
+    expect(formatCustomerPhoneDisplay('')).toBeNull();
   });
 
   it('normalizes valid emails case-insensitively', () => {
