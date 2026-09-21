@@ -14,7 +14,8 @@ import {
 } from 'react-native';
 import { radius, space } from '@fieldsolo/design-system/lib/tokens';
 
-import { bg, border, fg } from '../../../theme/nativeTokens';
+import { DsTextInput } from '../DsTextInput';
+import { bg, border, fg, textInputMinHeight } from '../../../theme/nativeTokens';
 import type { TextStyles } from '../../../theme/nativeTokens';
 import { JOB_SHORT_DESCRIPTION_MAX_LENGTH } from '@fieldsolo/shared-types';
 
@@ -34,11 +35,7 @@ const editRowText = {
   includeFontPadding: false,
 } as const;
 
-/**
- * iOS single-line `TextInput` glyphs sit ~1px low vs `Text` in icon rows (profile,
- * revenue, material description). Negative = shift input up to match tappable text rows.
- */
-const EDIT_FIELD_INPUT_OPTICAL_NUDGE_Y = Platform.select({ ios: -1, default: 0 }) ?? 0;
+const EDIT_FIELD_INPUT_MIN_HEIGHT = textInputMinHeight(EDIT_BODY_LINE_HEIGHT);
 
 /** Extra space below the focused field when the keyboard opens. */
 export const EDIT_KEYBOARD_SCROLL_OFFSET = 120;
@@ -543,7 +540,7 @@ export const EditTitleField = forwardRef<
     // width-bounded view that is already inset from the pill.
     <View style={styles.titleFieldWrap}>
       <View style={styles.titleFieldClip}>
-        <TextInput
+        <DsTextInput
           ref={ref}
           placeholderTextColor={fg.secondary}
           style={[typography.titleH3, styles.titleInput]}
@@ -655,20 +652,16 @@ export function EditFieldInput({
   onChangeText,
   multiline,
   style,
-  opticalNudgeY,
   value,
   placeholder,
   ...props
 }: React.ComponentProps<typeof TextInput> & {
   typography: TextStyles;
   align?: 'left' | 'right';
-  /** iOS single-line vertical offset (negative = up). Defaults to `EDIT_FIELD_INPUT_OPTICAL_NUDGE_Y`. */
-  opticalNudgeY?: number;
 }) {
   const scroll = useContext(EditKeyboardScrollContext);
   const scrollEntityBlock = useContext(EditEntityBlockContext);
   const keyboardOffset = useFocusedFieldKeyboardOffset();
-  const iosNudgeY = opticalNudgeY ?? EDIT_FIELD_INPUT_OPTICAL_NUDGE_Y;
 
   if (multiline) {
     return (
@@ -686,14 +679,13 @@ export function EditFieldInput({
   }
 
   return (
-    <TextInput
+    <DsTextInput
       placeholderTextColor={fg.secondary}
       value={value}
       placeholder={placeholder}
       style={[
         typography.body,
         styles.fieldInput,
-        Platform.OS === 'ios' && { transform: [{ translateY: iosNudgeY }] },
         align === 'right' && styles.fieldInputRight,
         style,
       ]}
@@ -770,7 +762,7 @@ function EditMultilineField({
       >
         {shown}
       </Text>
-      <TextInput
+      <DsTextInput
         placeholderTextColor={fg.secondary}
         {...props}
         value={value}
@@ -940,7 +932,6 @@ export function EditTappableValue({
   variant = 'body',
   align = 'left',
   accessibilityLabel,
-  opticalNudgeY,
 }: {
   typography: TextStyles;
   value: string;
@@ -949,8 +940,6 @@ export function EditTappableValue({
   variant?: 'body' | 'bodySmall' | 'metric';
   align?: 'left' | 'right';
   accessibilityLabel: string;
-  /** Override vertical offset (positive = down). Ignored on iOS `body` (uses TextInput metrics). */
-  opticalNudgeY?: number;
 }) {
   const isEmpty = value.length === 0;
   const display = isEmpty ? (placeholder ?? '') : value;
@@ -973,13 +962,10 @@ export function EditTappableValue({
         scrollEntityBlock?.(false);
         onPress();
       }}
-      style={[
-        styles.tappableHit,
-        !mirrorFieldInput && opticalNudgeY != null && { transform: [{ translateY: opticalNudgeY }] },
-      ]}
+      style={styles.tappableHit}
     >
       {mirrorFieldInput ? (
-        <TextInput
+        <DsTextInput
           editable={false}
           caretHidden
           showSoftInputOnFocus={false}
@@ -991,7 +977,6 @@ export function EditTappableValue({
             typography.body,
             styles.fieldInput,
             {
-              transform: [{ translateY: EDIT_FIELD_INPUT_OPTICAL_NUDGE_Y }],
               color: isEmpty ? fg.secondary : fg.primary,
             },
             align === 'right' && styles.fieldInputRight,
@@ -1189,12 +1174,9 @@ const styles = StyleSheet.create({
   },
   fieldInput: {
     color: fg.primary,
-    padding: 0,
+    paddingHorizontal: 0,
     margin: 0,
     width: '100%',
-    minHeight: EDIT_BODY_LINE_HEIGHT,
-    includeFontPadding: false,
-    ...(Platform.OS === 'android' ? { textAlignVertical: 'center' as const } : null),
   },
   fieldInputMultilineWrap: {
     position: 'relative',
@@ -1266,11 +1248,9 @@ const styles = StyleSheet.create({
     minHeight: EDIT_BODY_LINE_HEIGHT,
     gap: space('Spacing/8'),
   },
-  /** Shared clip box so TextInput + Text placeholders share one vertical center on iOS. */
   materialBreakdownCell: {
-    height: EDIT_BODY_LINE_HEIGHT,
+    minHeight: EDIT_FIELD_INPUT_MIN_HEIGHT,
     justifyContent: 'center',
-    overflow: 'hidden',
   },
   /** Floor so empty `Qty` / `UOM` placeholders keep the row gap on ~360dp phones. */
   materialQtyCol: {
@@ -1300,7 +1280,7 @@ const styles = StyleSheet.create({
   tappableHit: {
     alignSelf: 'stretch',
     justifyContent: 'center',
-    minHeight: EDIT_BODY_LINE_HEIGHT,
+    minHeight: EDIT_FIELD_INPUT_MIN_HEIGHT,
   },
   timeRangeRow: {
     flexDirection: 'row',

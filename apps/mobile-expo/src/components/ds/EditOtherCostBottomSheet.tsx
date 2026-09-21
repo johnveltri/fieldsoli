@@ -3,12 +3,12 @@ import {
   Pressable,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { color, radius, space } from '@fieldsolo/design-system/lib/tokens';
 
+import { DsTextInput } from './DsTextInput';
 import { bg, border, cardShadowRn, fg } from '../../theme/nativeTokens';
 import type { TextStyles } from '../../theme/nativeTokens';
 import {
@@ -200,7 +200,7 @@ export function EditOtherCostBottomSheet({
         </Pressable>
 
         <View style={styles.inputShell}>
-          <TextInput
+          <DsTextInput
             value={priceText}
             onChangeText={setPriceText}
             placeholder="Cost"
@@ -211,7 +211,7 @@ export function EditOtherCostBottomSheet({
         </View>
 
         <View style={styles.inputShell}>
-          <TextInput
+          <DsTextInput
             value={description}
             onChangeText={setDescription}
             placeholder="Description (optional)"

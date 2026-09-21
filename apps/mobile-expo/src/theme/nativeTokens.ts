@@ -147,6 +147,47 @@ export function typographyRn(
 
 export type TextStyles = ReturnType<typeof createTextStyles>;
 
+/**
+ * Extra layout height beyond the design token line-height. iOS `TextInput` clips glyphs to
+ * `lineHeight`, so we either omit it (iOS) or inflate it (Android).
+ */
+export const TEXT_INPUT_DESCENDER_SLACK = Platform.select({ ios: 6, android: 4, default: 4 }) ?? 4;
+
+/** Minimum box height for a single-line input using the given design line-height. */
+export function textInputMinHeight(designLineHeight: number): number {
+  return designLineHeight + TEXT_INPUT_DESCENDER_SLACK;
+}
+
+/**
+ * Applies typography to a `TextInput` without clipping descenders. Use instead of raw token
+ * styles on single-line inputs (edit rows, sheet fields, search bars).
+ */
+export function withTextInputMetrics(style: TextStyle): TextStyle {
+  const fontSize = style.fontSize ?? 16;
+  const designLineHeight =
+    typeof style.lineHeight === 'number' ? style.lineHeight : Math.round(fontSize * 1.4);
+  const minHeight = textInputMinHeight(designLineHeight);
+
+  if (Platform.OS === 'ios') {
+    // iOS clips descenders when `lineHeight` matches tight design tokens — drop it and
+    // size the field with `minHeight` so native font metrics can paint below the baseline.
+    const { lineHeight: _lineHeight, ...rest } = style;
+    return {
+      ...rest,
+      includeFontPadding: false,
+      minHeight,
+    };
+  }
+
+  return {
+    ...style,
+    lineHeight: designLineHeight + TEXT_INPUT_DESCENDER_SLACK,
+    includeFontPadding: false,
+    minHeight,
+    textAlignVertical: 'center' as const,
+  };
+}
+
 /** Typography mapped to loaded Expo Google Font family names — all sizes/weights from `typography.json`. */
 export function createTextStyles(f: LoadedFonts) {
   const t = (name: TypographyTokenName, colorOverride?: string): TextStyle =>

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { TextStyles } from '../../theme/nativeTokens';
+import { DsTextInput } from './DsTextInput';
 import { fg, border, space } from '../../theme/nativeTokens';
 import { color } from '@fieldsolo/design-system/lib/tokens';
 import type { FieldSoloSupabaseClient } from '@fieldsolo/api-client';
@@ -179,7 +180,7 @@ export function EditJobBottomSheet({
 
         <View style={styles.fields}>
           <View style={styles.titleShell}>
-            <TextInput
+            <DsTextInput
               ref={shortDescriptionRef}
               value={shortDescription}
               onChangeText={(t) =>
@@ -199,7 +200,7 @@ export function EditJobBottomSheet({
             />
           </View>
           <View style={styles.descriptionShell}>
-            <TextInput
+            <DsTextInput
               value={longDescription}
               onChangeText={setLongDescription}
               placeholder="Description"
@@ -225,7 +226,7 @@ export function EditJobBottomSheet({
           <InputShell>
             <View style={styles.revenueRow}>
               <Text style={[typography.bodyBold, { color: fg.primary }]}>$</Text>
-              <TextInput
+              <DsTextInput
                 ref={revenueRef}
                 value={revenue}
                 onChangeText={setRevenue}

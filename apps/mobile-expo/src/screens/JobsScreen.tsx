@@ -52,6 +52,7 @@ import {
   RECENCY_BUCKET_TITLE,
   type RecencyBucket,
 } from '../lib/timeBuckets';
+import { DsTextInput } from '../components/ds/DsTextInput';
 import {
   bg,
   border,
@@ -646,7 +647,7 @@ export function JobsScreen({
             <View style={styles.searchIconSlot} pointerEvents="none">
               <JobsSearchIcon color={fg.secondary} />
             </View>
-            <TextInput
+            <DsTextInput
               ref={searchInputRef}
               testID="jobs-search-input"
               accessibilityLabel="Search jobs"

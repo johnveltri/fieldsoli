@@ -11,9 +11,7 @@ type AddressSuggestionPanelProps = {
   typography: TextStyles;
   suggestions: AddressSuggestion[];
   loading: boolean;
-  unavailable: boolean;
-  noMatches: boolean;
-  meetsThreshold: boolean;
+  noResults: boolean;
   onSelect: (suggestion: AddressSuggestion) => void;
 };
 
@@ -21,29 +19,14 @@ export function AddressSuggestionPanel({
   typography,
   suggestions,
   loading,
-  unavailable,
-  noMatches,
-  meetsThreshold,
+  noResults,
   onSelect,
 }: AddressSuggestionPanelProps) {
-  if (!meetsThreshold) return null;
-
   return (
     <View style={styles.wrap}>
       {loading ? (
         <Text style={[typography.bodySmall, { color: fg.secondary }]}>Searching…</Text>
-      ) : null}
-      {!loading && noMatches ? (
-        <Text style={[typography.bodySmall, { color: fg.secondary }]}>
-          No matching addresses. Keep typing or use this address.
-        </Text>
-      ) : null}
-      {!loading && unavailable ? (
-        <Text style={[typography.bodySmall, { color: fg.secondary }]}>
-          Address suggestions are unavailable. You can keep typing and save this address.
-        </Text>
-      ) : null}
-      {!loading && !unavailable && suggestions.length > 0 ? (
+      ) : suggestions.length > 0 ? (
         <>
           {suggestions.map((suggestion) => (
             <Pressable
@@ -67,6 +50,8 @@ export function AddressSuggestionPanel({
             </Text>
           </Pressable>
         </>
+      ) : noResults ? (
+        <Text style={[typography.bodySmall, { color: fg.secondary }]}>No results</Text>
       ) : null}
     </View>
   );

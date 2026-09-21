@@ -75,8 +75,8 @@ jest.mock('./customer/useAddressAutocomplete', () => ({
   useAddressAutocomplete: () => ({
     suggestions: [],
     loading: false,
-    unavailable: false,
-    noMatches: false,
+    noResults: false,
+    showPanel: false,
     meetsThreshold: false,
   }),
 }));

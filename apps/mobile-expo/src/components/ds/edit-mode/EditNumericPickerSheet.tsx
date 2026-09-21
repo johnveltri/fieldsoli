@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { radius, space } from '@fieldsolo/design-system/lib/tokens';
 
 import { BottomSheetShell } from '../BottomSheetShell';
 import { EditPickerSheetHeader } from './EditPickerSheetHeader';
+import { DsTextInput } from '../DsTextInput';
 import { bg, border, fg } from '../../../theme/nativeTokens';
 import type { TextStyles } from '../../../theme/nativeTokens';
 
@@ -93,7 +94,7 @@ export function EditNumericPickerSheet({
           {mode === 'currency' ? (
             <Text style={[typography.body, { color: fg.secondary }]}>$</Text>
           ) : null}
-          <TextInput
+          <DsTextInput
             autoFocus
             keyboardType="decimal-pad"
             inputMode="decimal"

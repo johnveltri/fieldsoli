@@ -26,8 +26,8 @@ export type AddressAutocompleteResponse =
 
 const MAX_QUERY_LENGTH = 120;
 const MIN_QUERY_LENGTH = 5;
-const MAX_LIMIT = 5;
-const UPSTREAM_TIMEOUT_MS = 2500;
+const MAX_LIMIT = 4;
+const UPSTREAM_TIMEOUT_MS = 5000;
 
 export function validateAddressAutocompleteRequest(
   input: unknown,
@@ -54,16 +54,46 @@ export function validateAddressAutocompleteRequest(
   return { query, countryCode: 'us', limit };
 }
 
-type GeoapifyFeature = {
-  properties?: {
-    formatted?: string;
-    address_line1?: string;
-    city?: string;
-    state?: string;
-    postcode?: string;
-    country_code?: string;
-  };
+type GeoapifyAddressFields = {
+  formatted?: string;
+  address_line1?: string;
+  city?: string;
+  state?: string;
+  postcode?: string;
+  country_code?: string;
 };
+
+type GeoapifyFeature = {
+  properties?: GeoapifyAddressFields;
+};
+
+type GeoapifyResult = GeoapifyAddressFields;
+
+function stripUsCountrySuffix(formatted: string): string {
+  return formatted
+    .replace(/,\s*United States of America$/i, '')
+    .replace(/,\s*USA$/i, '')
+    .trim();
+}
+
+function mapGeoapifyAddressFields(
+  fields: GeoapifyAddressFields | undefined,
+  index: number,
+): AddressSuggestion | null {
+  const formatted = fields?.formatted?.trim();
+  if (!formatted) return null;
+  const displayAddress = stripUsCountrySuffix(formatted);
+  if (!displayAddress) return null;
+  return {
+    token: `g${index}`,
+    displayAddress,
+    addressLine1: fields?.address_line1 ?? undefined,
+    city: fields?.city ?? undefined,
+    region: fields?.state ?? undefined,
+    postalCode: fields?.postcode ?? undefined,
+    countryCode: fields?.country_code?.toLowerCase() ?? undefined,
+  };
+}
 
 export function mapGeoapifyFeatures(
   features: GeoapifyFeature[],
@@ -71,18 +101,20 @@ export function mapGeoapifyFeatures(
 ): AddressSuggestion[] {
   const suggestions: AddressSuggestion[] = [];
   for (let index = 0; index < features.length && suggestions.length < limit; index += 1) {
-    const props = features[index]?.properties;
-    const displayAddress = props?.formatted?.trim();
-    if (!displayAddress) continue;
-    suggestions.push({
-      token: `g${index}`,
-      displayAddress,
-      addressLine1: props?.address_line1 ?? undefined,
-      city: props?.city ?? undefined,
-      region: props?.state ?? undefined,
-      postalCode: props?.postcode ?? undefined,
-      countryCode: props?.country_code?.toLowerCase() ?? undefined,
-    });
+    const mapped = mapGeoapifyAddressFields(features[index]?.properties, index);
+    if (mapped) suggestions.push(mapped);
+  }
+  return suggestions;
+}
+
+export function mapGeoapifyResults(
+  results: GeoapifyResult[],
+  limit: number,
+): AddressSuggestion[] {
+  const suggestions: AddressSuggestion[] = [];
+  for (let index = 0; index < results.length && suggestions.length < limit; index += 1) {
+    const mapped = mapGeoapifyAddressFields(results[index], index);
+    if (mapped) suggestions.push(mapped);
   }
   return suggestions;
 }
@@ -105,7 +137,13 @@ export async function fetchGeoapifySuggestions(
     if (!response.ok) {
       throw new Error(`geoapify_status_${response.status}`);
     }
-    const payload = await response.json() as { features?: GeoapifyFeature[] };
+    const payload = await response.json() as {
+      features?: GeoapifyFeature[];
+      results?: GeoapifyResult[];
+    };
+    if (Array.isArray(payload.results) && payload.results.length > 0) {
+      return mapGeoapifyResults(payload.results, request.limit);
+    }
     return mapGeoapifyFeatures(payload.features ?? [], request.limit);
   } finally {
     clearTimeout(timeout);

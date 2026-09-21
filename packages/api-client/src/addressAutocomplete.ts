@@ -1,5 +1,7 @@
 import type { FieldSoloSupabaseClient } from './client';
 
+export const ADDRESS_SUGGESTION_LIMIT = 4;
+
 export type AddressSuggestion = {
   token: string;
   displayAddress: string;
@@ -29,24 +31,49 @@ export async function fetchAddressSuggestions(
     body: {
       query,
       countryCode: options?.countryCode ?? 'us',
-      limit: options?.limit ?? 5,
+      limit: options?.limit ?? ADDRESS_SUGGESTION_LIMIT,
     },
   });
 
-  if (error) {
-    return { status: 'error', code: 'unavailable' };
-  }
+  const fromData = resultFromPayload(data);
+  if (fromData) return fromData;
 
-  const payload = data as
-    | { status?: string; suggestions?: AddressSuggestion[]; error?: AddressAutocompleteErrorCode }
-    | null;
+  const fromError = await resultFromInvokeError(error);
+  if (fromError) return fromError;
 
-  if (!payload) {
-    return { status: 'error', code: 'unavailable' };
-  }
+  return { status: 'error', code: 'unavailable' };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function resultFromPayload(payload: unknown): AddressAutocompleteResult | null {
+  if (!isRecord(payload)) return null;
   if (payload.status === 'ok' && Array.isArray(payload.suggestions)) {
-    return { status: 'ok', suggestions: payload.suggestions };
+    return { status: 'ok', suggestions: payload.suggestions as AddressSuggestion[] };
   }
-  const code = payload.error ?? 'unavailable';
-  return { status: 'error', code };
+  if (payload.status === 'error') {
+    const code = payload.error;
+    if (
+      code === 'unauthorized' ||
+      code === 'invalid_request' ||
+      code === 'rate_limited' ||
+      code === 'unavailable'
+    ) {
+      return { status: 'error', code };
+    }
+    return { status: 'error', code: 'unavailable' };
+  }
+  return null;
+}
+
+async function resultFromInvokeError(error: unknown): Promise<AddressAutocompleteResult | null> {
+  const context = isRecord(error) && 'context' in error ? error.context : null;
+  if (!context || typeof (context as Response).json !== 'function') return null;
+  try {
+    return resultFromPayload(await (context as Response).json());
+  } catch {
+    return null;
+  }
 }

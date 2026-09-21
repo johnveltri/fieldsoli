@@ -15,7 +15,8 @@
 ## Quota monitoring
 
 - Free plan hard cap: 3,000 requests/day project-wide.
-- Per-user budget is enforced in `private.consume_address_autocomplete_budget`.
+- Per-user budget is enforced in `private.consume_address_autocomplete_budget` (100/day hosted).
+- Local `seed.sql` raises that cap to 1000/day so Geoapify testing is not blocked.
 - Monitor coarse request counts only; logs must not include query text or provider payloads.
 
 ## Failure handling

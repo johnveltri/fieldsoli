@@ -36,6 +36,7 @@ export {
   type CustomerSuggestion,
 } from './customerSuggestions';
 export {
+  ADDRESS_SUGGESTION_LIMIT,
   fetchAddressSuggestions,
   type AddressSuggestion,
   type AddressAutocompleteErrorCode,

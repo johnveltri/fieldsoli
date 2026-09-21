@@ -503,7 +503,6 @@ export function JobDetailEditMode({
                 typography={typography}
                 placeholder="Revenue"
                 value={revenueText}
-                opticalNudgeY={-5}
                 keyboardType="decimal-pad"
                 inputMode="decimal"
                 onFocus={() => {
@@ -938,7 +937,6 @@ function MaterialEditBlock({
         <EditFieldInput
           typography={typography}
           value={row.description}
-          opticalNudgeY={-4}
           onChangeText={(description) => onChange({ description })}
           placeholder="Material"
         />
@@ -1086,7 +1084,6 @@ function OtherCostEditBlock({
           placeholder="Amount"
           accessibilityLabel="Amount"
           value={amountText}
-          opticalNudgeY={-5}
           keyboardType="decimal-pad"
           inputMode="decimal"
           onFocus={() => {

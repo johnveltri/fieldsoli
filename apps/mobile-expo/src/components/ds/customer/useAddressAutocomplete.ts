@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
+  ADDRESS_SUGGESTION_LIMIT,
   fetchAddressSuggestions,
   type AddressSuggestion,
 } from '@fieldsolo/api-client';
@@ -22,35 +23,51 @@ export function useAddressAutocomplete(
 ) {
   const [suggestions, setSuggestions] = useState<AddressSuggestion[]>([]);
   const [loading, setLoading] = useState(false);
-  const [unavailable, setUnavailable] = useState(false);
-  const [noMatches, setNoMatches] = useState(false);
+  const [noResults, setNoResults] = useState(false);
   const requestIdRef = useRef(0);
+  const rateLimitedRef = useRef(false);
 
   const runLookup = useCallback(
     async (text: string, requestId: number) => {
+      // Always enter Searching before the request resolves so empty lookups
+      // never jump straight to "No results".
       setLoading(true);
-      setUnavailable(false);
-      setNoMatches(false);
-      const result = await fetchAddressSuggestions(client, text, { countryCode: 'us', limit: 5 });
+      setNoResults(false);
+      setSuggestions([]);
+      const lookup = await fetchAddressSuggestions(client, text, {
+        countryCode: 'us',
+        limit: ADDRESS_SUGGESTION_LIMIT,
+      });
       if (requestId !== requestIdRef.current) return;
+
       setLoading(false);
-      if (result.status === 'error') {
+      if (lookup.status === 'error') {
+        if (lookup.code === 'rate_limited') rateLimitedRef.current = true;
         setSuggestions([]);
-        setUnavailable(true);
+        setNoResults(false);
         return;
       }
-      setSuggestions(result.suggestions);
-      setNoMatches(result.suggestions.length === 0);
+      setSuggestions(lookup.suggestions);
+      setNoResults(lookup.suggestions.length === 0);
     },
     [client],
   );
 
   useEffect(() => {
-    if (!enabled || !meetsAddressThreshold(query)) {
+    if (!enabled) {
+      requestIdRef.current += 1;
+      rateLimitedRef.current = false;
       setSuggestions([]);
       setLoading(false);
-      setUnavailable(false);
-      setNoMatches(false);
+      setNoResults(false);
+      return;
+    }
+
+    if (!meetsAddressThreshold(query) || rateLimitedRef.current) {
+      requestIdRef.current += 1;
+      setSuggestions([]);
+      setLoading(false);
+      setNoResults(false);
       return;
     }
 
@@ -61,5 +78,11 @@ export function useAddressAutocomplete(
     return () => clearTimeout(timer);
   }, [enabled, query, runLookup]);
 
-  return { suggestions, loading, unavailable, noMatches, meetsThreshold: meetsAddressThreshold(query) };
+  return {
+    suggestions,
+    loading,
+    noResults,
+    showPanel: loading || suggestions.length > 0 || noResults,
+    meetsThreshold: meetsAddressThreshold(query),
+  };
 }
