@@ -1,12 +1,16 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { space } from '@fieldsolo/design-system/lib/tokens';
-import type { CustomerSuggestion } from '@fieldsolo/api-client';
+import { formatCustomerPhoneDisplay, type CustomerSuggestion } from '@fieldsolo/api-client';
 
 import { fg } from '../../../theme/nativeTokens';
 import type { TextStyles } from '../../../theme/nativeTokens';
 
 function buildMetadataLine(suggestion: CustomerSuggestion): string {
-  const parts = [suggestion.phone, suggestion.email, suggestion.serviceAddress].filter(
+  const parts = [
+    formatCustomerPhoneDisplay(suggestion.phone),
+    suggestion.email,
+    suggestion.serviceAddress,
+  ].filter(
     (value) => (value ?? '').trim().length > 0,
   ) as string[];
   return parts.join(' · ');
@@ -33,7 +37,9 @@ export function CustomerSuggestionRow({
       onPress={onPress}
       style={({ pressed }) => [styles.row, pressed && styles.pressed]}
     >
-      <Text style={[typography.bodyBold, { color: fg.primary }]}>{suggestion.displayName}</Text>
+      <Text style={[typography.body, styles.name, { color: fg.primary }]}>
+        {suggestion.displayName}
+      </Text>
       {metadata ? (
         <Text style={[typography.bodySmall, styles.metadata, { color: fg.secondary }]} numberOfLines={2}>
           {metadata}
@@ -47,6 +53,9 @@ const styles = StyleSheet.create({
   row: {
     paddingVertical: space('Spacing/12'),
     gap: space('Spacing/4'),
+  },
+  name: {
+    flexShrink: 1,
   },
   metadata: {
     flexWrap: 'wrap',
