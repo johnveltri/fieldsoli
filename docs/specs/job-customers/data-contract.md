@@ -123,8 +123,8 @@ This order drives both Customer-default recomputation and recent-Customer orderi
 - Exclude soft-deleted Customers.
 - Exclude Customers whose current defaults fail REQ-02.
 - Require at least one active linked Job.
-- Return four rows for the blank-query recent state.
-- Return at most five rows for a typed query.
+- Return at most three rows for the blank-query recent state.
+- Return at most three rows for a typed query.
 
 Deleting/restoring a Job and recomputing its Customer occur in one transaction. Deleting the final active linked Job sets `customers.deleted_at`; restoring a linked Job clears it before recomputing.
 
@@ -154,7 +154,7 @@ Request:
 type AddressAutocompleteRequest = {
   query: string;
   countryCode: "us";
-  limit: 5;
+  limit: 4;
 };
 ```
 
@@ -172,7 +172,7 @@ type AddressSuggestion = {
 };
 ```
 
-The function rejects unauthenticated calls, enforces input limits, applies per-user abuse controls, sets short upstream timeouts, caps output at five, and returns typed coarse error codes. Logs redact query strings and provider payloads. Provider-specific parsing is isolated behind an adapter so a future provider switch does not alter mobile/domain types.
+The function rejects unauthenticated calls, enforces input limits, applies per-user abuse controls, sets short upstream timeouts, caps output at four, and returns typed coarse error codes. Logs redact query strings and provider payloads. Provider-specific parsing is isolated behind an adapter so a future provider switch does not alter mobile/domain types.
 
 The selected suggestion may populate the Job's address text/components, but FieldSoli does not persist the response token, Geoapify IDs, raw JSON, coordinates, or confidence values.
 
@@ -202,7 +202,7 @@ Forbidden properties include Customer IDs, device-contact IDs, names, phone numb
 - Existing rows keep `customer_id`, phone, and email null.
 - Older clients may continue updating name/address through legacy paths; those writes do not create or update Customers.
 - New clients invoke the customer RPC only after an explicit new/edit workflow interaction.
-- Account export/deletion behavior must be reviewed so customer data is portable and fully removed with the account, without adding a standalone Customer CSV in this scope.
+- Account export/deletion behavior must be reviewed so customer data is portable and fully removed with the account, without adding a standalone Customer CSV in this scope. Job Summary CSV already exports each Job's snapshot `customer_phone` and `customer_email` columns.
 
 ## DATA-13 — Failure and retry semantics
 
@@ -234,7 +234,7 @@ Forbidden properties include Customer IDs, device-contact IDs, names, phone numb
 
 - External metered resource: Geoapify autocomplete requests, currently assumed at 3,000/day on the free plan with attribution and no billing card.
 - Expected unit consumption: one request per eligible debounced query; approximately three to five requests per completed address is the planning assumption, yielding roughly 600–1,000 completed entries/day at the project level.
-- Controls: five-character/two-letter threshold, 300 ms debounce, stale cancellation, result cap five, per-user server abuse limit, and coarse request-count monitoring without query text.
+- Controls: five-character/two-letter threshold, 300 ms debounce, stale cancellation, result cap four, per-user server abuse limit, and coarse request-count monitoring without query text.
 - Limit behavior: return provider-unavailable and keep free-text save; never auto-upgrade or invoke a paid fallback.
 - Lock-in boundary: Geoapify adapter and attribution are provider-specific; mobile/domain data and persisted Jobs are not.
 - Revalidate current pricing, terms, attribution, and API behavior at implementation and release because provider terms can change.

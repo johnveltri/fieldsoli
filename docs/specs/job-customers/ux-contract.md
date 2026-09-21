@@ -12,7 +12,7 @@
 
 | Step | Surface | User action | System response | Next state/surface |
 | ---: | --- | --- | --- | --- |
-| 1 | Job Edit or Live Session | Focus Customer | Show four recents and searchable field | STATE-06/07 plus picker |
+| 1 | Job Edit or Live Session | Focus Customer | Show up to three recents and searchable field | STATE-06/07 plus picker |
 | 2 | Customer picker | Select saved Customer or keep typing | Fill draft; confirm if replacing non-empty values | STATE-07 or STATE-08 |
 | 3 | Customer block | Optionally import device contact/edit phone/email/address | Keep choices in one draft; autocomplete address when eligible | STATE-07 |
 | 4 | Job Edit | Tap Done | Atomically save Job/Customer | STATE-06, Job View |
@@ -23,8 +23,8 @@
 
 | Surface | Loading | Empty | Ready | Saving | Success | Error/retry | Offline/interrupted |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Customer picker | Small in-picker indicator; typed text remains | Exact UX-02 copy | Recent/search rows | N/A until selection commits | Draft populated | Exact UX-02 load error + retry | Free-typed Customer remains usable |
-| Address picker | Small in-picker indicator; typed address remains | Exact UX-10 no-match copy | Up to five rows + attribution | N/A until selection commits | Draft populated | Exact UX-10 unavailable copy | Same unavailable state; manual save works |
+| Customer picker | `Searching…` for a typed query with no rows yet; typed text remains | Exact UX-02 copy | Recent/search rows | N/A until selection commits | Draft populated | Exact UX-02 load error + retry | Free-typed Customer remains usable |
+| Address picker | `Searching…`; typed address remains | Exact UX-10 no-match copy | Up to four rows + attribution | N/A until selection commits | Draft populated | Hide the panel; typed address remains savable | Same hide-panel state; manual save works |
 | Job Edit Customer block | Existing Job load behavior | Blank optional fields | Editable UX-01 block | Existing Done progress; prevent duplicate submit | Return to Job View | Existing save recovery with draft retained | Draft retained under existing edit rules; no partial write |
 | Live Session Customer block | Existing session load behavior | Blank optional fields | Editable UX-01 block | Inline pending state without clearing inputs | Remain in Live Session | UX-06 retry copy/action | Dirty draft retained; retry on reconnect/blur |
 | Device contacts | Native picker/permission UI | Contact/field has no usable value | Native selection/field chooser | N/A | Values copied to draft | UX-09 settings recovery | Manual entry remains available |
@@ -46,10 +46,11 @@ Phone uses the phone keyboard; Email uses the email keyboard with autocapitaliza
 
 Focusing/tapping the Customer field opens the picker without requiring typed text.
 
-- Blank query: show up to four unique recent eligible Customers.
-- Typed query: show up to five eligible name matches.
+- Blank query: show up to three unique recent eligible Customers.
+- Typed query: show up to three eligible name matches.
 - No recent Customers: show `No saved customers yet.` without blocking typing.
-- No search matches: show `No matching customers.` while preserving the typed name.
+- Typed query in flight with no rows yet: show `Searching…`.
+- No search matches: hide the suggestion panel while preserving the typed name.
 - Load failure: show `Couldn't load customers. Try again.` with action `Try again`.
 
 The free-typed Customer value is always allowed; closing the picker never clears it.
@@ -146,18 +147,19 @@ The app does not show its own permission primer on screen entry and does not rep
 - Start no request before five trimmed characters and two alphabetic characters.
 - Wait 300 ms after the latest change.
 - Cancel or ignore stale requests as the user continues typing.
-- Show up to five US address suggestions below the active field.
+- Show `Searching…` while a lookup is in flight and no suggestions are visible yet.
+- Show up to four US address suggestions below the active field.
 - Selecting a suggestion replaces the address draft with its `displayAddress`.
 - The user may continue editing the selected value before save.
 - Keyboard navigation, VoiceOver/TalkBack traversal, tap dismissal, and focus restoration follow the Customer picker's established primitives.
 
 No-result copy:
 
-`No matching addresses. Keep typing or use this address.`
+`No results`
 
-Failure/quota/offline copy:
+Failure/quota/offline:
 
-`Address suggestions are unavailable. You can keep typing and save this address.`
+Hide the suggestion panel. Do not show unavailable copy. The typed address remains savable.
 
 Neither state presents a blocking alert.
 

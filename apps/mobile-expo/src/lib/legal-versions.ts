@@ -1,6 +1,6 @@
 /** Must match docs/legal/consent-versions.md and canonical markdown sources. */
 export const REQUIRED_PRIVACY_VERSION = '2026-09-20';
-export const REQUIRED_TERMS_VERSION = '2026-08-30';
+export const REQUIRED_TERMS_VERSION = '2026-09-20';
 
 export const LEGAL_URLS = {
   privacyPolicy: 'https://fieldsoli.com/privacy',

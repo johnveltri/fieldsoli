@@ -332,7 +332,7 @@ describe('SignInScreen', () => {
       expect(mockCacheLegalAcceptance).toHaveBeenCalledWith({
         userId: 'user-1',
         privacyVersion: '2026-09-20',
-        termsVersion: '2026-08-30',
+        termsVersion: '2026-09-20',
       });
     });
   });

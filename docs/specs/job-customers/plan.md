@@ -332,7 +332,7 @@ These are release prerequisites, not blockers to beginning implementation with m
 | Job and Customer drift | One full-snapshot transaction for every customer commit |
 | Old Job changes unexpectedly | Job-owned snapshots; no cascade from Customer defaults |
 | Permission harms onboarding | Request only on explicit action; manual path always present |
-| Address cost/quota | 300 ms debounce, threshold, max five, server abuse controls, hard free-plan budget, manual fallback |
+| Address cost/quota | 300 ms debounce, threshold, max four, server abuse controls, hard free-plan budget, manual fallback |
 | Provider lock-in | Neutral server/mobile types; persist no provider identifiers/raw response |
 | Sensitive data leakage | Redacted logs, forbidden telemetry fields, explicit TEST-22 inspection |
 | Soft-delete edge cases | Transactional recomputation and restore/delete SQL tests |

@@ -6,7 +6,7 @@
 
 **Feature slug:** `job-customers`
 
-**Last updated:** 2026-09-19
+**Last updated:** 2026-09-20
 
 ## Product intent
 
@@ -64,7 +64,7 @@ A meaningful service address is trimmed text containing at least five characters
 
 ### REQ-04 — Customer picker
 
-The Customer-name field opens a picker. Before typing, it shows the four unique eligible Customers with the most recently saved active linked Jobs. Typing searches eligible Customers. Each suggestion shows:
+The Customer-name field opens a picker. Before typing, it shows up to three unique eligible Customers with the most recently saved active linked Jobs. Typing searches eligible Customers and also returns at most three matches. Each suggestion shows:
 
 - Customer name as the primary line.
 - Available phone, email, and last service address together in a compact secondary block.
@@ -93,7 +93,7 @@ Device contacts are a read-only input source. The app requests access only after
 
 ### REQ-08 — Address autocomplete
 
-Geoapify is the V1 provider. After at least five trimmed characters, including at least two alphabetic characters, and a 300 ms pause, the app requests up to five US address suggestions. A new query cancels or supersedes the prior request.
+Geoapify is the V1 provider. After at least five trimmed characters, including at least two alphabetic characters, and a 300 ms pause, the app requests up to four US address suggestions. A new query cancels or supersedes the prior request. The picker shows `Searching…` while a lookup is in flight, then `No results` when the provider returns none. Provider errors, timeouts, and quota exhaustion hide the suggestion panel instead of showing unavailable copy.
 
 The picker displays the smallest legible app caption style in its footer:
 

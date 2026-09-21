@@ -105,8 +105,8 @@ Force failures between logical mutation steps and verify no partial Job/Customer
 
 Covers REQ-04; DATA-07, DATA-08.
 
-- Blank query returns at most four unique eligible Customers in derived recency order.
-- Typed query returns at most five owned eligible name matches.
+- Blank query returns at most three unique eligible Customers in derived recency order.
+- Typed query returns at most three owned eligible name matches.
 - Deleted/ineligible/no-active-Job Customers are absent.
 - Same-name Customers remain separate with their own metadata.
 
@@ -154,7 +154,7 @@ Verify field order, keyboard props, initial values, draft changes, atomic `Done`
 
 Covers REQ-04; UX-02, UX-03.
 
-Verify four recents, five search results, exact empty/error copy, omission of missing separators, natural metadata wrap, two-line truncation, same-name differentiation, and accessible combined labels.
+Verify three recents, three search results, exact empty/error copy, omission of missing separators, natural metadata wrap, two-line truncation, same-name differentiation, and accessible combined labels. Typed queries with no matches hide the panel. Typed queries in flight with no rows yet show `Searching…`.
 
 ### TEST-15 — Replacement confirmation
 
@@ -189,7 +189,7 @@ Test zero, one, and multiple phone/email/address values; device labels; independ
 
 Covers REQ-08; STATE-09 through STATE-13; UX-10.
 
-Verify no request before five trimmed characters or two letters; one request after 300 ms; new input cancels/supersedes; maximum five US suggestions; stale responses do not replace newer results; selection updates address; free text saves in every error/no-result state.
+Verify no request before five trimmed characters or two letters; one request after 300 ms; new input cancels/supersedes; maximum four US suggestions; `Searching…` before results; `No results` when empty; errors hide the panel; stale responses do not replace newer results; selection updates address; free text saves in every error/no-result state.
 
 Use fake timers and mocked network responses.
 

@@ -60,6 +60,7 @@ describe('JobExportScreen', () => {
     expect(screen.getByText('2026')).toBeTruthy();
     expect(mockRequestJobExport).not.toHaveBeenCalled();
     expect(screen.getByText('tech@example.com')).toBeTruthy();
+    expect(screen.getByText(/customer names, phone numbers, emails, service addresses/)).toBeTruthy();
     expect(screen.queryByText('Time zone')).toBeNull();
     expect(screen.queryByText(/This file may contain sensitive customer/)).toBeNull();
   });

@@ -126,7 +126,7 @@ The trimmed query has fewer than five characters, has fewer than two letters, or
 
 ### STATE-10 — Address lookup pending
 
-The input meets the threshold and its 300 ms debounce has elapsed. One latest-query request is authoritative.
+The input meets the threshold and its 300 ms debounce has elapsed. One latest-query request is authoritative. The picker shows `Searching…` until results, no-results, or an error arrives.
 
 Transitions:
 
@@ -138,15 +138,15 @@ Transitions:
 
 ### STATE-11 — Address suggestions visible
 
-Up to five provider suggestions and required attribution are visible. Selecting one updates the whole service-address draft. Free text remains editable.
+Up to four provider suggestions and required attribution are visible. Selecting one updates the whole service-address draft. Free text remains editable.
 
 ### STATE-12 — No address matches
 
-The typed value remains intact and savable. The picker may explain that the user can keep typing or use the entered address.
+The typed value remains intact and savable. The picker shows `No results`.
 
 ### STATE-13 — Address suggestions unavailable
 
-The typed value remains intact and savable. The app displays non-blocking fallback copy and emits only a coarse error category.
+The typed value remains intact and savable. The app hides the suggestion panel and emits only a coarse error category.
 
 ### STATE-14 — Device-contact access unresolved
 
