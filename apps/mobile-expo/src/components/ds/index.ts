@@ -95,7 +95,11 @@ export {
   ChooseJobBottomSheet,
   type ChooseJobBottomSheetJob,
 } from './ChooseJobBottomSheet';
-export { jobDetailCtaConfig, nextStatusAfterPrimaryAction } from './jobDetailCtaConfig';
+export {
+  jobDetailCtaConfig,
+  nextStatusAfterPrimaryAction,
+  resolveStatusWriteTarget,
+} from './jobDetailCtaConfig';
 export {
   ProfileRowsCard,
   type ProfileRowsCardRow,

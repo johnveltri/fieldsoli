@@ -51,6 +51,7 @@ import {
   LiveSessionStartTile,
   NewSessionBottomSheet,
   nextStatusAfterPrimaryAction,
+  resolveStatusWriteTarget,
   SessionCard,
   ViewMaterialsBuckets,
   ViewNotesBuckets,
@@ -1366,23 +1367,28 @@ export function JobDetailScreen({
     } else {
       setStatusActionPending(true);
     }
+    const writeStatus = resolveStatusWriteTarget(next, job.noRevenueConfirmed, job.workStatus);
     try {
-      await updateJobStatusById(supabase, job.id, next);
+      await updateJobStatusById(supabase, job.id, writeStatus);
       await refetchJob();
       analytics.capture('job_status_changed', {
         job_id: job.id,
         from_status: job.workStatus,
-        to_status: next,
+        to_status: writeStatus,
         source: 'primary_cta',
       });
-      if (job.workStatus !== 'completed' && next === 'completed') {
+      if (
+        job.workStatus !== 'completed' &&
+        job.workStatus !== 'paid' &&
+        isCompletedOrPaidWorkStatus(writeStatus)
+      ) {
         void maybeShowCompletionFeedbackPrompt();
       }
     } catch (e) {
       analytics.capture('job_status_change_failed', {
         job_id: job.id,
         from_status: job.workStatus,
-        attempted_status: next,
+        attempted_status: writeStatus,
         source: 'primary_cta',
         ...errorProperties(e),
       });
@@ -2100,7 +2106,11 @@ export function JobDetailScreen({
 
   const performMarkJobCompleted = useCallback(async () => {
     if (!job) return;
-    const toStatus = pendingStatusAfterWizardRef.current;
+    const toStatus = resolveStatusWriteTarget(
+      pendingStatusAfterWizardRef.current,
+      job.noRevenueConfirmed,
+      job.workStatus,
+    );
     setStatusActionPending(true);
     try {
       const fromStatus = job.workStatus;

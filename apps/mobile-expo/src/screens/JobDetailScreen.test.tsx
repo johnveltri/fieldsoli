@@ -92,6 +92,14 @@ jest.mock('../components/ds', () => ({
     if (status === 'completed') return 'paid';
     return 'completed';
   },
+  resolveStatusWriteTarget: (
+    intended: string,
+    noRevenueConfirmed: boolean,
+    current: string,
+  ) =>
+    intended === 'completed' && noRevenueConfirmed && current === 'inProgress'
+      ? 'paid'
+      : intended,
   EditJobBottomSheet: ({ visible }: { visible: boolean }) => {
     const { Text } = require('react-native');
     return visible ? <Text accessibilityLabel="Legacy edit">Legacy Edit Job</Text> : null;
@@ -1974,9 +1982,76 @@ describe('JobDetailScreen simplified view (flag on)', () => {
       ),
     );
     await waitFor(() =>
-      expect(apiClient.updateJobStatusById).toHaveBeenCalledWith({}, 'job-1', 'completed'),
+      expect(apiClient.updateJobStatusById).toHaveBeenCalledWith({}, 'job-1', 'paid'),
     );
     expect(screen.queryByTestId('edit-focus-target')).toBeNull();
+  });
+
+  it('allows mark unpaid from auto-paid no-revenue job', async () => {
+    apiClient.fetchJobDetail.mockResolvedValue({
+      ...incompleteJob,
+      shortDescription: 'Fixture install',
+      workStatus: 'paid',
+      metrics: { ...incompleteJob.metrics, sessionCount: 1 },
+      displaySessions: [
+        {
+          id: 'sess-usable',
+          startedAt: '2026-04-17T14:00:00.000Z',
+          endedAt: '2026-04-17T15:00:00.000Z',
+          dateLabel: 'Apr 17, 2026',
+          timeRangeLabel: '9:00 AM – 10:00 AM',
+          durationLabel: '1.0h',
+          clockTimesExplicit: true,
+          clockStartExplicit: true,
+          clockEndExplicit: true,
+          calendarDateExplicit: true,
+          attachments: [],
+        },
+      ],
+      noMaterialsConfirmed: true,
+      noOtherCostsConfirmed: true,
+      noRevenueConfirmed: true,
+      earnings: { ...incompleteJob.earnings, revenueCents: 0, netEarningsCents: 0 },
+    });
+    const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
+    await waitFor(() => expect(screen.getByText('Primary status action')).toBeTruthy());
+    fireEvent.press(screen.getByText('Primary status action'));
+    await waitFor(() =>
+      expect(apiClient.updateJobStatusById).toHaveBeenCalledWith({}, 'job-1', 'completed'),
+    );
+  });
+
+  it('marks a financially complete no-revenue job paid when completing from the primary CTA', async () => {
+    apiClient.fetchJobDetail.mockResolvedValue({
+      ...incompleteJob,
+      shortDescription: 'Fixture install',
+      metrics: { ...incompleteJob.metrics, sessionCount: 1 },
+      displaySessions: [
+        {
+          id: 'sess-usable',
+          startedAt: '2026-04-17T14:00:00.000Z',
+          endedAt: '2026-04-17T15:00:00.000Z',
+          dateLabel: 'Apr 17, 2026',
+          timeRangeLabel: '9:00 AM – 10:00 AM',
+          durationLabel: '1.0h',
+          clockTimesExplicit: true,
+          clockStartExplicit: true,
+          clockEndExplicit: true,
+          calendarDateExplicit: true,
+          attachments: [],
+        },
+      ],
+      noMaterialsConfirmed: true,
+      noOtherCostsConfirmed: true,
+      noRevenueConfirmed: true,
+      earnings: { ...incompleteJob.earnings, revenueCents: 0, netEarningsCents: 0 },
+    });
+    const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
+    await waitFor(() => expect(screen.getByText('Primary status action')).toBeTruthy());
+    fireEvent.press(screen.getByText('Primary status action'));
+    await waitFor(() =>
+      expect(apiClient.updateJobStatusById).toHaveBeenCalledWith({}, 'job-1', 'paid'),
+    );
   });
 
   it('TEST-V08 materials confirm-none checkbox in Edit advances completeness gap', async () => {
