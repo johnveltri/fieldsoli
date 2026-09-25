@@ -1174,20 +1174,32 @@ export function jobDetailWorkStatusToDbColumns(
 ): {
   job_work_status: JobWorkStatusDb;
   collected_cents: number;
+  no_revenue_marked_paid: boolean;
 } {
   switch (status) {
     case 'notStarted':
-      return { job_work_status: 'not_started', collected_cents: 0 };
+      return { job_work_status: 'not_started', collected_cents: 0, no_revenue_marked_paid: false };
     case 'inProgress':
-      return { job_work_status: 'in_progress', collected_cents: 0 };
+      return { job_work_status: 'in_progress', collected_cents: 0, no_revenue_marked_paid: false };
     case 'onHold':
-      return { job_work_status: 'on_hold', collected_cents: 0 };
+      return { job_work_status: 'on_hold', collected_cents: 0, no_revenue_marked_paid: false };
     case 'completed':
-      return { job_work_status: 'completed', collected_cents: 0 };
+      return { job_work_status: 'completed', collected_cents: 0, no_revenue_marked_paid: false };
     case 'paid':
-      return { job_work_status: 'completed', collected_cents: Math.max(0, revenueCents) };
+      if (revenueCents > 0) {
+        return {
+          job_work_status: 'completed',
+          collected_cents: revenueCents,
+          no_revenue_marked_paid: false,
+        };
+      }
+      return {
+        job_work_status: 'completed',
+        collected_cents: 0,
+        no_revenue_marked_paid: true,
+      };
     case 'cancelled':
-      return { job_work_status: 'canceled', collected_cents: 0 };
+      return { job_work_status: 'canceled', collected_cents: 0, no_revenue_marked_paid: false };
   }
 }
 

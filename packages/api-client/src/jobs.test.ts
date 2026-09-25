@@ -536,18 +536,27 @@ describe('jobs api client', () => {
     expect(jobDetailWorkStatusToDbColumns('notStarted')).toEqual({
       job_work_status: 'not_started',
       collected_cents: 0,
+      no_revenue_marked_paid: false,
     });
     expect(jobDetailWorkStatusToDbColumns('completed')).toEqual({
       job_work_status: 'completed',
       collected_cents: 0,
+      no_revenue_marked_paid: false,
     });
     expect(jobDetailWorkStatusToDbColumns('paid', 25000)).toEqual({
       job_work_status: 'completed',
       collected_cents: 25000,
+      no_revenue_marked_paid: false,
+    });
+    expect(jobDetailWorkStatusToDbColumns('paid', 0)).toEqual({
+      job_work_status: 'completed',
+      collected_cents: 0,
+      no_revenue_marked_paid: true,
     });
     expect(jobDetailWorkStatusToDbColumns('cancelled')).toEqual({
       job_work_status: 'canceled',
       collected_cents: 0,
+      no_revenue_marked_paid: false,
     });
   });
 
@@ -572,6 +581,7 @@ describe('jobs api client', () => {
     expect(patch).toEqual({
       job_work_status: 'in_progress',
       collected_cents: 0,
+      no_revenue_marked_paid: false,
     });
   });
 

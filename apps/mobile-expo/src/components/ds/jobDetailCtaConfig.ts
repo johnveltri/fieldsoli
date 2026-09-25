@@ -78,6 +78,23 @@ export function jobDetailCtaConfig(status: JobDetailWorkStatus): JobCtaResolved 
   }
 }
 
+/**
+ * When finishing work on a confirmed no-revenue job (in progress → completed),
+ * write `paid` so the job does not stall in an unset payment state.
+ * Does not apply when the user explicitly marks unpaid (paid → completed) or
+ * picks Completed from the status sheet.
+ */
+export function resolveStatusWriteTarget(
+  intended: JobDetailWorkStatus,
+  noRevenueConfirmed: boolean,
+  current: JobDetailWorkStatus,
+): JobDetailWorkStatus {
+  if (intended === 'completed' && noRevenueConfirmed && current === 'inProgress') {
+    return 'paid';
+  }
+  return intended;
+}
+
 /** Next `JobDetailWorkStatus` when the user taps the primary CTA. */
 export function nextStatusAfterPrimaryAction(
   current: JobDetailWorkStatus,
