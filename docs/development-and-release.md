@@ -180,3 +180,34 @@ verify each one:
 If a production migration fails or causes a regression, ship a corrective forward migration.
 Website rollback and mobile-store recovery are separate operations; a native build cannot undo a
 database migration.
+
+## Applying a migration with the Supabase MCP
+
+MCP `apply_migration` is safe to use on production. It runs the SQL and records a history row, but
+the row's `version` is the clock time of the apply, not the prefix of the file in
+`backend/supabase/migrations/`. `supabase db push` matches on that prefix only. Leave the clock
+version in place and the next `npm run db:deploy:production:plan` treats the MCP row as a remote
+migration the repo does not have, and treats the repo file as not yet applied.
+
+Use this sequence for every MCP apply:
+
+1. The migration file must already be committed (or at least present) under
+   `backend/supabase/migrations/`. Apply that file's SQL, not an edited copy.
+2. Call MCP `apply_migration` with the same snake_case name as the filename suffix.
+3. Read the new `version` from MCP `list_migrations`.
+4. Rewrite that history row so `version` is the filename prefix. With MCP `execute_sql`:
+
+```sql
+update supabase_migrations.schema_migrations
+set version = '<filename prefix>'
+where version = '<version just inserted>'
+  and name = '<migration name>';
+```
+
+5. Confirm `list_migrations` shows the filename prefix and no extra row for that change.
+
+One repo file must end as one history row. If a large file is applied in more than one MCP call,
+keep a single row whose `version` is the filename prefix and delete the extra history rows. Do not
+re-run the SQL. History is a ledger; the schema is already applied.
+
+Do not use `apply_migration` for this rewrite. That inserts another clock-time row.
