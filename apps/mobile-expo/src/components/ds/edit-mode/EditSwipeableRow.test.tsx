@@ -31,6 +31,41 @@ const typography = createTextStyles({
 });
 
 describe('EditSwipeableRow', () => {
+  it('keeps children mounted while swipe-to-delete is disabled during focus', () => {
+    const onMount = jest.fn();
+    const onUnmount = jest.fn();
+    function Child() {
+      React.useEffect(() => {
+        onMount();
+        return onUnmount;
+      }, []);
+      return <TextInput accessibilityLabel="Customer" />;
+    }
+
+    const props = {
+      typography,
+      accessibilityLabel: 'Customer',
+      onDelete: jest.fn(),
+    };
+    const view = render(
+      <EditSwipeableRow {...props} enabled>
+        <Child />
+      </EditSwipeableRow>,
+    );
+    expect(onMount).toHaveBeenCalledTimes(1);
+
+    view.rerender(
+      <EditSwipeableRow {...props} enabled={false}>
+        <Child />
+      </EditSwipeableRow>,
+    );
+
+    expect(onMount).toHaveBeenCalledTimes(1);
+    expect(onUnmount).not.toHaveBeenCalled();
+    expect(screen.getByTestId('swipeable').props.enabled).toBe(false);
+    expect(screen.getAllByLabelText('Customer')).toHaveLength(2);
+  });
+
   it('keeps delete as a custom action without making nested fields a button', () => {
     const onDelete = jest.fn();
     render(

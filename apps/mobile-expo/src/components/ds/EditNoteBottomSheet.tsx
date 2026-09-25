@@ -3,11 +3,11 @@ import {
   Pressable,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import { color, radius, space } from '@fieldsolo/design-system/lib/tokens';
 
+import { DsTextInput } from './DsTextInput';
 import { bg, border, cardShadowRn, fg } from '../../theme/nativeTokens';
 import type { TextStyles } from '../../theme/nativeTokens';
 import {
@@ -174,7 +174,7 @@ export function EditNoteBottomSheet({
         </Text>
 
         <View style={styles.textareaShell}>
-          <TextInput
+          <DsTextInput
             value={body}
             onChangeText={setBody}
             placeholder="What happened on site? Measurements, observations, next steps..."

@@ -150,9 +150,9 @@ describe("POST /api/waitlist", () => {
       uses_software: false,
       tracking_tools: ["notes_paper_memory"],
       job_sources: ["referrals"],
-      privacy_policy_version: "2026-08-30",
+      privacy_policy_version: "2026-09-20",
       privacy_accepted_at: expect.any(String),
-      terms_version: "2026-08-30",
+      terms_version: "2026-09-20",
       terms_accepted_at: expect.any(String),
       marketing_consent: true,
     });
@@ -194,9 +194,9 @@ describe("POST /api/waitlist", () => {
       uses_software: false,
       tracking_tools: ["notes_paper_memory"],
       job_sources: ["referrals"],
-      privacy_policy_version: "2026-08-30",
+      privacy_policy_version: "2026-09-20",
       privacy_accepted_at: expect.any(String),
-      terms_version: "2026-08-30",
+      terms_version: "2026-09-20",
       terms_accepted_at: expect.any(String),
       marketing_consent: true,
     });

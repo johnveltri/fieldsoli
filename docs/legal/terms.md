@@ -1,8 +1,8 @@
 # FieldSoli Terms of Service
 
-**Effective date:** August 30, 2026
+**Effective date:** September 20, 2026
 
-**Terms version:** 2026-08-30
+**Terms version:** 2026-09-20
 
 FieldSoli™ is a product operated by **Veltri Ventures LLC, an Illinois limited liability company** ("FieldSoli," "we," "us," or "our"). These Terms of Service (the "Terms") govern access to and use of:
 
@@ -31,7 +31,8 @@ The Services are intended for users in the United States.
 
 FieldSoli provides business-organizing tools that currently allow users to:
 
-- create and organize jobs, including job descriptions, customer names, service addresses, work status, payment status, and revenue;
+- create and organize jobs, including job descriptions, customer names, phone numbers, email addresses, service addresses, work status, payment status, and revenue;
+- optionally import selected name, phone, email, and address values from one device contact into a Job (the app does not sync or store your address book);
 - start, resume, edit, end, and organize live or manually entered work sessions;
 - capture notes and material or other job-cost entries for a job or work session or hold them unassigned in the Inbox for later assignment;
 - record material and other job-cost quantities, units, unit costs, and calculated totals;
@@ -121,7 +122,7 @@ We may investigate suspected misuse and remove or restrict content or access whe
 
 ## 8. User Content and Customer Information
 
-**User Content** means information you enter or store through the Services, including job descriptions, customer names, service addresses, work and payment statuses, revenue, work-session information, notes, material and other job-cost entries, and related business records. **Customer Information** means User Content concerning your own customers, properties, worksites, or jobs.
+**User Content** means information you enter or store through the Services, including job descriptions, customer names, phone numbers, email addresses, service addresses, work and payment statuses, revenue, work-session information, notes, material and other job-cost entries, selected values you import from a device contact for a Job, and related business records. **Customer Information** means User Content concerning your own customers, properties, worksites, or jobs.
 
 As between you and FieldSoli, you retain ownership of your User Content. You are responsible for its accuracy, quality, legality, and appropriateness and for the consequences of entering or using it through the Services.
 

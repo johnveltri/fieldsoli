@@ -98,6 +98,51 @@ export type Database = {
           },
         ]
       }
+      customers: {
+        Row: {
+          created_at: string
+          deleted_at: string | null
+          display_name: string
+          email: string | null
+          id: string
+          last_service_address: string | null
+          normalized_email: string | null
+          normalized_name: string
+          normalized_phone: string | null
+          phone: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          deleted_at?: string | null
+          display_name?: string
+          email?: string | null
+          id?: string
+          last_service_address?: string | null
+          normalized_email?: string | null
+          normalized_name?: string
+          normalized_phone?: string | null
+          phone?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          deleted_at?: string | null
+          display_name?: string
+          email?: string | null
+          id?: string
+          last_service_address?: string | null
+          normalized_email?: string | null
+          normalized_name?: string
+          normalized_phone?: string | null
+          phone?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       job_activity_events: {
         Row: {
           created_at: string
@@ -308,7 +353,10 @@ export type Database = {
           costs_reviewed_at: string | null
           created_at: string
           created_via: Database["public"]["Enums"]["job_created_via_enum"]
+          customer_email: string | null
+          customer_id: string | null
           customer_name: string | null
+          customer_phone: string | null
           deleted_at: string | null
           id: string
           is_job_record_complete: boolean
@@ -334,7 +382,10 @@ export type Database = {
           costs_reviewed_at?: string | null
           created_at?: string
           created_via?: Database["public"]["Enums"]["job_created_via_enum"]
+          customer_email?: string | null
+          customer_id?: string | null
           customer_name?: string | null
+          customer_phone?: string | null
           deleted_at?: string | null
           id?: string
           is_job_record_complete?: boolean
@@ -360,7 +411,10 @@ export type Database = {
           costs_reviewed_at?: string | null
           created_at?: string
           created_via?: Database["public"]["Enums"]["job_created_via_enum"]
+          customer_email?: string | null
+          customer_id?: string | null
           customer_name?: string | null
+          customer_phone?: string | null
           deleted_at?: string | null
           id?: string
           is_job_record_complete?: boolean
@@ -380,7 +434,15 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "jobs_customer_owner_fkey"
+            columns: ["customer_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id", "user_id"]
+          },
+        ]
       }
       legal_acceptances: {
         Row: {
@@ -675,6 +737,7 @@ export type Database = {
         Args: { p_key_hash: string; p_limit?: number }
         Returns: boolean
       }
+      end_stale_live_sessions: { Args: never; Returns: number }
       job_export_rows: {
         Args: {
           p_before_completed_at?: string
@@ -692,8 +755,8 @@ export type Database = {
           helper_labor_cost: number
           job_description: string
           job_id: string
-          long_description: string | null
           last_worked_at: string
+          long_description: string
           material_cost: number
           other_cost: number
           paid_at: string
@@ -705,9 +768,14 @@ export type Database = {
           work_status: string
         }[]
       }
+      list_customer_suggestions: { Args: { p_query?: string }; Returns: Json }
       retry_job_export_queue_message: {
         Args: { p_delay_seconds: number; p_message_id: number }
         Returns: undefined
+      }
+      save_job_customer: {
+        Args: { p_job_id: string; p_payload: Json }
+        Returns: Json
       }
     }
     Enums: {
@@ -860,3 +928,4 @@ export const Constants = {
     },
   },
 } as const
+

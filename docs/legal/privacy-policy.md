@@ -1,8 +1,8 @@
 # FieldSoli Privacy Policy
 
-**Effective date:** August 30, 2026
+**Effective date:** September 20, 2026
 
-**Policy version:** 2026-08-30
+**Policy version:** 2026-09-20
 
 FieldSoli™ is a product operated by **Veltri Ventures LLC, an Illinois limited liability company** ("FieldSoli," "we," "us," or "our"). This Privacy Policy explains how we collect, use, disclose, retain, and protect personal information when you use:
 
@@ -22,10 +22,10 @@ FieldSoli provides job-tracking and business-organizing tools for independent tr
 In this Privacy Policy:
 
 - a **User** is an individual who creates or uses a FieldSoli account;
-- **Customer Information** means information a User enters about the User's own customer, worksite, or job; and
-- **User Content** means job records, Customer Information, notes, material and other job-cost entries, and other content a User enters into FieldSoli.
+- **Customer Information** means information a User enters or imports about the User's own customer, worksite, or job; and
+- **User Content** means job records, Customer Information, notes, material and other job-cost entries, and other content a User enters or imports into FieldSoli.
 
-Users decide what Customer Information and User Content to enter. FieldSoli processes that information to provide the Services to the User. Users are responsible for having appropriate authority to provide information about their customers and worksites.
+Users decide what Customer Information and User Content to enter or import. FieldSoli processes that information to provide the Services to the User. Users are responsible for having appropriate authority to provide information about their customers and worksites.
 
 If you are a customer of a FieldSoli User and want to make a request concerning information that User entered about you, contact the User first. We may assist the User with the request where appropriate.
 
@@ -73,7 +73,7 @@ We use these records to apply your choices, determine whether updated terms requ
 
 When you use FieldSoli to organize work, we collect the information you choose to enter, including:
 
-- job descriptions, customer names, and service addresses;
+- job descriptions, customer names, customer phone numbers, customer email addresses, and service addresses;
 - job status, payment status, revenue, record source, and whether you confirmed that no materials were used;
 - record creation, update, last-worked, completed, paid, and deletion timestamps;
 - live or manually entered work sessions, including their associated job, status, entry mode, start and end times, and the starting time zone for live sessions;
@@ -103,7 +103,7 @@ In-app product analytics is disabled unless it is configured for the app and you
 - coarse ranges or buckets for money, quantity, duration, and text length; and
 - coarse error categories.
 
-We use this information to understand how the app is used, diagnose problems, evaluate reliability, and improve usability. Under FieldSoli's production analytics configuration, PostHog does not receive note text, customer names, service addresses, job descriptions, material descriptions, full email addresses, or detailed error text.
+We use this information to understand how the app is used, diagnose problems, evaluate reliability, and improve usability. Under FieldSoli's production analytics configuration, PostHog does not receive note text, customer names, customer phone numbers, service addresses, job descriptions, material descriptions, full email addresses, or detailed error text.
 
 You may withdraw analytics permission at any time in the app's Privacy Choices screen. Withdrawal stops new in-app analytics collection and clears the app's locally stored analytics identifier. It does not automatically erase information processed before withdrawal. You may request deletion of personal information as described in Section 10.
 
@@ -125,7 +125,7 @@ We use communications to respond, investigate and resolve issues, fulfill reques
 
 When you use the in-app **Export Job Summary** control (Profile → Your data), we process information to create and deliver a CSV summary of your completed jobs for one calendar year you select.
 
-The export may include job descriptions, customer names, service addresses, work and payment status, creation, last-worked, completed, and paid dates, revenue, job-cost totals by category, and net earnings. It does not include notes, work-session rows, photos, attachments, or a full account backup.
+The export may include job descriptions, customer names, customer phone numbers, customer email addresses, service addresses, work and payment status, creation, last-worked, completed, and paid dates, revenue, job-cost totals by category, and net earnings. It does not include notes, work-session rows, photos, attachments, or a full account backup.
 
 To fulfill your request, we:
 
@@ -140,9 +140,19 @@ The download link expires within 24 hours after the first email-delivery attempt
 
 We use this information to provide the portability feature you request. You are responsible for storing downloaded exports securely because they may contain Customer Information and financial details.
 
-### J. Information FieldSoli does not currently collect through the mobile app
+### J. Customer contact details, device contacts, and address suggestions
 
-The current FieldSoli mobile app does not request or collect precise GPS location, contacts, calendars, camera or photo-library content, audio recordings, microphone data, email-inbox content, payment-card numbers, or bank-account credentials.
+When you enter or import customer details for a Job, we store the customer name, phone number, email address, and service address you choose for that Job snapshot. We also maintain reusable customer defaults linked to your account when you save Jobs with customer details.
+
+If you tap **Add from Contacts**, the app requests read-only access to your device contacts at that moment only. FieldSoli does not sync your address book, bulk-import contacts, or retain native contact identifiers. We copy only the values you select for the current Job draft.
+
+When you type in the Address field, FieldSoli may send your typed query to our server, which forwards a redacted autocomplete request to Geoapify so we can show up to four U.S. address suggestions. We do not store Geoapify place identifiers, coordinates, or the full provider response with your Job. Address suggestion requests are subject to per-user daily limits and are not logged with the full query text.
+
+Job Summary CSV exports may include job-snapshot customer phone and email columns when present.
+
+### K. Information FieldSoli does not currently collect through the mobile app
+
+The current FieldSoli mobile app does not request or collect precise GPS location, calendars, camera or photo-library content, audio recordings, microphone data, email-inbox content, payment-card numbers, or bank-account credentials. FieldSoli does not request write access to your contacts.
 
 ## 3. How We Use Information
 

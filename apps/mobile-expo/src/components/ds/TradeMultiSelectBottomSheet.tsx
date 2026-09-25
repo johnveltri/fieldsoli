@@ -4,13 +4,13 @@ import {
   Pressable,
   StyleSheet,
   Text,
-  TextInput,
   useWindowDimensions,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { color, radius, space } from '@fieldsolo/design-system/lib/tokens';
 
+import { DsTextInput } from './DsTextInput';
 import { bg, border, cardShadowRn, fg } from '../../theme/nativeTokens';
 import type { TextStyles } from '../../theme/nativeTokens';
 import {
@@ -182,7 +182,7 @@ export function TradeMultiSelectBottomSheet({
           {/* Custom + APPLY row, always shown. */}
           <View style={styles.customRowWrap}>
             <View style={styles.customShell}>
-              <TextInput
+              <DsTextInput
                 value={customText}
                 onChangeText={setCustomText}
                 placeholder="Custom"

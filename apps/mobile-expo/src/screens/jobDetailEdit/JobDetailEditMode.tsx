@@ -16,6 +16,7 @@ import {
   formatSessionDurationLabel,
   formatSessionTimeLabel,
   JOB_DETAIL_EMPTY_LABELS,
+  type FieldSoloSupabaseClient,
 } from '@fieldsolo/api-client';
 
 import {
@@ -38,7 +39,8 @@ import {
   EditDescriptionField,
   editSheetRowSeparator,
 } from '../../components/ds/edit-mode/EditFormRows';
-import { EditIconLink, EditIconLocation, EditIconPerson } from '../../components/ds/edit-mode/EditModeIcons';
+import { EditIconLink } from '../../components/ds/edit-mode/EditModeIcons';
+import { CustomerFieldsBlock } from '../../components/ds/customer/CustomerFieldsBlock';
 import { EditSwipeableRow } from '../../components/ds/edit-mode/EditSwipeableRow';
 import { PlatformHeaderAction } from '../../components/platform/PlatformHeaderAction';
 import {
@@ -85,6 +87,7 @@ type JobDetailEditModeProps = {
   onDone: () => void;
   onDeleteJob: () => void;
   editApi: ReturnType<typeof useJobEditDraft>;
+  supabase: FieldSoloSupabaseClient;
   focusTarget?: JobDetailEditFocusTarget | null;
   /** When false, keyboard/dock scroll state is cleared (View/Edit crossfade keeps edit mounted). */
   active?: boolean;
@@ -221,6 +224,7 @@ export function JobDetailEditMode({
   onDone,
   onDeleteJob,
   editApi,
+  supabase,
   focusTarget = null,
   active = true,
   hideHeader = false,
@@ -474,29 +478,20 @@ export function JobDetailEditMode({
 
           {showSection('customer') ? (
           <View ref={setFocusAnchor('customer')} collapsable={false}>
-          <EditSheet>
-            <EditIconRow icon={<EditIconPerson color={iconColor} />}>
-              <EditFieldInput
-                typography={typography}
-                placeholder="Customer"
-                value={draft.customerName}
-                opticalNudgeY={-3}
-                onChangeText={(t) => updateDraft({ customerName: t })}
-              />
-            </EditIconRow>
-            <EditIconRow icon={<EditIconLocation color={iconColor} />}>
-              <EditFieldInput
-                typography={typography}
-                placeholder="Address"
-                value={draft.serviceAddress}
-                onChangeText={(t) =>
-                  updateDraft({ serviceAddress: t.replace(/[\r\n]+/g, ' ') })
-                }
-                returnKeyType="done"
-                blurOnSubmit
-              />
-            </EditIconRow>
-          </EditSheet>
+            <CustomerFieldsBlock
+              typography={typography}
+              iconColor={iconColor}
+              surface="job_edit"
+              supabase={supabase}
+              draft={{
+                customerName: draft.customerName,
+                customerPhone: draft.customerPhone,
+                customerEmail: draft.customerEmail,
+                customerId: draft.customerId,
+                serviceAddress: draft.serviceAddress,
+              }}
+              onChange={(patch) => updateDraft(patch)}
+            />
           </View>
           ) : null}
 
@@ -508,7 +503,6 @@ export function JobDetailEditMode({
                 typography={typography}
                 placeholder="Revenue"
                 value={revenueText}
-                opticalNudgeY={-5}
                 keyboardType="decimal-pad"
                 inputMode="decimal"
                 onFocus={() => {
@@ -943,7 +937,6 @@ function MaterialEditBlock({
         <EditFieldInput
           typography={typography}
           value={row.description}
-          opticalNudgeY={-4}
           onChangeText={(description) => onChange({ description })}
           placeholder="Material"
         />
@@ -1091,7 +1084,6 @@ function OtherCostEditBlock({
           placeholder="Amount"
           accessibilityLabel="Amount"
           value={amountText}
-          opticalNudgeY={-5}
           keyboardType="decimal-pad"
           inputMode="decimal"
           onFocus={() => {

@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Keyboard, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Keyboard, Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { color, radius, space } from '@fieldsolo/design-system/lib/tokens';
 
+import { DsTextInput } from './DsTextInput';
 import { bg, border, cardShadowRn, fg } from '../../theme/nativeTokens';
 import type { TextStyles } from '../../theme/nativeTokens';
 import { SessionSheetBackIcon } from '../figma-icons/JobDetailScreenIcons';
@@ -143,7 +144,7 @@ export function UpdateProfileBottomSheet({
 
         <View style={styles.fields} pointerEvents={saving ? 'none' : 'auto'}>
           <View style={styles.inputShell}>
-            <TextInput
+            <DsTextInput
               value={firstName}
               onChangeText={setFirstName}
               placeholder="First Name"
@@ -154,7 +155,7 @@ export function UpdateProfileBottomSheet({
             />
           </View>
           <View style={styles.inputShell}>
-            <TextInput
+            <DsTextInput
               value={lastName}
               onChangeText={setLastName}
               placeholder="Last Name"
@@ -166,7 +167,7 @@ export function UpdateProfileBottomSheet({
           </View>
           <View style={[styles.inputShell, styles.inputShellDisabled]}>
             {/* Email is read-only — render as disabled TextInput so layout / font match. */}
-            <TextInput
+            <DsTextInput
               value={email ?? ''}
               editable={false}
               placeholder="Email"

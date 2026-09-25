@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Alert,
   Keyboard,
   Platform,
   Pressable,
@@ -22,7 +23,7 @@ import { JOB_SHORT_DESCRIPTION_MAX_LENGTH } from '@fieldsolo/shared-types';
 import { bg, cardShadowRn, fg } from '../../theme/nativeTokens';
 import type { TextStyles } from '../../theme/nativeTokens';
 import { formatUsdCombined } from '../../lib/formatUsd';
-import { sanitizeDecimalInput, sanitizeSingleLineText } from '../../lib/moneyInput';
+import { sanitizeDecimalInput } from '../../lib/moneyInput';
 import {
   LiveSessionActiveDotIcon,
   JobDetailIconSectionMaterials,
@@ -46,9 +47,11 @@ import {
   EditTitleField,
   editSheetRowSeparator,
 } from './edit-mode/EditFormRows';
-import { EditIconLocation, EditIconPerson } from './edit-mode/EditModeIcons';
 import { EditSwipeableRow } from './edit-mode/EditSwipeableRow';
 import { BottomSheetShell } from './BottomSheetShell';
+import { CustomerFieldsBlock } from './customer/CustomerFieldsBlock';
+import type { CustomerDraft } from './customer/types';
+import type { FieldSoloSupabaseClient } from '@fieldsolo/api-client';
 import { FullWidthFab } from './FullWidthFab';
 import { InlineMonthCalendar } from './InlineMonthCalendar';
 import { LiveSessionCaptureCard } from './LiveSessionCaptureCard';
@@ -57,6 +60,9 @@ export type LiveSessionJobIdentity = {
   shortDescription: string;
   longDescription: string;
   customerName: string;
+  customerPhone: string;
+  customerEmail: string;
+  customerId: string | null;
   serviceAddress: string;
   revenueCents: number | null;
 };
@@ -64,8 +70,6 @@ export type LiveSessionJobIdentity = {
 export type LiveSessionJobIdentityPatch = {
   shortDescription?: string;
   longDescription?: string;
-  customerName?: string;
-  serviceAddress?: string;
   revenueCents?: number | null;
 };
 
@@ -116,6 +120,8 @@ type LiveSessionBottomSheetProps = {
   phase3Capture?: boolean;
   jobIdentity?: LiveSessionJobIdentity;
   onJobIdentityChange?: (patch: LiveSessionJobIdentityPatch) => void;
+  onCustomerSnapshotSave?: (draft: CustomerDraft) => void | Promise<void>;
+  supabase?: FieldSoloSupabaseClient;
   onChangeStartedAt?: (iso: string) => void | Promise<void>;
   /** Phase 3: persisted notes on the live session (inline edit). */
   liveNotes?: LiveSessionInlineNote[];
@@ -159,6 +165,26 @@ function combineDateAndTime(dateSource: Date, timeSource: Date): Date {
   return out;
 }
 
+function customerDraftFromIdentity(identity: LiveSessionJobIdentity): CustomerDraft {
+  return {
+    customerName: identity.customerName,
+    customerPhone: identity.customerPhone,
+    customerEmail: identity.customerEmail,
+    customerId: identity.customerId,
+    serviceAddress: identity.serviceAddress,
+  };
+}
+
+function customerDraftKey(draft: CustomerDraft): string {
+  return [
+    draft.customerName,
+    draft.customerPhone,
+    draft.customerEmail,
+    draft.serviceAddress,
+    draft.customerId ?? '',
+  ].join('\u0001');
+}
+
 /**
  * Live Session bottom sheet.
  * Flag-off: capture card + header EDIT.
@@ -182,6 +208,8 @@ export function LiveSessionBottomSheet({
   phase3Capture = false,
   jobIdentity,
   onJobIdentityChange,
+  onCustomerSnapshotSave,
+  supabase,
   onChangeStartedAt,
   liveNotes = EMPTY_NOTES,
   liveMaterials = EMPTY_MATERIALS,
@@ -217,8 +245,27 @@ export function LiveSessionBottomSheet({
 
   const [title, setTitle] = useState(jobIdentity?.shortDescription ?? jobShortDescription);
   const [longDescription, setLongDescription] = useState(jobIdentity?.longDescription ?? '');
-  const [customerName, setCustomerName] = useState(jobIdentity?.customerName ?? '');
-  const [serviceAddress, setServiceAddress] = useState(jobIdentity?.serviceAddress ?? '');
+  const initialCustomerDraft = customerDraftFromIdentity(
+    jobIdentity ?? {
+      shortDescription: jobShortDescription,
+      longDescription: '',
+      customerName: '',
+      customerPhone: '',
+      customerEmail: '',
+      customerId: null,
+      serviceAddress: '',
+      revenueCents: null,
+    },
+  );
+  const [customerDraft, setCustomerDraft] = useState<CustomerDraft>(initialCustomerDraft);
+  const customerDraftRef = useRef<CustomerDraft>(initialCustomerDraft);
+  const lastPersistedCustomerKey = useRef(customerDraftKey(initialCustomerDraft));
+  const customerSaveInFlight = useRef<Promise<void> | null>(null);
+  const retryCustomerSave = useRef<() => void>(() => undefined);
+  const customerSaveAlertOpen = useRef(false);
+  const sessionTransitionInFlight = useRef(false);
+  const [customerSavePending, setCustomerSavePending] = useState(false);
+  const [customerFieldFocused, setCustomerFieldFocused] = useState(false);
   const [revenueText, setRevenueText] = useState(
     jobIdentity?.revenueCents != null && jobIdentity.revenueCents > 0
       ? formatUsdCombined(jobIdentity.revenueCents)
@@ -228,9 +275,7 @@ export function LiveSessionBottomSheet({
   const [pickerTime, setPickerTime] = useState(() => startedDate);
   const [activePicker, setActivePicker] = useState<'date' | 'startTime' | null>(null);
   const acceptInlineFocusRef = useRef(false);
-  const focusedFieldRef = useRef<
-    'title' | 'longDescription' | 'customerName' | 'serviceAddress' | 'revenue' | null
-  >(null);
+  const focusedFieldRef = useRef<'title' | 'longDescription' | 'revenue' | null>(null);
   const titleInputRef = useRef<TextInput>(null);
   const sheetScrollRef = useRef<ScrollView | null>(null);
   const sheetScrollContentRef = useRef<View | null>(null);
@@ -245,8 +290,6 @@ export function LiveSessionBottomSheet({
   const draftRef = useRef({
     title: jobIdentity?.shortDescription ?? jobShortDescription,
     longDescription: jobIdentity?.longDescription ?? '',
-    customerName: jobIdentity?.customerName ?? '',
-    serviceAddress: jobIdentity?.serviceAddress ?? '',
     revenueText:
       jobIdentity?.revenueCents != null && jobIdentity.revenueCents > 0
         ? formatUsdCombined(jobIdentity.revenueCents)
@@ -363,6 +406,9 @@ export function LiveSessionBottomSheet({
       jobIdentity.shortDescription,
       jobIdentity.longDescription,
       jobIdentity.customerName,
+      jobIdentity.customerPhone,
+      jobIdentity.customerEmail,
+      jobIdentity.customerId ?? '',
       jobIdentity.serviceAddress,
       jobIdentity.revenueCents ?? '',
     ].join('\u0001');
@@ -379,11 +425,15 @@ export function LiveSessionBottomSheet({
     if (focused !== 'longDescription') {
       setLongDescription(jobIdentity.longDescription);
     }
-    if (focused !== 'customerName') {
-      setCustomerName(jobIdentity.customerName);
-    }
-    if (focused !== 'serviceAddress') {
-      setServiceAddress(jobIdentity.serviceAddress);
+    if (
+      !customerFieldFocused &&
+      !customerSaveInFlight.current &&
+      customerDraftKey(customerDraftRef.current) === lastPersistedCustomerKey.current
+    ) {
+      const nextCustomer = customerDraftFromIdentity(jobIdentity);
+      setCustomerDraft(nextCustomer);
+      customerDraftRef.current = nextCustomer;
+      lastPersistedCustomerKey.current = customerDraftKey(nextCustomer);
     }
     if (focused !== 'revenue') {
       setRevenueText(nextRevenueText);
@@ -394,18 +444,12 @@ export function LiveSessionBottomSheet({
         focused === 'longDescription'
           ? draftRef.current.longDescription
           : jobIdentity.longDescription,
-      customerName:
-        focused === 'customerName' ? draftRef.current.customerName : jobIdentity.customerName,
-      serviceAddress:
-        focused === 'serviceAddress'
-          ? draftRef.current.serviceAddress
-          : jobIdentity.serviceAddress,
       revenueText: focused === 'revenue' ? draftRef.current.revenueText : nextRevenueText,
     };
     if (focused !== 'title') {
       lastPersistedTitle.current = jobIdentity.shortDescription;
     }
-  }, [jobIdentity, visible]);
+  }, [customerFieldFocused, jobIdentity, visible]);
 
   const flushIdentity = useCallback(
     (next?: LiveSessionJobIdentityPatch) => {
@@ -430,17 +474,19 @@ export function LiveSessionBottomSheet({
       const patch: LiveSessionJobIdentityPatch = {
         shortDescription: nextTitle.slice(0, JOB_SHORT_DESCRIPTION_MAX_LENGTH),
         longDescription: next?.longDescription ?? draft.longDescription,
-        customerName: next?.customerName ?? draft.customerName,
-        serviceAddress: next?.serviceAddress ?? draft.serviceAddress,
         revenueCents: cents,
       };
       onJobIdentityChange(patch);
       lastPersistedTitle.current = nextTitle;
+      const customer = customerDraftRef.current;
       lastIdentityKey.current = [
         patch.shortDescription,
         patch.longDescription,
-        patch.customerName,
-        patch.serviceAddress,
+        customer.customerName,
+        customer.customerPhone,
+        customer.customerEmail,
+        customer.customerId ?? '',
+        customer.serviceAddress,
         patch.revenueCents ?? '',
       ].join('\u0001');
     },
@@ -641,6 +687,7 @@ export function LiveSessionBottomSheet({
   const dismissInlineEditing = useCallback(() => {
     setActivePicker(null);
     focusedFieldRef.current = null;
+    setCustomerFieldFocused(false);
     titleInputRef.current?.blur();
     const focused = TextInput.State.currentlyFocusedInput();
     if (focused) {
@@ -649,7 +696,79 @@ export function LiveSessionBottomSheet({
     Keyboard.dismiss();
   }, []);
 
-  const flushPendingEdits = useCallback(() => {
+  const updateCustomerDraft = useCallback((patch: Partial<CustomerDraft>) => {
+    const next = { ...customerDraftRef.current, ...patch };
+    customerDraftRef.current = next;
+    setCustomerDraft(next);
+  }, []);
+
+  const commitCustomerSnapshot = useCallback(
+    async (draft?: CustomerDraft) => {
+      if (!onCustomerSnapshotSave) return true;
+      if (draft) {
+        customerDraftRef.current = draft;
+        setCustomerDraft(draft);
+      }
+      if (customerSaveInFlight.current) {
+        try {
+          await customerSaveInFlight.current;
+          return true;
+        } catch {
+          return false;
+        }
+      }
+
+      const saveLatestDraft = async () => {
+        while (true) {
+          const next = customerDraftRef.current;
+          const key = customerDraftKey(next);
+          if (key === lastPersistedCustomerKey.current) return;
+          await onCustomerSnapshotSave(next);
+          lastPersistedCustomerKey.current = key;
+          if (customerDraftKey(customerDraftRef.current) === key) return;
+        }
+      };
+      const pending = saveLatestDraft();
+      customerSaveInFlight.current = pending;
+      setCustomerSavePending(true);
+      try {
+        await pending;
+        customerSaveAlertOpen.current = false;
+        return true;
+      } catch {
+        if (!customerSaveAlertOpen.current) {
+          customerSaveAlertOpen.current = true;
+          Alert.alert(
+            "Couldn't save customer details. Try again.",
+            undefined,
+            [
+              {
+                text: 'Try again',
+                onPress: () => {
+                  customerSaveAlertOpen.current = false;
+                  retryCustomerSave.current();
+                },
+              },
+            ],
+            { onDismiss: () => { customerSaveAlertOpen.current = false; } },
+          );
+        }
+        return false;
+      } finally {
+        if (customerSaveInFlight.current === pending) {
+          customerSaveInFlight.current = null;
+          setCustomerSavePending(false);
+        }
+      }
+    },
+    [onCustomerSnapshotSave],
+  );
+  retryCustomerSave.current = () => {
+    void commitCustomerSnapshot();
+  };
+
+  const flushPendingEdits = useCallback(async () => {
+    const customerSaved = commitCustomerSnapshot();
     flushIdentity();
     for (const note of liveNotesRef.current) {
       void persistExistingNote(note.id, noteDraftsRef.current[note.id] ?? note.body);
@@ -669,7 +788,9 @@ export function LiveSessionBottomSheet({
     for (const material of composerMaterialsRef.current) {
       void persistNewMaterial(material.localId, material.description, material.totalText);
     }
+    return customerSaved;
   }, [
+    commitCustomerSnapshot,
     flushIdentity,
     persistExistingMaterial,
     persistExistingNote,
@@ -677,11 +798,29 @@ export function LiveSessionBottomSheet({
     persistNewNote,
   ]);
 
-  /** Blur + persist drafts before minimizing so X / swipe does not drop in-progress edits. */
-  const handleMinimize = useCallback(() => {
-    flushPendingEdits();
+  const handleEndSessionPress = useCallback(async () => {
+    if (sessionTransitionInFlight.current) return;
+    sessionTransitionInFlight.current = true;
     dismissInlineEditing();
-    onMinimize();
+    try {
+      if (!(await flushPendingEdits())) return;
+      onEndSessionPress();
+    } finally {
+      sessionTransitionInFlight.current = false;
+    }
+  }, [dismissInlineEditing, flushPendingEdits, onEndSessionPress]);
+
+  /** Blur + persist drafts before minimizing so X / swipe does not drop in-progress edits. */
+  const handleMinimize = useCallback(async () => {
+    if (sessionTransitionInFlight.current) return;
+    sessionTransitionInFlight.current = true;
+    dismissInlineEditing();
+    try {
+      if (!(await flushPendingEdits())) return;
+      onMinimize();
+    } finally {
+      sessionTransitionInFlight.current = false;
+    }
   }, [dismissInlineEditing, flushPendingEdits, onMinimize]);
 
   const statusBarTop =
@@ -713,12 +852,12 @@ export function LiveSessionBottomSheet({
       // manager state".
       registerInGlobalStack={false}
       stickyFooter={
-        phase3Capture ? (
+        phase3Capture && !customerFieldFocused ? (
           <FullWidthFab
             typography={typography}
             label="END SESSION"
             accessibilityLabel="End session"
-            onPress={onEndSessionPress}
+            onPress={handleEndSessionPress}
             includeSafeArea
           />
         ) : undefined
@@ -913,45 +1052,29 @@ export function LiveSessionBottomSheet({
             </View>
 
             <View style={styles.pickerHitLayer}>
-            <EditSheet>
-              <EditIconRow icon={<EditIconPerson color={iconColor} />}>
-                <EditFieldInput
-                  typography={typography}
-                  placeholder="Customer"
-                  value={customerName}
-                  onChangeText={(t) => {
-                    setCustomerName(t);
-                    draftRef.current = { ...draftRef.current, customerName: t };
-                    schedulePersist();
-                  }}
-                  onFocus={() => onInlineFieldFocus('customerName')}
-                  onBlur={() => {
-                    onInlineFieldBlur('customerName');
-                    flushIdentity();
-                  }}
-                />
-              </EditIconRow>
-              <EditIconRow icon={<EditIconLocation color={iconColor} />} showTopBorder>
-                <EditFieldInput
-                  typography={typography}
-                  placeholder="Address"
-                  value={serviceAddress}
-                  returnKeyType="done"
-                  blurOnSubmit
-                  onChangeText={(t) => {
-                    const next = sanitizeSingleLineText(t);
-                    setServiceAddress(next);
-                    draftRef.current = { ...draftRef.current, serviceAddress: next };
-                    schedulePersist();
-                  }}
-                  onFocus={() => onInlineFieldFocus('serviceAddress')}
-                  onBlur={() => {
-                    onInlineFieldBlur('serviceAddress');
-                    flushIdentity();
-                  }}
-                />
-              </EditIconRow>
-            </EditSheet>
+            {supabase ? (
+              <CustomerFieldsBlock
+                typography={typography}
+                iconColor={iconColor}
+                draft={customerDraft}
+                onChange={updateCustomerDraft}
+                surface="live_session"
+                supabase={supabase}
+                onFocusChange={(focused) => {
+                  setCustomerFieldFocused(focused);
+                  if (focused) dismissStartedPickers();
+                }}
+                onCustomerFieldBlur={() => {
+                  void commitCustomerSnapshot();
+                }}
+                onCustomerCommit={(next) => {
+                  void commitCustomerSnapshot(next);
+                }}
+              />
+            ) : null}
+            {phase3Capture && customerSavePending ? (
+              <Text style={[typography.bodySmall, { color: fg.secondary }]}>Saving customer details…</Text>
+            ) : null}
 
             <EditSheet>
               <EditIconRow icon={<JobDetailIconSectionOtherCosts color={iconColor} />}>

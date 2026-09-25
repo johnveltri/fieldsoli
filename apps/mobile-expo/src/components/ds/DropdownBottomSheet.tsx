@@ -3,13 +3,13 @@ import {
   Pressable,
   StyleSheet,
   Text,
-  TextInput,
   useWindowDimensions,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { color, radius, space } from '@fieldsolo/design-system/lib/tokens';
 
+import { DsTextInput } from './DsTextInput';
 import { bg, border, cardShadowRn, fg } from '../../theme/nativeTokens';
 import type { TextStyles } from '../../theme/nativeTokens';
 import { SessionSheetBackIcon } from '../figma-icons/JobDetailScreenIcons';
@@ -216,7 +216,7 @@ export function DropdownBottomSheet({
             // preset row after typing doesn't send the wrong value.
             <View style={styles.customRowWrap}>
               <View style={styles.customShell}>
-                <TextInput
+                <DsTextInput
                   value={customText}
                   onChangeText={setCustomText}
                   placeholder={customPlaceholder ?? 'Custom'}

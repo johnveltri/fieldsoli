@@ -1,5 +1,5 @@
 export const JOB_EXPORT_HEADERS = [
-  'job_id', 'job_description', 'long_description', 'customer_name', 'service_address', 'work_status', 'payment_status',
+  'job_id', 'job_description', 'long_description', 'customer_name', 'customer_phone', 'customer_email', 'service_address', 'work_status', 'payment_status',
   'created_date', 'last_worked_date', 'completed_date', 'paid_date', 'revenue', 'material_cost',
   'helper_labor_cost', 'equipment_rental_cost', 'permit_cost', 'disposal_cost', 'travel_parking_cost',
   'other_cost', 'total_costs', 'net_earnings',
@@ -10,6 +10,8 @@ export type JobExportRow = {
   job_description: string;
   long_description: string | null;
   customer_name: string | null;
+  customer_phone: string | null;
+  customer_email: string | null;
   service_address: string | null;
   work_status: string;
   payment_status: string | null;
@@ -108,6 +110,8 @@ export function jobExportRowToCsv(row: JobExportRow, timeZone: string): string {
     row.job_description,
     row.long_description,
     row.customer_name,
+    row.customer_phone,
+    row.customer_email,
     row.service_address,
     row.work_status,
     row.payment_status,
@@ -123,7 +127,7 @@ export function jobExportRowToCsv(row: JobExportRow, timeZone: string): string {
 
   return cells.map((cell, index) => {
     // Only free-form, user-supplied fields need spreadsheet-formula protection.
-    if ([1, 2, 3, 4].includes(index)) return csvText(cell);
+    if ([1, 2, 3, 4, 5, 6].includes(index)) return csvText(cell);
     const text = String(cell ?? '');
     return `"${text.replaceAll('"', '""')}"`;
   }).join(',');
@@ -173,12 +177,12 @@ export function buildJobExportEmail(input: {
     `Download CSV: ${input.downloadUrl}`, '',
     `This link expires on ${expiration}.`, '',
     'Anyone with this link can download the CSV until it expires. Do not forward or share it.',
-    'The file may contain customer names, service addresses, job descriptions, and financial information. Store it securely.', '',
+    'The file may contain customer names, phone numbers, email addresses, service addresses, job descriptions, and financial information. Store it securely.', '',
     'If the button does not work, copy and paste this link into your browser:', input.downloadUrl, '',
     'If you did not request this export, do not download it. Contact support@fieldsoli.com.', '',
     'FieldSoli · support@fieldsoli.com',
   ].join('\n');
   const preview = `Download your ${year} job summary CSV before the secure link expires.`;
-  const html = `<!doctype html><html><body style="margin:0;background:#f6f7f8;font-family:Arial,sans-serif;color:#18212b"><div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent">${escapeHtml(preview)}</div><table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center" style="padding:32px 16px"><table role="presentation" width="600" cellspacing="0" cellpadding="0" style="max-width:600px;background:#fff;border-radius:12px"><tr><td style="padding:32px"><p style="margin:0 0 24px;font-weight:700;font-size:20px">FieldSoli</p><h1 style="margin:0 0 16px;font-size:26px">Your job export is ready</h1><p style="line-height:1.5">Your ${year} FieldSoli job summary CSV is ready to download.</p><p style="margin:28px 0"><a href="${safeUrl}" style="display:inline-block;background:#18212b;color:#fff;padding:13px 20px;border-radius:7px;text-decoration:none;font-weight:700">Download CSV</a></p><p style="line-height:1.5">This link expires on ${escapeHtml(expiration)}.</p><p style="line-height:1.5">Anyone with this link can download the CSV until it expires. Do not forward or share it.</p><p style="line-height:1.5">The file may contain customer names, service addresses, job descriptions, and financial information. Store it securely.</p><p style="line-height:1.5">If the button does not work, copy and paste this link into your browser:</p><p style="word-break:break-all;line-height:1.5"><a href="${safeUrl}">${safeUrl}</a></p><p style="line-height:1.5">If you did not request this export, do not download it. Contact <a href="mailto:support@fieldsoli.com">support@fieldsoli.com</a>.</p><p style="margin:28px 0 0;color:#667085;font-size:13px">FieldSoli · support@fieldsoli.com</p></td></tr></table></td></tr></table></body></html>`;
+  const html = `<!doctype html><html><body style="margin:0;background:#f6f7f8;font-family:Arial,sans-serif;color:#18212b"><div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent">${escapeHtml(preview)}</div><table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center" style="padding:32px 16px"><table role="presentation" width="600" cellspacing="0" cellpadding="0" style="max-width:600px;background:#fff;border-radius:12px"><tr><td style="padding:32px"><p style="margin:0 0 24px;font-weight:700;font-size:20px">FieldSoli</p><h1 style="margin:0 0 16px;font-size:26px">Your job export is ready</h1><p style="line-height:1.5">Your ${year} FieldSoli job summary CSV is ready to download.</p><p style="margin:28px 0"><a href="${safeUrl}" style="display:inline-block;background:#18212b;color:#fff;padding:13px 20px;border-radius:7px;text-decoration:none;font-weight:700">Download CSV</a></p><p style="line-height:1.5">This link expires on ${escapeHtml(expiration)}.</p><p style="line-height:1.5">Anyone with this link can download the CSV until it expires. Do not forward or share it.</p><p style="line-height:1.5">The file may contain customer names, phone numbers, email addresses, service addresses, job descriptions, and financial information. Store it securely.</p><p style="line-height:1.5">If the button does not work, copy and paste this link into your browser:</p><p style="word-break:break-all;line-height:1.5"><a href="${safeUrl}">${safeUrl}</a></p><p style="line-height:1.5">If you did not request this export, do not download it. Contact <a href="mailto:support@fieldsoli.com">support@fieldsoli.com</a>.</p><p style="margin:28px 0 0;color:#667085;font-size:13px">FieldSoli · support@fieldsoli.com</p></td></tr></table></td></tr></table></body></html>`;
   return { html, text };
 }

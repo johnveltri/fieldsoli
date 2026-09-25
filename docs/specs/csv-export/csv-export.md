@@ -4,7 +4,7 @@
 
 **Version:** V1
 
-**Last updated:** 2026-09-11
+**Last updated:** 2026-09-20
 
 ## Summary
 
@@ -42,7 +42,7 @@ The screen shows:
 - the **EXPORT JOBS** heading, including after the user submits a request;
 - the selected year;
 - the verified account email that will receive the link;
-- that the CSV includes completed jobs, customer names, service addresses, job details, revenue, and direct costs.
+- that the CSV includes completed jobs, customer names, phone numbers, emails, service addresses, job details, revenue, and direct costs.
 
 The recipient is not editable. The app makes no export-specific network request until the user presses **Request Export** and disables the button only while that request is in flight.
 
@@ -115,23 +115,25 @@ The fixed columns, in order, are:
 | 2 | `job_description` | `jobs.short_description`; always present |
 | 3 | `long_description` | `jobs.long_description`; blank when null |
 | 4 | `customer_name` | `jobs.customer_name`; blank when null |
-| 5 | `service_address` | Current formatted address; blank when null |
-| 6 | `work_status` | Current work status |
-| 7 | `payment_status` | Current derived payment state |
-| 8 | `created_date` | `created_at` as reporting-zone `YYYY-MM-DD` |
-| 9 | `last_worked_date` | Existing `last_worked_at` as reporting-zone `YYYY-MM-DD`; blank when null |
-| 10 | `completed_date` | `completed_at` as reporting-zone `YYYY-MM-DD` |
-| 11 | `paid_date` | `paid_at` as reporting-zone `YYYY-MM-DD` only when currently paid; otherwise blank |
-| 12 | `revenue` | `revenue_cents`; blank when null |
-| 13 | `material_cost` | Active `material` costs; `0.00` when absent |
-| 14 | `helper_labor_cost` | Active `helper_labor` costs; `0.00` when absent |
-| 15 | `equipment_rental_cost` | Active `equipment_rental` costs; `0.00` when absent |
-| 16 | `permit_cost` | Active `permit` costs; `0.00` when absent |
-| 17 | `disposal_cost` | Active `disposal` costs; `0.00` when absent |
-| 18 | `travel_parking_cost` | Active `travel_parking` costs; `0.00` when absent |
-| 19 | `other_cost` | Active `other` costs; `0.00` when absent |
-| 20 | `total_costs` | Sum of all seven cost columns |
-| 21 | `net_earnings` | Revenue minus total costs; blank when revenue is null and may be negative |
+| 5 | `customer_phone` | `jobs.customer_phone`; blank when null |
+| 6 | `customer_email` | `jobs.customer_email`; blank when null |
+| 7 | `service_address` | Current formatted address; blank when null |
+| 8 | `work_status` | Current work status |
+| 9 | `payment_status` | Current derived payment state |
+| 10 | `created_date` | `created_at` as reporting-zone `YYYY-MM-DD` |
+| 11 | `last_worked_date` | Existing `last_worked_at` as reporting-zone `YYYY-MM-DD`; blank when null |
+| 12 | `completed_date` | `completed_at` as reporting-zone `YYYY-MM-DD` |
+| 13 | `paid_date` | `paid_at` as reporting-zone `YYYY-MM-DD` only when currently paid; otherwise blank |
+| 14 | `revenue` | `revenue_cents`; blank when null |
+| 15 | `material_cost` | Active `material` costs; `0.00` when absent |
+| 16 | `helper_labor_cost` | Active `helper_labor` costs; `0.00` when absent |
+| 17 | `equipment_rental_cost` | Active `equipment_rental` costs; `0.00` when absent |
+| 18 | `permit_cost` | Active `permit` costs; `0.00` when absent |
+| 19 | `disposal_cost` | Active `disposal` costs; `0.00` when absent |
+| 20 | `travel_parking_cost` | Active `travel_parking` costs; `0.00` when absent |
+| 21 | `other_cost` | Active `other` costs; `0.00` when absent |
+| 22 | `total_costs` | Sum of all seven cost columns |
+| 23 | `net_earnings` | Revenue minus total costs; blank when revenue is null and may be negative |
 
 `long_description` exports optional Job View/Edit body copy added in Phase 2. It is separate from the title in `job_description`.
 
@@ -225,7 +227,7 @@ The HTML and plain-text versions contain the same information:
 4. **Download CSV** button.
 5. Exact expiry, for example: `This link expires on August 30, 2026 at 3:15 PM CDT (America/Chicago).`
 6. `Anyone with this link can download the CSV until it expires. Do not forward or share it.`
-7. `The file may contain customer names, service addresses, job descriptions, and financial information. Store it securely.`
+7. `The file may contain customer names, phone numbers, email addresses, service addresses, job descriptions, and financial information. Store it securely.`
 8. A visible fallback URL introduced by `If the button does not work, copy and paste this link into your browser:`.
 9. `If you did not request this export, do not download it. Contact support@fieldsoli.com.`
 10. Minimal FieldSoli footer and support address.
@@ -313,7 +315,7 @@ Automated coverage must include:
 
 - timestamp transitions and the one-time `last_worked_at` backfill;
 - time-zone account/current-year validation and DST year boundaries;
-- exact 21-column order, nulls, zero/negative values, all cost types, deduplication, Unicode, multiline text, formula protection, BOM, and CRLF;
+- exact 23-column order, including `customer_phone` and `customer_email`, plus nulls, zero/negative values, all cost types, deduplication, Unicode, multiline text, formula protection, BOM, and CRLF;
 - pagination beyond 1,000 jobs;
 - different-year requests, in-flight same-year deduplication, empty-year no-op, same-year rerequest after 15 minutes, and same-year 15-minute rate limiting;
 - worker recovery, stable email payload/idempotency, and permanent/transient provider errors;

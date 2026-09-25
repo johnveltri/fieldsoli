@@ -3,13 +3,13 @@ import {
   Pressable,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { color, radius, space } from '@fieldsolo/design-system/lib/tokens';
 // radius() still used for pill (Radius/Full).
 
+import { DsTextInput } from './DsTextInput';
 import { bg, border, cardShadowRn, fg } from '../../theme/nativeTokens';
 import type { TextStyles } from '../../theme/nativeTokens';
 import {
@@ -339,7 +339,7 @@ export function EditMaterialBottomSheet({
         </Text>
 
         <View style={styles.inputShell}>
-          <TextInput
+          <DsTextInput
             value={description}
             onChangeText={setDescription}
             placeholder={'e.g. Copper Pipe 1/2"'}
@@ -351,7 +351,7 @@ export function EditMaterialBottomSheet({
         {totalFirstMode ? (
           <>
             <View style={styles.inputShell}>
-              <TextInput
+              <DsTextInput
                 value={totalText}
                 onChangeText={setTotalText}
                 placeholder="Total"
@@ -378,7 +378,7 @@ export function EditMaterialBottomSheet({
         {!totalFirstMode || showBreakdown ? (
         <View style={styles.row}>
           <View style={[styles.inputShell, styles.priceShell]}>
-            <TextInput
+            <DsTextInput
               value={priceText}
               onChangeText={setPriceText}
               placeholder="Unit Price"
@@ -388,7 +388,7 @@ export function EditMaterialBottomSheet({
             />
           </View>
           <View style={[styles.inputShell, styles.qtyShell]}>
-            <TextInput
+            <DsTextInput
               value={qtyText}
               onChangeText={setQtyText}
               placeholder="1"

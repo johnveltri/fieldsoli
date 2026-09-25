@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { color, radius, space } from '@fieldsolo/design-system/lib/tokens';
 
+import { DsTextInput } from './DsTextInput';
 import { bg, border, cardShadowRn, fg } from '../../theme/nativeTokens';
 import type { TextStyles } from '../../theme/nativeTokens';
 import { SessionSheetBackIcon } from '../figma-icons/JobDetailScreenIcons';
@@ -92,7 +93,7 @@ export function DeleteAccountBottomSheet({
 
         <View style={styles.fields}>
           <View style={styles.inputShell}>
-            <TextInput
+            <DsTextInput
               value={confirmation}
               onChangeText={setConfirmation}
               placeholder={DELETE_ACCOUNT_CONFIRMATION_PHRASE}

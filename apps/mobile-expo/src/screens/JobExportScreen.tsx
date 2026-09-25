@@ -234,7 +234,7 @@ export function JobExportScreen({ onBack, onBackToHome }: JobExportScreenProps) 
                 <Text selectable style={[typography.labelCaps, styles.label]}>INCLUDED DATA</Text>
                 <View style={styles.infoCard}>
                   <Text selectable style={[typography.body, styles.infoBody]}>
-                    Completed jobs, customer and service details, dates, revenue, costs, and net earnings.
+                    Completed jobs, customer names, phone numbers, emails, service addresses, dates, revenue, costs, and net earnings.
                   </Text>
                 </View>
 

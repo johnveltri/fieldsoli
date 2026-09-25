@@ -1,6 +1,7 @@
 import React from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { describe, expect, it, jest } from '@jest/globals';
+import { Alert } from 'react-native';
 
 import { LiveSessionBottomSheet } from './LiveSessionBottomSheet';
 import { LegacyLiveSessionBottomSheet } from './LegacyLiveSessionBottomSheet';
@@ -51,6 +52,35 @@ jest.mock('../platform/PlatformHeaderAction', () => {
     ),
   };
 });
+
+const mockCustomerSuggestionsState = {
+  suggestions: [] as Array<{
+    customerId: string;
+    displayName: string;
+    phone: string | null;
+    email: string | null;
+    serviceAddress: string | null;
+  }>,
+  suggestionsQuery: '' as string | null,
+  loading: false,
+  error: false,
+  reload: jest.fn(),
+};
+
+jest.mock('./customer/useCustomerSuggestions', () => ({
+  ...jest.requireActual('./customer/useCustomerSuggestions'),
+  useCustomerSuggestions: () => mockCustomerSuggestionsState,
+}));
+
+jest.mock('./customer/useAddressAutocomplete', () => ({
+  useAddressAutocomplete: () => ({
+    suggestions: [],
+    loading: false,
+    noResults: false,
+    showPanel: false,
+    meetsThreshold: false,
+  }),
+}));
 
 jest.mock('./BottomSheetShell', () => {
   const { View, Text } = require('react-native');
@@ -128,10 +158,14 @@ const identity = {
   shortDescription: 'Panel upgrade',
   longDescription: '',
   customerName: 'Acme',
+  customerPhone: '',
+  customerEmail: '',
+  customerId: null as string | null,
   serviceAddress: '1 Main',
   revenueCents: null as number | null,
 };
 
+const supabase = {} as never;
 const noop = () => undefined;
 
 describe('LiveSessionBottomSheet phase3Capture', () => {
@@ -141,6 +175,7 @@ describe('LiveSessionBottomSheet phase3Capture', () => {
         typography={typography}
         visible
         phase3Capture
+        supabase={supabase}
         jobShortDescription="Panel upgrade"
         startedAt="2026-01-01T12:00:00.000Z"
         attachments={[]}
@@ -167,6 +202,7 @@ describe('LiveSessionBottomSheet phase3Capture', () => {
         startedAt={new Date().toISOString()}
         attachments={[]}
         phase3Capture
+        supabase={supabase}
         jobIdentity={identity}
         onJobIdentityChange={onJobIdentityChange}
         onAddNote={onAddNote}
@@ -191,9 +227,10 @@ describe('LiveSessionBottomSheet phase3Capture', () => {
     expect(screen.getByLabelText('End session')).toBeTruthy();
   });
 
-  it('TEST-L04 persists customer changes without a Done action', () => {
+  it('TEST-16 persists customer changes on blur, not per keystroke', () => {
     jest.useFakeTimers({ advanceTimers: true });
     const onJobIdentityChange = jest.fn();
+    const onCustomerSnapshotSave = jest.fn();
     const screen = render(
       <LiveSessionBottomSheet
         typography={typography}
@@ -202,8 +239,11 @@ describe('LiveSessionBottomSheet phase3Capture', () => {
         startedAt={new Date().toISOString()}
         attachments={[]}
         phase3Capture
+        supabase={supabase}
         jobIdentity={identity}
+        supabase={supabase}
         onJobIdentityChange={onJobIdentityChange}
+        onCustomerSnapshotSave={onCustomerSnapshotSave}
         onAddNote={noop}
         onAddMaterial={noop}
         onPressAttachment={noop}
@@ -212,12 +252,272 @@ describe('LiveSessionBottomSheet phase3Capture', () => {
       />,
     );
 
-    fireEvent.changeText(screen.getByPlaceholderText('Customer'), 'Beta Electric');
+    const customer = screen.getByPlaceholderText('Customer');
+    fireEvent.changeText(customer, 'Beta Electric');
     jest.advanceTimersByTime(500);
-    expect(onJobIdentityChange).toHaveBeenCalledWith(
+    expect(onJobIdentityChange).not.toHaveBeenCalled();
+    expect(onCustomerSnapshotSave).not.toHaveBeenCalled();
+    fireEvent(customer, 'blur');
+    expect(onCustomerSnapshotSave).toHaveBeenCalledWith(
       expect.objectContaining({ customerName: 'Beta Electric' }),
     );
     expect(screen.queryByLabelText('Done')).toBeNull();
+    screen.unmount();
+    jest.useRealTimers();
+  });
+
+  it('saves the latest customer draft when it changes during an in-flight save', async () => {
+    let resolveFirstSave: (() => void) | undefined;
+    const onCustomerSnapshotSave = jest
+      .fn<() => Promise<void>>()
+      .mockImplementationOnce(
+        () => new Promise<void>((resolve) => { resolveFirstSave = resolve; }),
+      )
+      .mockResolvedValue(undefined);
+    const screen = render(
+      <LiveSessionBottomSheet
+        typography={typography}
+        visible
+        jobShortDescription="Panel upgrade"
+        startedAt={new Date().toISOString()}
+        attachments={[]}
+        phase3Capture
+        supabase={supabase}
+        jobIdentity={identity}
+        onCustomerSnapshotSave={onCustomerSnapshotSave}
+        onAddNote={noop}
+        onAddMaterial={noop}
+        onPressAttachment={noop}
+        onMinimize={noop}
+        onEndSessionPress={noop}
+      />,
+    );
+
+    const customer = screen.getByLabelText('Customer');
+    fireEvent.changeText(customer, 'Beta Electric');
+    fireEvent(customer, 'blur');
+    await waitFor(() => expect(onCustomerSnapshotSave).toHaveBeenCalledTimes(1));
+
+    fireEvent.changeText(screen.getByLabelText('Customer'), 'Gamma Electric');
+    screen.rerender(
+      <LiveSessionBottomSheet
+        typography={typography}
+        visible
+        jobShortDescription="Panel upgrade"
+        startedAt={new Date().toISOString()}
+        attachments={[]}
+        phase3Capture
+        supabase={supabase}
+        jobIdentity={{ ...identity, customerName: 'Stale refetched name' }}
+        onCustomerSnapshotSave={onCustomerSnapshotSave}
+        onAddNote={noop}
+        onAddMaterial={noop}
+        onPressAttachment={noop}
+        onMinimize={noop}
+        onEndSessionPress={noop}
+      />,
+    );
+    expect(screen.getByDisplayValue('Gamma Electric')).toBeTruthy();
+
+    await act(async () => {
+      resolveFirstSave?.();
+    });
+
+    await waitFor(() => {
+      expect(onCustomerSnapshotSave).toHaveBeenCalledTimes(2);
+      expect(onCustomerSnapshotSave).toHaveBeenLastCalledWith(
+        expect.objectContaining({ customerName: 'Gamma Electric' }),
+      );
+    });
+    screen.unmount();
+  });
+
+  it.each([
+    ['minimize', 'Close'] as const,
+    ['end', 'End session'] as const,
+  ])('%s stays open on Customer-save failure and offers retry', async (transition, label) => {
+    let alertButtons: Parameters<typeof Alert.alert>[2] = [];
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation((_title, _message, buttons) => {
+      alertButtons = buttons ?? [];
+    });
+    const onMinimize = jest.fn();
+    const onEndSessionPress = jest.fn();
+    const onCustomerSnapshotSave = jest
+      .fn<() => Promise<void>>()
+      .mockRejectedValueOnce(new Error('Offline'))
+      .mockRejectedValueOnce(new Error('Still offline'))
+      .mockResolvedValue(undefined);
+    const screen = render(
+      <LiveSessionBottomSheet
+        typography={typography}
+        visible
+        jobShortDescription="Panel upgrade"
+        startedAt={new Date().toISOString()}
+        attachments={[]}
+        phase3Capture
+        supabase={supabase}
+        jobIdentity={identity}
+        onCustomerSnapshotSave={onCustomerSnapshotSave}
+        onAddNote={noop}
+        onAddMaterial={noop}
+        onPressAttachment={noop}
+        onMinimize={onMinimize}
+        onEndSessionPress={onEndSessionPress}
+      />,
+    );
+
+    fireEvent.changeText(screen.getByLabelText('Customer'), 'Beta Electric');
+    fireEvent.press(screen.getByLabelText(label));
+    await waitFor(() => expect(alertSpy).toHaveBeenCalledTimes(1));
+    expect(onMinimize).not.toHaveBeenCalled();
+    expect(onEndSessionPress).not.toHaveBeenCalled();
+    expect(alertSpy).toHaveBeenCalledWith(
+      "Couldn't save customer details. Try again.",
+      undefined,
+      expect.any(Array),
+      expect.any(Object),
+    );
+
+    await act(async () => {
+      alertButtons[0]?.onPress?.();
+    });
+    await waitFor(() => expect(alertSpy).toHaveBeenCalledTimes(2));
+    expect(screen.getByDisplayValue('Beta Electric')).toBeTruthy();
+    expect(onMinimize).not.toHaveBeenCalled();
+    expect(onEndSessionPress).not.toHaveBeenCalled();
+    await act(async () => {
+      alertButtons[0]?.onPress?.();
+    });
+    await waitFor(() => expect(onCustomerSnapshotSave).toHaveBeenCalledTimes(3));
+    expect(onMinimize).not.toHaveBeenCalled();
+    expect(onEndSessionPress).not.toHaveBeenCalled();
+
+    fireEvent.press(screen.getByLabelText(label));
+    await waitFor(() => {
+      if (transition === 'minimize') expect(onMinimize).toHaveBeenCalledTimes(1);
+      else expect(onEndSessionPress).toHaveBeenCalledTimes(1);
+    });
+    alertSpy.mockRestore();
+    screen.unmount();
+  });
+
+  it.each([
+    ['minimize', 'Close'] as const,
+    ['end', 'End session'] as const,
+  ])('%s waits for the customer save before closing the Live Session', async (transition, label) => {
+    let resolveSave: (() => void) | undefined;
+    const onCustomerSnapshotSave = jest.fn(
+      () => new Promise<void>((resolve) => { resolveSave = resolve; }),
+    );
+    const onMinimize = jest.fn();
+    const onEndSessionPress = jest.fn();
+    const screen = render(
+      <LiveSessionBottomSheet
+        typography={typography}
+        visible
+        jobShortDescription="Panel upgrade"
+        startedAt={new Date().toISOString()}
+        attachments={[]}
+        phase3Capture
+        supabase={supabase}
+        jobIdentity={identity}
+        onCustomerSnapshotSave={onCustomerSnapshotSave}
+        onAddNote={noop}
+        onAddMaterial={noop}
+        onPressAttachment={noop}
+        onMinimize={onMinimize}
+        onEndSessionPress={onEndSessionPress}
+      />,
+    );
+
+    fireEvent.changeText(screen.getByLabelText('Customer'), 'Beta Electric');
+    fireEvent.press(screen.getByLabelText(label));
+    await waitFor(() => expect(onCustomerSnapshotSave).toHaveBeenCalledTimes(1));
+    expect(onMinimize).not.toHaveBeenCalled();
+    expect(onEndSessionPress).not.toHaveBeenCalled();
+
+    await act(async () => {
+      resolveSave?.();
+    });
+    await waitFor(() => {
+      if (transition === 'minimize') expect(onMinimize).toHaveBeenCalledTimes(1);
+      else expect(onEndSessionPress).toHaveBeenCalledTimes(1);
+    });
+    screen.unmount();
+  });
+
+  it('restores End Session when the address input blurs and keeps the lookup row mounted', () => {
+    const screen = render(
+      <LiveSessionBottomSheet
+        typography={typography}
+        visible
+        jobShortDescription="Panel upgrade"
+        startedAt={new Date().toISOString()}
+        attachments={[]}
+        phase3Capture
+        supabase={supabase}
+        jobIdentity={identity}
+        onAddNote={noop}
+        onAddMaterial={noop}
+        onPressAttachment={noop}
+        onMinimize={noop}
+        onEndSessionPress={noop}
+      />,
+    );
+
+    const address = screen.getByLabelText('Address');
+    fireEvent(address, 'focus', { nativeEvent: { target: 1 } });
+    expect(screen.queryByLabelText('End session')).toBeNull();
+    fireEvent(address, 'blur');
+    expect(screen.getByLabelText('End session')).toBeTruthy();
+    expect(screen.getByLabelText('Address')).toBeTruthy();
+    screen.unmount();
+  });
+
+  it('restores End Session after selecting a customer suggestion', () => {
+    jest.useFakeTimers();
+    mockCustomerSuggestionsState.suggestions = [
+      {
+        customerId: 'customer-1',
+        displayName: 'Beta Electric',
+        phone: null,
+        email: null,
+        serviceAddress: null,
+      },
+    ];
+    mockCustomerSuggestionsState.suggestionsQuery = '';
+
+    const screen = render(
+      <LiveSessionBottomSheet
+        typography={typography}
+        visible
+        jobShortDescription="Panel upgrade"
+        startedAt={new Date().toISOString()}
+        attachments={[]}
+        phase3Capture
+        supabase={supabase}
+        jobIdentity={{ ...identity, customerName: '' }}
+        onAddNote={noop}
+        onAddMaterial={noop}
+        onPressAttachment={noop}
+        onMinimize={noop}
+        onEndSessionPress={noop}
+      />,
+    );
+
+    act(() => {
+      jest.advanceTimersByTime(320);
+    });
+
+    const customer = screen.getByPlaceholderText('Customer');
+    fireEvent(customer, 'focus', { nativeEvent: { target: 1 } });
+    expect(screen.queryByLabelText('End session')).toBeNull();
+
+    fireEvent.press(screen.getByLabelText('Beta Electric'));
+    expect(screen.getByLabelText('End session')).toBeTruthy();
+
+    mockCustomerSuggestionsState.suggestions = [];
+    mockCustomerSuggestionsState.suggestionsQuery = '';
     screen.unmount();
     jest.useRealTimers();
   });
@@ -232,6 +532,7 @@ describe('LiveSessionBottomSheet phase3Capture', () => {
         startedAt={new Date().toISOString()}
         attachments={[]}
         phase3Capture
+        supabase={supabase}
         jobIdentity={identity}
         onAddNote={noop}
         onAddMaterial={noop}
@@ -268,6 +569,7 @@ describe('LiveSessionBottomSheet phase3Capture', () => {
         startedAt={new Date().toISOString()}
         attachments={[]}
         phase3Capture
+        supabase={supabase}
         jobIdentity={identity}
         onJobIdentityChange={onJobIdentityChange}
         onAddNote={noop}
@@ -299,6 +601,7 @@ describe('LiveSessionBottomSheet phase3Capture', () => {
         startedAt={new Date().toISOString()}
         attachments={[]}
         phase3Capture
+        supabase={supabase}
         jobIdentity={identity}
         onCreateNote={onCreateNote}
         onAddNote={noop}
@@ -331,6 +634,7 @@ describe('LiveSessionBottomSheet phase3Capture', () => {
         startedAt={new Date().toISOString()}
         attachments={[]}
         phase3Capture
+        supabase={supabase}
         jobIdentity={identity}
         liveNotes={[{ id: 'note-1', body: 'Old note' }]}
         onCreateNote={onCreateNote}
@@ -358,7 +662,7 @@ describe('LiveSessionBottomSheet phase3Capture', () => {
     // No blur — keyboard dismiss can leave focus; Close must still persist.
     fireEvent.press(screen.getByLabelText('Close'));
 
-    expect(onMinimize).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(onMinimize).toHaveBeenCalledTimes(1));
     await waitFor(() => {
       expect(onUpdateNote).toHaveBeenCalledWith('note-1', 'Updated note');
       expect(onCreateNote).toHaveBeenCalledWith('Brand new note');
@@ -377,6 +681,7 @@ describe('LiveSessionBottomSheet phase3Capture', () => {
         startedAt={new Date().toISOString()}
         attachments={[]}
         phase3Capture
+        supabase={supabase}
         jobIdentity={identity}
         onCreateMaterial={onCreateMaterial}
         onAddNote={noop}
@@ -421,6 +726,7 @@ describe('LiveSessionBottomSheet phase3Capture', () => {
         startedAt={startedAt}
         attachments={[]}
         phase3Capture
+        supabase={supabase}
         jobIdentity={identity}
         onChangeStartedAt={onChangeStartedAt}
         onAddNote={noop}
@@ -458,6 +764,7 @@ describe('LiveSessionBottomSheet phase3Capture', () => {
         startedAt={new Date().toISOString()}
         attachments={[]}
         phase3Capture
+        supabase={supabase}
         jobIdentity={identity}
         onAddNote={noop}
         onAddMaterial={noop}
@@ -485,6 +792,7 @@ describe('LiveSessionBottomSheet phase3Capture', () => {
         startedAt={new Date().toISOString()}
         attachments={[]}
         phase3Capture
+        supabase={supabase}
         jobIdentity={identity}
         onAddNote={noop}
         onAddMaterial={noop}
@@ -512,6 +820,7 @@ describe('LiveSessionBottomSheet phase3Capture', () => {
         startedAt={new Date().toISOString()}
         attachments={[]}
         phase3Capture
+        supabase={supabase}
         jobIdentity={identity}
         onAddNote={noop}
         onAddMaterial={noop}
@@ -543,6 +852,7 @@ describe('LiveSessionBottomSheet phase3Capture', () => {
         startedAt={new Date().toISOString()}
         attachments={[]}
         phase3Capture
+        supabase={supabase}
         jobIdentity={identity}
         onAddNote={noop}
         onAddMaterial={noop}
@@ -574,6 +884,7 @@ describe('LiveSessionBottomSheet phase3Capture', () => {
         startedAt={new Date().toISOString()}
         attachments={[]}
         phase3Capture
+        supabase={supabase}
         jobIdentity={identity}
         onAddNote={noop}
         onAddMaterial={noop}

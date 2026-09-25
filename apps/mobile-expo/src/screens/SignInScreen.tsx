@@ -34,6 +34,7 @@ import {
 } from '../lib/legal-versions';
 import { cacheLegalAcceptance } from '../lib/legalAcceptanceStorage';
 import { supabase } from '../lib/supabase';
+import { DsTextInput } from '../components/ds/DsTextInput';
 import { cardShadowRn, createTextStyles, fg, space } from '../theme/nativeTokens';
 import { useContentColumn } from '../theme/useContentColumn';
 import { announceAccessibilityMessage } from '../lib/accessibility';
@@ -567,7 +568,7 @@ export function SignInScreen() {
                 >
                   First name
                 </Text>
-                <TextInput
+                <DsTextInput
                   value={firstName}
                   onChangeText={(value) => {
                     setFirstName(value);
@@ -598,7 +599,7 @@ export function SignInScreen() {
                 >
                   Last name
                 </Text>
-                <TextInput
+                <DsTextInput
                   ref={lastNameInputRef}
                   value={lastName}
                   onChangeText={(value) => {
@@ -625,7 +626,7 @@ export function SignInScreen() {
             <Text style={[text.caption, { color: fg.secondary, marginBottom: space('Spacing/8') }]}>
               Email
             </Text>
-            <TextInput
+            <DsTextInput
               ref={emailInputRef}
               value={email}
               onChangeText={(value) => {
@@ -665,7 +666,7 @@ export function SignInScreen() {
               Password
             </Text>
             <View style={styles.passwordInputShell}>
-              <TextInput
+              <DsTextInput
                 ref={passwordInputRef}
                 value={password}
                 onChangeText={(value) => {
@@ -747,7 +748,7 @@ export function SignInScreen() {
                 >
                   Confirm password
                 </Text>
-                <TextInput
+                <DsTextInput
                   ref={confirmPasswordInputRef}
                   value={confirmPassword}
                   onChangeText={(value) => {

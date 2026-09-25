@@ -72,6 +72,9 @@ import {
   JobDetailIconTopClose,
   JobDetailIconTopEdit,
 } from '../components/figma-icons/JobDetailScreenIcons';
+import { EditIconPerson } from '../components/ds/edit-mode/EditModeIcons';
+import { buildCustomerContactActions } from '@fieldsolo/api-client';
+import { showCustomerContactMenu } from '../lib/customerContactMenu';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { color, colorWithAlpha, radius } from '@fieldsolo/design-system/lib/tokens';
 import {
@@ -713,6 +716,9 @@ export function JobDetailScreen({
       shortDescription: j.shortDescription,
       longDescription: j.longDescription ?? '',
       customerName: j.customerName,
+      customerPhone: j.customerPhone,
+      customerEmail: j.customerEmail,
+      customerId: j.customerId,
       serviceAddress: j.serviceAddress,
       revenue,
     };
@@ -728,12 +734,24 @@ export function JobDetailScreen({
       setJobSaving(true);
       try {
         const before = toEditValues(job);
-        await updateJobById(supabase, job.id, {
-          shortDescription: values.shortDescription,
-          longDescription: values.longDescription,
-          customerName: values.customerName.trim(),
-          serviceAddress: values.serviceAddress.trim(),
-          revenueCents,
+        await applyJobDetailEdit(supabase, job.id, {
+          job: {
+            shortDescription: values.shortDescription.trim(),
+            longDescription: values.longDescription,
+            customerName: values.customerName.trim(),
+            customerPhone: values.customerPhone.trim() || null,
+            customerEmail: values.customerEmail.trim() || null,
+            customerId: values.customerId ?? null,
+            serviceAddress: values.serviceAddress.trim(),
+            revenueCents,
+            noRevenueConfirmed: job.noRevenueConfirmed,
+            noMaterialsConfirmed: job.noMaterialsConfirmed,
+            noOtherCostsConfirmed: job.noOtherCostsConfirmed,
+          },
+          sessions: { create: [], update: [], deleteIds: [] },
+          notes: { create: [], update: [], deleteIds: [] },
+          materials: { create: [], update: [], deleteIds: [] },
+          otherCosts: { create: [], update: [], deleteIds: [] },
         });
         const refreshed = await fetchJobDetail(supabase, job.id);
         if (refreshed) setJob(refreshed);
@@ -2808,6 +2826,20 @@ export function JobDetailScreen({
       ? 'Next'
       : 'Done';
 
+  const customerContactActions = buildCustomerContactActions(
+    job.customerPhone,
+    job.customerEmail,
+  );
+  const contactCustomerButton =
+    customerContactActions.length > 0 ? (
+      <PlatformHeaderAction
+        accessibilityLabel="Contact customer"
+        onPress={() => showCustomerContactMenu(job.customerPhone, job.customerEmail)}
+      >
+        <EditIconPerson color={fg.primary} />
+      </PlatformHeaderAction>
+    ) : null;
+
   const sharedTopHeader = (
     <View style={styles.sharedTopHeader}>
       <PlatformHeaderAction
@@ -2847,15 +2879,18 @@ export function JobDetailScreen({
           )}
         </Pressable>
       ) : (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Edit job"
-          onPress={onEdit}
-          style={({ pressed }) => [styles.editButton, pressed && styles.pressed, styles.editButtonShared]}
-        >
-          <JobDetailIconTopEdit color={bg.canvasWarm} />
-          <Text style={[typography.pillCompact, styles.actionButtonLabelOnDark]}>EDIT</Text>
-        </Pressable>
+        <View style={styles.headerActionRow}>
+          {contactCustomerButton}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Edit job"
+            onPress={onEdit}
+            style={({ pressed }) => [styles.editButton, pressed && styles.pressed, styles.editButtonShared]}
+          >
+            <JobDetailIconTopEdit color={bg.canvasWarm} />
+            <Text style={[typography.pillCompact, styles.actionButtonLabelOnDark]}>EDIT</Text>
+          </Pressable>
+        </View>
       )}
     </View>
   );
@@ -2874,15 +2909,18 @@ export function JobDetailScreen({
                 <JobDetailIconTopClose color={fg.primary} />
               </PlatformHeaderAction>
             </View>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Edit job"
-              onPress={onEdit}
-              style={({ pressed }) => [styles.editButton, pressed && styles.pressed]}
-            >
-              <JobDetailIconTopEdit color={bg.canvasWarm} />
-              <Text style={[typography.pillCompact, styles.actionButtonLabelOnDark]}>EDIT</Text>
-            </Pressable>
+            <View style={styles.headerActionRow}>
+              {contactCustomerButton}
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Edit job"
+                onPress={onEdit}
+                style={({ pressed }) => [styles.editButton, pressed && styles.pressed]}
+              >
+                <JobDetailIconTopEdit color={bg.canvasWarm} />
+                <Text style={[typography.pillCompact, styles.actionButtonLabelOnDark]}>EDIT</Text>
+              </Pressable>
+            </View>
           </View>
         </View>
       )}
@@ -2892,6 +2930,8 @@ export function JobDetailScreen({
           title={job.shortDescription}
           longDescription={job.longDescription}
           customerName={job.customerName}
+          customerPhone={job.customerPhone}
+          customerEmail={job.customerEmail}
           serviceAddress={job.serviceAddress}
           lastWorkedLabel={job.lastWorkedLabel}
           workStatus={job.workStatus}
@@ -3220,6 +3260,7 @@ export function JobDetailScreen({
                   void onDeleteJobFromEdit();
                 }}
                 editApi={editApi}
+                supabase={supabase}
               />
             </Animated.View>
           </View>
@@ -3240,6 +3281,7 @@ export function JobDetailScreen({
             void onDeleteJobFromEdit();
           }}
           editApi={editApi}
+          supabase={supabase}
         />
       ) : (
         viewScroll
@@ -3249,6 +3291,7 @@ export function JobDetailScreen({
         <EditJobBottomSheet
           typography={typography}
           values={job ? toEditValues(job) : undefined}
+          supabase={supabase}
           revenueError={editJobRevenueError}
           visible={editSheetVisible}
           onClose={onCloseEditSheet}
@@ -3916,6 +3959,11 @@ const styles = StyleSheet.create({
   },
   editButtonShared: {
     marginTop: 0,
+  },
+  headerActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space('Spacing/8'),
   },
   sharedTopHeader: {
     flexDirection: 'row',

@@ -1,4 +1,6 @@
+import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { formatCustomerPhoneDisplay } from '@fieldsolo/api-client';
 import { radius, space } from '@fieldsolo/design-system/lib/tokens';
 import type { JobDetailWorkStatus } from '@fieldsolo/shared-types';
 
@@ -6,10 +8,85 @@ import type { TextStyles } from '../../theme/nativeTokens';
 import { screenHeaderA11y } from '../../lib/accessibility';
 import { JobDetailStatusPill } from './JobDetailStatusPill';
 
+type CustomerHeaderInput = {
+  customerName: string;
+  customerPhone: string;
+  customerEmail: string;
+  serviceAddress: string;
+  lastWorkedLabel: string;
+};
+
+export type CustomerSubtitleSegment = {
+  text: string;
+  /** When true, keep the segment on one line (move to next line rather than wrap mid-value). */
+  keepWhole: boolean;
+};
+
+const BULLET = ' · ';
+
+/** Prevent mid-phone / mid-email wraps; RN breaks between sibling `Text` nodes instead. */
+export function toNonBreakingSegmentText(text: string): string {
+  return text.replace(/ /g, '\u00A0').replace(/-/g, '\u2011');
+}
+
+export function buildCustomerSubtitleSegments(
+  input: CustomerHeaderInput,
+): CustomerSubtitleSegment[] {
+  const segments: CustomerSubtitleSegment[] = [];
+  const name = input.customerName.trim();
+  segments.push({ text: name.length > 0 ? name : 'No Customer', keepWhole: false });
+
+  const phone =
+    formatCustomerPhoneDisplay(input.customerPhone) ?? input.customerPhone.trim();
+  if (phone.length > 0) {
+    segments.push({ text: phone, keepWhole: true });
+  }
+
+  const email = input.customerEmail.trim();
+  if (email.length > 0) {
+    segments.push({ text: email, keepWhole: true });
+  }
+
+  const address = input.serviceAddress.trim().replace(/\s*\n\s*/g, ', ');
+  if (address.length > 0) {
+    segments.push({ text: address, keepWhole: false });
+  }
+
+  const lastWorked = input.lastWorkedLabel.trim();
+  if (lastWorked.length > 0) {
+    segments.push({ text: lastWorked, keepWhole: false });
+  }
+
+  return segments;
+}
+
+export function buildCustomerSubtitleLabel(input: CustomerHeaderInput): string {
+  return buildCustomerSubtitleSegments(input)
+    .map((segment) => segment.text)
+    .join(BULLET);
+}
+
+function buildCustomerSubtitleContent(segments: CustomerSubtitleSegment[]): ReactNode[] {
+  const nodes: ReactNode[] = [];
+  segments.forEach((segment, index) => {
+    if (index > 0) nodes.push(BULLET);
+    if (segment.keepWhole) {
+      nodes.push(
+        <Text key={index}>{toNonBreakingSegmentText(segment.text)}</Text>,
+      );
+    } else {
+      nodes.push(segment.text);
+    }
+  });
+  return nodes;
+}
+
 export function JobDetailJobHeader({
   title,
   longDescription,
   customerName,
+  customerPhone,
+  customerEmail,
   serviceAddress,
   lastWorkedLabel,
   workStatus,
@@ -20,6 +97,8 @@ export function JobDetailJobHeader({
   title: string;
   longDescription?: string;
   customerName: string;
+  customerPhone: string;
+  customerEmail: string;
   serviceAddress: string;
   lastWorkedLabel: string;
   workStatus: JobDetailWorkStatus;
@@ -27,13 +106,21 @@ export function JobDetailJobHeader({
   onTitlePress?: () => void;
   onCustomerPress?: () => void;
 }) {
-  const customerLabel = customerName.trim().length > 0 ? customerName.trim() : 'No Customer';
-  const addressLabel =
-    serviceAddress.trim().length > 0
-      ? serviceAddress.trim().replace(/\s*\n\s*/g, ', ')
-      : 'No Address';
-  const subtitleLabel = `${customerLabel} • ${addressLabel} • ${lastWorkedLabel}`;
+  const customerInput = {
+    customerName,
+    customerPhone,
+    customerEmail,
+    serviceAddress,
+    lastWorkedLabel,
+  };
+  const subtitleSegments = buildCustomerSubtitleSegments(customerInput);
+  const subtitleLabel = buildCustomerSubtitleLabel(customerInput);
   const description = longDescription?.trim() ?? '';
+  const subtitleContent = (
+    <Text style={typography.jobDetailSubtitle}>
+      {buildCustomerSubtitleContent(subtitleSegments)}
+    </Text>
+  );
 
   const titleStyle = [typography.displayH1, styles.jobTitle];
   const descriptionEl =
@@ -74,12 +161,10 @@ export function JobDetailJobHeader({
             onPress={onCustomerPress}
             style={({ pressed }) => [styles.subtitlePressable, pressed && styles.pressed]}
           >
-            <Text style={typography.jobDetailSubtitle}>{subtitleLabel}</Text>
+            {subtitleContent}
           </Pressable>
         ) : (
-          <View style={styles.subtitlePressable}>
-            <Text style={typography.jobDetailSubtitle}>{subtitleLabel}</Text>
-          </View>
+          <View style={styles.subtitlePressable}>{subtitleContent}</View>
         )}
       </View>
     </View>

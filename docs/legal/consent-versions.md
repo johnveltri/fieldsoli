@@ -4,8 +4,8 @@ This file is the canonical source of truth for current legal document version id
 
 | Document | Version constant | Effective date |
 | --- | --- | --- |
-| Privacy Policy | `2026-08-30` | August 30, 2026 |
-| Terms of Service | `2026-08-30` | August 30, 2026 |
+| Privacy Policy | `2026-09-20` | September 20, 2026 |
+| Terms of Service | `2026-09-20` | September 20, 2026 |
 
 ## Where versions are referenced
 

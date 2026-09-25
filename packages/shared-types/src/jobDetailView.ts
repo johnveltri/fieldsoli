@@ -159,6 +159,10 @@ export type JobDetailViewModel = {
   /** Optional longer description under the title. Empty string when unset. */
   longDescription: string;
   customerName: string;
+  customerPhone: string;
+  customerEmail: string;
+  /** Linked reusable customer identity when present. */
+  customerId: string | null;
   serviceAddress: string;
   jobType: string;
   lastWorkedLabel: string;
