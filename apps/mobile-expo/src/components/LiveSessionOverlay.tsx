@@ -3,7 +3,7 @@ import {
   fieldsoloExpoFontAssets,
   fieldsoloLoadedFonts,
 } from '@fieldsolo/design-system/expo/loadFieldSoloFonts';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Animated, Modal, Platform, StyleSheet, useWindowDimensions } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -17,7 +17,7 @@ import {
   deleteNote,
   fetchJobDetail,
   saveJobCustomer,
-  updateJobById,
+  updateLiveSessionJobIdentityById,
   updateMaterial,
   updateNote,
 } from '@fieldsolo/api-client';
@@ -120,6 +120,9 @@ export function LiveSessionOverlay({
   );
 
   const [jobDetail, setJobDetail] = useState<JobDetailViewModel | null>(null);
+  const jobDetailRequestSequence = useRef(0);
+  const activeJobIdRef = useRef(liveSession?.jobId ?? null);
+  activeJobIdRef.current = liveSession?.jobId ?? null;
 
   const [noteFlow, setNoteFlow] = useState<NoteFlow>('closed');
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
@@ -141,9 +144,17 @@ export function LiveSessionOverlay({
 
   const refetchJobDetail = useCallback(async () => {
     if (!liveSession || !isSupabaseConfigured()) return;
+    const jobId = liveSession.jobId;
+    const requestSequence = ++jobDetailRequestSequence.current;
     try {
-      const j = await fetchJobDetail(supabase, liveSession.jobId);
-      if (j) setJobDetail(j);
+      const j = await fetchJobDetail(supabase, jobId);
+      if (
+        j &&
+        requestSequence === jobDetailRequestSequence.current &&
+        activeJobIdRef.current === jobId
+      ) {
+        setJobDetail(j);
+      }
     } catch {
       // best-effort; attachment list may stay stale
     }
@@ -781,11 +792,6 @@ export function LiveSessionOverlay({
       const base = phase3JobIdentity ?? {
         shortDescription: liveSession.jobShortDescription || '',
         longDescription: '',
-        customerName: '',
-        customerPhone: '',
-        customerEmail: '',
-        customerId: null,
-        serviceAddress: '',
         revenueCents: null as number | null,
       };
       const next = {
@@ -797,11 +803,9 @@ export function LiveSessionOverlay({
       const title = next.shortDescription.trim();
       if (!title) return;
       try {
-        await updateJobById(supabase, liveSession.jobId, {
+        await updateLiveSessionJobIdentityById(supabase, liveSession.jobId, {
           shortDescription: title,
           longDescription: next.longDescription,
-          customerName: base.customerName.trim(),
-          serviceAddress: base.serviceAddress.trim(),
           revenueCents: next.revenueCents,
         });
         if (patch.shortDescription !== undefined) {
@@ -857,24 +861,15 @@ export function LiveSessionOverlay({
   const onPhase3CustomerSnapshotSave = useCallback(
     async (draft: CustomerDraft) => {
       if (!liveSession || !phase3Capture) return;
-      try {
-        await saveJobCustomer(supabase, liveSession.jobId, {
-          customerId: draft.customerId,
-          customerName: draft.customerName.trim(),
-          customerPhone: draft.customerPhone.trim() || null,
-          customerEmail: draft.customerEmail.trim() || null,
-          serviceAddress: draft.serviceAddress.trim() || null,
-        });
-        await refetchJobDetail();
-        invalidateJobsList();
-      } catch {
-        Alert.alert(
-          "Couldn't save customer details. Try again.",
-          undefined,
-          [{ text: 'Try again' }],
-        );
-        throw new Error('customer_save_failed');
-      }
+      await saveJobCustomer(supabase, liveSession.jobId, {
+        customerId: draft.customerId,
+        customerName: draft.customerName.trim(),
+        customerPhone: draft.customerPhone.trim() || null,
+        customerEmail: draft.customerEmail.trim() || null,
+        serviceAddress: draft.serviceAddress.trim() || null,
+      });
+      await refetchJobDetail();
+      invalidateJobsList();
     },
     [invalidateJobsList, liveSession, phase3Capture, refetchJobDetail],
   );

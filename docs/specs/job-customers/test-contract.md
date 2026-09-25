@@ -93,6 +93,9 @@ Covers REQ-11; STATE-03 through STATE-05.
 - Delete newest linked Job: defaults and recency recompute from newest remaining active Job.
 - Delete final active linked Job: Customer becomes unavailable.
 - Restore a Job: Customer reactivates/recomputes.
+- Reassign a Job while its old Customer retains another active Job: defaults recompute from the remaining Job.
+- Reassign the old Customer's final active Job: it becomes soft-deleted.
+- Explicitly unlink a Job while other links remain: the Customer stays active.
 - Operational Job status changes alone do not hide the Customer.
 
 ### TEST-07 — Transactionality and conflicts
@@ -149,6 +152,7 @@ Valid phone produces Call/Text URLs; valid email produces Email URL; invalid/mis
 Covers REQ-04, REQ-05; UX-01, UX-05.
 
 Verify field order, keyboard props, initial values, draft changes, atomic `Done` payload, `Cancel`, permissive invalid values, and keyboard-aware scroll behavior.
+Phone, Email, and Address remain visible when Customer is blank and after its name is cleared. Focusing a name-only Customer does not remount the TextInput or lose keyboard focus.
 
 ### TEST-14 — Picker recents and rows
 
@@ -171,7 +175,11 @@ Covers REQ-06; UX-06.
 - Saved-Customer, device-contact, and address selection call once immediately.
 - Minimize/end flush a focused dirty field.
 - Failure retains draft, shows exact retry copy, and retry succeeds.
+- A second field edit made during a pending save is persisted after the first write completes; stale detail refetches never replace the dirty draft.
+- End Session and minimize wait for the latest customer save; failed saves keep the Live Session open.
+- Live Session identity and Customer saves preserve each other's columns regardless of completion order.
 - Existing non-customer persistence remains unchanged.
+- Address blur restores End Session while preserving address suggestion taps.
 
 ### TEST-17 — Device-contact permission timing
 

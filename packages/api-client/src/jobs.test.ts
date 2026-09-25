@@ -15,6 +15,7 @@ import {
   listJobsForCurrentUserPage,
   listRecentJobsForCurrentUser,
   updateJobById,
+  updateLiveSessionJobIdentityById,
   updateJobCostsReviewed,
   updateJobNoRevenueConfirmed,
   bumpJobToInProgressIfNotStarted,
@@ -498,6 +499,35 @@ describe('jobs api client', () => {
       long_description: 'Recaulk and replace the valve.',
       customer_name: 'Jane Doe',
       service_address: '101 Main St',
+      revenue_cents: 125000,
+    });
+  });
+
+  it('updates only Live Session identity columns, leaving customer fields untouched', async () => {
+    let patch: unknown;
+    const client = makeClient({
+      authUserId: 'user-1',
+      buildersByTable: {
+        jobs: [
+          makeBuilder({
+            onUpdate: (value) => {
+              patch = value;
+            },
+            maybeSingleResult: { data: { id: 'job-1' }, error: null },
+          }),
+        ],
+      },
+    });
+
+    await updateLiveSessionJobIdentityById(client as never, 'job-1', {
+      shortDescription: '  Replace ceiling fan  ',
+      longDescription: '  Recaulk the valve.  ',
+      revenueCents: 125000,
+    });
+
+    expect(patch).toEqual({
+      short_description: 'Replace ceiling fan',
+      long_description: 'Recaulk the valve.',
       revenue_cents: 125000,
     });
   });

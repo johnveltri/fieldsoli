@@ -142,7 +142,6 @@ export function CustomerFieldsBlock({
     maybeReplaceDraft(next, 'device_contact');
   }, [draft, maybeReplaceDraft, surface]);
 
-  const hasCustomerName = draft.customerName.trim().length > 0;
   const contactSwipeable = isCustomerContactSwipeable(draft, customerFocused);
   const trimmedCustomerQuery = draft.customerName.trim();
   const visibleSuggestions = visibleCustomerSuggestions(
@@ -157,7 +156,6 @@ export function CustomerFieldsBlock({
       trimmedCustomerQuery.length === 0 ||
       loading ||
       visibleSuggestions.length > 0);
-  const showContactDetailFields = hasCustomerName && !customerFocused;
   const showAddressSuggestionPanel =
     addressFocused && addressLookup.meetsThreshold && addressLookup.showPanel;
 
@@ -211,84 +209,80 @@ export function CustomerFieldsBlock({
           ) : null}
         </View>
       </EditIconGroup>
-      {showContactDetailFields ? (
-        <>
-          <EditIconRow icon={<EditIconPhone color={iconColor} />}>
-            <EditFieldInput
+      <EditIconRow icon={<EditIconPhone color={iconColor} />}>
+        <EditFieldInput
+          typography={typography}
+          placeholder="Phone"
+          accessibilityLabel="Phone"
+          value={draft.customerPhone}
+          keyboardType="phone-pad"
+          onChangeText={(text) => onChange({ customerPhone: text })}
+          onBlur={() => {
+            onCustomerFieldBlur?.();
+            onFocusChange?.(false);
+          }}
+          onFocus={() => {
+            setAddressFocused(false);
+            onFocusChange?.(true);
+          }}
+        />
+      </EditIconRow>
+      <EditIconRow icon={<EditIconEmail color={iconColor} />}>
+        <EditFieldInput
+          typography={typography}
+          placeholder="Email"
+          accessibilityLabel="Email"
+          value={draft.customerEmail}
+          keyboardType="email-address"
+          autoCapitalize="none"
+          autoCorrect={false}
+          onChangeText={(text) => onChange({ customerEmail: text })}
+          onBlur={() => {
+            onCustomerFieldBlur?.();
+            onFocusChange?.(false);
+          }}
+          onFocus={() => {
+            setAddressFocused(false);
+            onFocusChange?.(true);
+          }}
+        />
+      </EditIconRow>
+      <EditIconGroup
+        icon={<EditIconLocation color={iconColor} />}
+        iconAlign={showAddressSuggestionPanel ? 'top' : 'center'}
+      >
+        <View style={styles.addressColumn}>
+          <EditFieldInput
+            typography={typography}
+            placeholder="Address"
+            accessibilityLabel="Address"
+            value={draft.serviceAddress}
+            onChangeText={(text) =>
+              onChange({ serviceAddress: text.replace(/[\r\n]+/g, ' ') })
+            }
+            onFocus={() => {
+              setAddressFocused(true);
+              onFocusChange?.(true);
+            }}
+            onBlur={() => {
+              // Keep lookup results mounted through suggestion taps after blur.
+              onCustomerFieldBlur?.();
+              onFocusChange?.(false);
+            }}
+            returnKeyType="done"
+            blurOnSubmit
+          />
+          {showAddressSuggestionPanel ? (
+            <AddressSuggestionPanel
               typography={typography}
-              placeholder="Phone"
-              accessibilityLabel="Phone"
-              value={draft.customerPhone}
-              keyboardType="phone-pad"
-              onChangeText={(text) => onChange({ customerPhone: text })}
-              onBlur={() => {
-                onCustomerFieldBlur?.();
-                onFocusChange?.(false);
-              }}
-              onFocus={() => {
-                setAddressFocused(false);
-                onFocusChange?.(true);
-              }}
+              suggestions={addressLookup.suggestions}
+              loading={addressLookup.loading}
+              noResults={addressLookup.noResults}
+              onSelect={handleAddressSuggestionSelect}
             />
-          </EditIconRow>
-          <EditIconRow icon={<EditIconEmail color={iconColor} />}>
-            <EditFieldInput
-              typography={typography}
-              placeholder="Email"
-              accessibilityLabel="Email"
-              value={draft.customerEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
-              onChangeText={(text) => onChange({ customerEmail: text })}
-              onBlur={() => {
-                onCustomerFieldBlur?.();
-                onFocusChange?.(false);
-              }}
-              onFocus={() => {
-                setAddressFocused(false);
-                onFocusChange?.(true);
-              }}
-            />
-          </EditIconRow>
-          <EditIconGroup
-            icon={<EditIconLocation color={iconColor} />}
-            iconAlign={showAddressSuggestionPanel ? 'top' : 'center'}
-          >
-            <View style={styles.addressColumn}>
-              <EditFieldInput
-                typography={typography}
-                placeholder="Address"
-                accessibilityLabel="Address"
-                value={draft.serviceAddress}
-                onChangeText={(text) =>
-                  onChange({ serviceAddress: text.replace(/[\r\n]+/g, ' ') })
-                }
-                onFocus={() => {
-                  setAddressFocused(true);
-                  onFocusChange?.(true);
-                }}
-                onBlur={() => {
-                  // Keep the lookup session active through layout-induced blurs and
-                  // suggestion taps. Other fields / keyboard-hide end the session.
-                  onCustomerFieldBlur?.();
-                }}
-                returnKeyType="done"
-                blurOnSubmit
-              />
-              {showAddressSuggestionPanel ? (
-                <AddressSuggestionPanel
-                  typography={typography}
-                  suggestions={addressLookup.suggestions}
-                  loading={addressLookup.loading}
-                  noResults={addressLookup.noResults}
-                  onSelect={handleAddressSuggestionSelect}
-                />
-              ) : null}
-            </View>
-          </EditIconGroup>
-        </>
-      ) : null}
+          ) : null}
+        </View>
+      </EditIconGroup>
     </>
   );
 

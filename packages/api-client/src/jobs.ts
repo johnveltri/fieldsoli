@@ -84,6 +84,12 @@ export type UpdateJobInput = {
   revenueCents: number | null;
 };
 
+export type UpdateLiveSessionJobIdentityInput = {
+  shortDescription: string;
+  longDescription: string;
+  revenueCents: number | null;
+};
+
 export type ListJobsForCurrentUserItem = {
   id: JobId;
   shortDescription: string;
@@ -1110,6 +1116,43 @@ export async function updateJobById(
   const { data, error } = await client
     .from('jobs')
     .update(patch)
+    .eq('id', id)
+    .is('deleted_at', null)
+    .select('id')
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) {
+    throw new Error('Update affected no rows (check RLS: job must be owned by you).');
+  }
+}
+
+/** Updates only the non-customer fields edited inline in a Live Session. */
+export async function updateLiveSessionJobIdentityById(
+  client: FieldSoloSupabaseClient,
+  id: JobId,
+  input: UpdateLiveSessionJobIdentityInput,
+): Promise<void> {
+  const shortDescription = input.shortDescription
+    .trim()
+    .slice(0, JOB_SHORT_DESCRIPTION_MAX_LENGTH);
+  if (!shortDescription) {
+    throw new Error('Short description is required.');
+  }
+  if (
+    input.revenueCents != null &&
+    (!Number.isInteger(input.revenueCents) || input.revenueCents < 0)
+  ) {
+    throw new Error('Revenue must be a non-negative dollar amount.');
+  }
+
+  const { data, error } = await client
+    .from('jobs')
+    .update({
+      short_description: shortDescription,
+      long_description: input.longDescription.trim() || null,
+      revenue_cents: input.revenueCents,
+    })
     .eq('id', id)
     .is('deleted_at', null)
     .select('id')

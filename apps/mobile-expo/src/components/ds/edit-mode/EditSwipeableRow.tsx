@@ -11,7 +11,7 @@ type EditSwipeableRowProps = {
   children: ReactNode;
   onDelete: () => void;
   accessibilityLabel: string;
-  /** When false, renders the row without swipe-to-delete (stable tree for focus). */
+  /** When false, disables swipe-to-delete without remounting children that may hold focus. */
   enabled?: boolean;
 };
 
@@ -63,28 +63,21 @@ export function EditSwipeableRow({
     );
   };
 
-  const row = (
-    <View accessibilityLabel={accessibilityLabel} style={styles.row}>
-      {children}
-    </View>
-  );
-
-  if (!enabled) {
-    return row;
-  }
-
   return (
     <AccessibleSwipeable
       ref={swipeRef}
+      enabled={enabled}
       friction={2}
       overshootRight={false}
-      renderRightActions={renderRightActions}
-      accessibilityActions={[{ name: 'delete', label: 'Delete' }]}
+      renderRightActions={enabled ? renderRightActions : undefined}
+      accessibilityActions={enabled ? [{ name: 'delete', label: 'Delete' }] : []}
       onAccessibilityAction={(e) => {
-        if (e.nativeEvent.actionName === 'delete') onDelete();
+        if (enabled && e.nativeEvent.actionName === 'delete') onDelete();
       }}
     >
-      {row}
+      <View accessibilityLabel={accessibilityLabel} style={styles.row}>
+        {children}
+      </View>
     </AccessibleSwipeable>
   );
 }

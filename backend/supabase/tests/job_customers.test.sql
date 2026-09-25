@@ -21,6 +21,8 @@ declare
   job_a uuid;
   job_b uuid;
   job_c uuid;
+  job_d uuid;
+  job_e uuid;
   customer_1 uuid;
   customer_2 uuid;
   result jsonb;
@@ -241,6 +243,154 @@ begin
     select 1 from public.customers where id = customer_1 and deleted_at is null
   ) then
     raise exception 'TEST-06 failed: customer not reactivated after job restore';
+  end if;
+
+  -- TEST-06: reassignment recomputes both the old and new Customer.
+  insert into public.jobs (user_id, short_description, revenue_cents)
+  values (user_a, 'Remaining old-customer job', 3500)
+  returning id into job_d;
+  result := public.save_job_customer(job_d, jsonb_build_object(
+    'customerId', customer_1::text,
+    'customerName', 'Jordan Lee',
+    'customerPhone', '(312) 555-0198',
+    'customerEmail', 'jordan@example.com',
+    'serviceAddress', '789 Pine Ave'
+  ));
+  if result ->> 'status' <> 'ok' then
+    raise exception 'TEST-06 reassignment setup failed: %', result;
+  end if;
+
+  insert into public.jobs (user_id, short_description, revenue_cents)
+  values (user_a, 'Other customer job', 4500)
+  returning id into job_e;
+  result := public.save_job_customer(job_e, jsonb_build_object(
+    'customerName', 'Casey Lane',
+    'customerPhone', '(847) 555-0134',
+    'customerEmail', 'casey@example.com',
+    'serviceAddress', '12 Lake St'
+  ));
+  customer_2 := (result #>> '{snapshot,customerId}')::uuid;
+  if customer_2 is null then
+    raise exception 'TEST-06 reassignment setup failed: second Customer was not created';
+  end if;
+
+  result := public.save_job_customer(job_b, jsonb_build_object(
+    'customerId', customer_2::text,
+    'customerName', 'Casey Lane',
+    'customerPhone', '(847) 555-0134',
+    'customerEmail', 'casey@example.com',
+    'serviceAddress', '22 River Rd'
+  ));
+  if result ->> 'status' <> 'ok'
+    or (result #>> '{snapshot,customerId}')::uuid is distinct from customer_2 then
+    raise exception 'TEST-06 reassignment to existing Customer failed: %', result;
+  end if;
+  if not exists (
+    select 1 from public.customers
+    where id = customer_1
+      and display_name = 'Jordan Lee'
+      and last_service_address = '789 Pine Ave'
+      and deleted_at is null
+  ) then
+    raise exception 'TEST-06 failed: previous Customer did not recompute from its remaining Job';
+  end if;
+  if not exists (
+    select 1 from public.customers
+    where id = customer_2
+      and display_name = 'Casey Lane'
+      and last_service_address = '22 River Rd'
+      and deleted_at is null
+  ) then
+    raise exception 'TEST-06 failed: new Customer did not recompute from the reassigned Job';
+  end if;
+
+  result := public.save_job_customer(job_d, jsonb_build_object(
+    'customerId', customer_2::text,
+    'customerName', 'Casey Lane',
+    'customerPhone', '(847) 555-0134',
+    'customerEmail', 'casey@example.com',
+    'serviceAddress', '32 Cedar Ave'
+  ));
+  if result ->> 'status' <> 'ok'
+    or not exists (
+      select 1 from public.customers
+      where id = customer_1 and deleted_at is not null
+    )
+    or not exists (
+      select 1 from public.customers
+      where id = customer_2
+        and deleted_at is null
+        and last_service_address = '32 Cedar Ave'
+    ) then
+    raise exception 'TEST-06 failed: previous Customer remained active after its final Job moved';
+  end if;
+
+  perform set_config('role', 'postgres', true);
+  update public.jobs set customer_id = null where id = job_b;
+  perform pg_temp.login_as(user_a);
+  if (select customer_id from public.jobs where id = job_b) is not null
+    or not exists (
+      select 1 from public.customers
+      where id = customer_2
+        and deleted_at is null
+        and last_service_address = '32 Cedar Ave'
+    ) then
+    raise exception 'TEST-06 failed: explicit unlink did not preserve remaining Customer links';
+  end if;
+
+  -- TEST-16: identity and Customer writes preserve each other's columns in either order.
+  perform set_config('role', 'postgres', true);
+  update public.jobs
+  set short_description = 'Identity before Customer',
+      long_description = 'Identity details saved first',
+      revenue_cents = 5600
+  where id = job_e;
+  perform pg_temp.login_as(user_a);
+  result := public.save_job_customer(job_e, jsonb_build_object(
+    'customerId', customer_2::text,
+    'customerName', 'Casey Lane',
+    'customerPhone', '(847) 555-0134',
+    'customerEmail', 'casey@example.com',
+    'serviceAddress', '13 Lake St'
+  ));
+  if result ->> 'status' <> 'ok'
+    or not exists (
+      select 1 from public.jobs
+      where id = job_e
+        and short_description = 'Identity before Customer'
+        and long_description = 'Identity details saved first'
+        and revenue_cents = 5600
+        and customer_name = 'Casey Lane'
+        and service_address = '13 Lake St'
+    ) then
+    raise exception 'TEST-16 failed: Customer write overwrote earlier identity fields';
+  end if;
+
+  result := public.save_job_customer(job_d, jsonb_build_object(
+    'customerId', customer_2::text,
+    'customerName', 'Casey Lane',
+    'customerPhone', '(847) 555-0134',
+    'customerEmail', 'casey@example.com',
+    'serviceAddress', '33 Cedar Ave'
+  ));
+  perform set_config('role', 'postgres', true);
+  update public.jobs
+  set short_description = 'Identity after Customer',
+      long_description = 'Identity details saved last',
+      revenue_cents = 6700
+  where id = job_d;
+  perform pg_temp.login_as(user_a);
+  if result ->> 'status' <> 'ok'
+    or not exists (
+      select 1 from public.jobs
+      where id = job_d
+        and short_description = 'Identity after Customer'
+        and long_description = 'Identity details saved last'
+        and revenue_cents = 6700
+        and customer_name = 'Casey Lane'
+        and service_address = '33 Cedar Ave'
+    ) then
+    raise exception 'TEST-16 failed: identity write overwrote earlier Customer fields';
   end if;
 
   -- TEST-07: conflict returns latest snapshot without overwrite

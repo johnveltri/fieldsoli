@@ -1,6 +1,7 @@
 import React from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { describe, expect, it, jest } from '@jest/globals';
+import { Alert } from 'react-native';
 
 import { LiveSessionBottomSheet } from './LiveSessionBottomSheet';
 import { LegacyLiveSessionBottomSheet } from './LegacyLiveSessionBottomSheet';
@@ -265,6 +266,214 @@ describe('LiveSessionBottomSheet phase3Capture', () => {
     jest.useRealTimers();
   });
 
+  it('saves the latest customer draft when it changes during an in-flight save', async () => {
+    let resolveFirstSave: (() => void) | undefined;
+    const onCustomerSnapshotSave = jest
+      .fn<() => Promise<void>>()
+      .mockImplementationOnce(
+        () => new Promise<void>((resolve) => { resolveFirstSave = resolve; }),
+      )
+      .mockResolvedValue(undefined);
+    const screen = render(
+      <LiveSessionBottomSheet
+        typography={typography}
+        visible
+        jobShortDescription="Panel upgrade"
+        startedAt={new Date().toISOString()}
+        attachments={[]}
+        phase3Capture
+        supabase={supabase}
+        jobIdentity={identity}
+        onCustomerSnapshotSave={onCustomerSnapshotSave}
+        onAddNote={noop}
+        onAddMaterial={noop}
+        onPressAttachment={noop}
+        onMinimize={noop}
+        onEndSessionPress={noop}
+      />,
+    );
+
+    const customer = screen.getByLabelText('Customer');
+    fireEvent.changeText(customer, 'Beta Electric');
+    fireEvent(customer, 'blur');
+    await waitFor(() => expect(onCustomerSnapshotSave).toHaveBeenCalledTimes(1));
+
+    fireEvent.changeText(screen.getByLabelText('Customer'), 'Gamma Electric');
+    screen.rerender(
+      <LiveSessionBottomSheet
+        typography={typography}
+        visible
+        jobShortDescription="Panel upgrade"
+        startedAt={new Date().toISOString()}
+        attachments={[]}
+        phase3Capture
+        supabase={supabase}
+        jobIdentity={{ ...identity, customerName: 'Stale refetched name' }}
+        onCustomerSnapshotSave={onCustomerSnapshotSave}
+        onAddNote={noop}
+        onAddMaterial={noop}
+        onPressAttachment={noop}
+        onMinimize={noop}
+        onEndSessionPress={noop}
+      />,
+    );
+    expect(screen.getByDisplayValue('Gamma Electric')).toBeTruthy();
+
+    await act(async () => {
+      resolveFirstSave?.();
+    });
+
+    await waitFor(() => {
+      expect(onCustomerSnapshotSave).toHaveBeenCalledTimes(2);
+      expect(onCustomerSnapshotSave).toHaveBeenLastCalledWith(
+        expect.objectContaining({ customerName: 'Gamma Electric' }),
+      );
+    });
+    screen.unmount();
+  });
+
+  it.each([
+    ['minimize', 'Close'] as const,
+    ['end', 'End session'] as const,
+  ])('%s stays open on Customer-save failure and offers retry', async (transition, label) => {
+    let alertButtons: Parameters<typeof Alert.alert>[2] = [];
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation((_title, _message, buttons) => {
+      alertButtons = buttons ?? [];
+    });
+    const onMinimize = jest.fn();
+    const onEndSessionPress = jest.fn();
+    const onCustomerSnapshotSave = jest
+      .fn<() => Promise<void>>()
+      .mockRejectedValueOnce(new Error('Offline'))
+      .mockRejectedValueOnce(new Error('Still offline'))
+      .mockResolvedValue(undefined);
+    const screen = render(
+      <LiveSessionBottomSheet
+        typography={typography}
+        visible
+        jobShortDescription="Panel upgrade"
+        startedAt={new Date().toISOString()}
+        attachments={[]}
+        phase3Capture
+        supabase={supabase}
+        jobIdentity={identity}
+        onCustomerSnapshotSave={onCustomerSnapshotSave}
+        onAddNote={noop}
+        onAddMaterial={noop}
+        onPressAttachment={noop}
+        onMinimize={onMinimize}
+        onEndSessionPress={onEndSessionPress}
+      />,
+    );
+
+    fireEvent.changeText(screen.getByLabelText('Customer'), 'Beta Electric');
+    fireEvent.press(screen.getByLabelText(label));
+    await waitFor(() => expect(alertSpy).toHaveBeenCalledTimes(1));
+    expect(onMinimize).not.toHaveBeenCalled();
+    expect(onEndSessionPress).not.toHaveBeenCalled();
+    expect(alertSpy).toHaveBeenCalledWith(
+      "Couldn't save customer details. Try again.",
+      undefined,
+      expect.any(Array),
+      expect.any(Object),
+    );
+
+    await act(async () => {
+      alertButtons[0]?.onPress?.();
+    });
+    await waitFor(() => expect(alertSpy).toHaveBeenCalledTimes(2));
+    expect(screen.getByDisplayValue('Beta Electric')).toBeTruthy();
+    expect(onMinimize).not.toHaveBeenCalled();
+    expect(onEndSessionPress).not.toHaveBeenCalled();
+    await act(async () => {
+      alertButtons[0]?.onPress?.();
+    });
+    await waitFor(() => expect(onCustomerSnapshotSave).toHaveBeenCalledTimes(3));
+    expect(onMinimize).not.toHaveBeenCalled();
+    expect(onEndSessionPress).not.toHaveBeenCalled();
+
+    fireEvent.press(screen.getByLabelText(label));
+    await waitFor(() => {
+      if (transition === 'minimize') expect(onMinimize).toHaveBeenCalledTimes(1);
+      else expect(onEndSessionPress).toHaveBeenCalledTimes(1);
+    });
+    alertSpy.mockRestore();
+    screen.unmount();
+  });
+
+  it.each([
+    ['minimize', 'Close'] as const,
+    ['end', 'End session'] as const,
+  ])('%s waits for the customer save before closing the Live Session', async (transition, label) => {
+    let resolveSave: (() => void) | undefined;
+    const onCustomerSnapshotSave = jest.fn(
+      () => new Promise<void>((resolve) => { resolveSave = resolve; }),
+    );
+    const onMinimize = jest.fn();
+    const onEndSessionPress = jest.fn();
+    const screen = render(
+      <LiveSessionBottomSheet
+        typography={typography}
+        visible
+        jobShortDescription="Panel upgrade"
+        startedAt={new Date().toISOString()}
+        attachments={[]}
+        phase3Capture
+        supabase={supabase}
+        jobIdentity={identity}
+        onCustomerSnapshotSave={onCustomerSnapshotSave}
+        onAddNote={noop}
+        onAddMaterial={noop}
+        onPressAttachment={noop}
+        onMinimize={onMinimize}
+        onEndSessionPress={onEndSessionPress}
+      />,
+    );
+
+    fireEvent.changeText(screen.getByLabelText('Customer'), 'Beta Electric');
+    fireEvent.press(screen.getByLabelText(label));
+    await waitFor(() => expect(onCustomerSnapshotSave).toHaveBeenCalledTimes(1));
+    expect(onMinimize).not.toHaveBeenCalled();
+    expect(onEndSessionPress).not.toHaveBeenCalled();
+
+    await act(async () => {
+      resolveSave?.();
+    });
+    await waitFor(() => {
+      if (transition === 'minimize') expect(onMinimize).toHaveBeenCalledTimes(1);
+      else expect(onEndSessionPress).toHaveBeenCalledTimes(1);
+    });
+    screen.unmount();
+  });
+
+  it('restores End Session when the address input blurs and keeps the lookup row mounted', () => {
+    const screen = render(
+      <LiveSessionBottomSheet
+        typography={typography}
+        visible
+        jobShortDescription="Panel upgrade"
+        startedAt={new Date().toISOString()}
+        attachments={[]}
+        phase3Capture
+        supabase={supabase}
+        jobIdentity={identity}
+        onAddNote={noop}
+        onAddMaterial={noop}
+        onPressAttachment={noop}
+        onMinimize={noop}
+        onEndSessionPress={noop}
+      />,
+    );
+
+    const address = screen.getByLabelText('Address');
+    fireEvent(address, 'focus', { nativeEvent: { target: 1 } });
+    expect(screen.queryByLabelText('End session')).toBeNull();
+    fireEvent(address, 'blur');
+    expect(screen.getByLabelText('End session')).toBeTruthy();
+    expect(screen.getByLabelText('Address')).toBeTruthy();
+    screen.unmount();
+  });
+
   it('restores End Session after selecting a customer suggestion', () => {
     jest.useFakeTimers();
     mockCustomerSuggestionsState.suggestions = [
@@ -453,7 +662,7 @@ describe('LiveSessionBottomSheet phase3Capture', () => {
     // No blur — keyboard dismiss can leave focus; Close must still persist.
     fireEvent.press(screen.getByLabelText('Close'));
 
-    expect(onMinimize).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(onMinimize).toHaveBeenCalledTimes(1));
     await waitFor(() => {
       expect(onUpdateNote).toHaveBeenCalledWith('note-1', 'Updated note');
       expect(onCreateNote).toHaveBeenCalledWith('Brand new note');

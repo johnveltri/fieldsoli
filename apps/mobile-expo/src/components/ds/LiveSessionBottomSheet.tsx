@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Alert,
   Keyboard,
   Platform,
   Pressable,
@@ -259,6 +260,11 @@ export function LiveSessionBottomSheet({
   const [customerDraft, setCustomerDraft] = useState<CustomerDraft>(initialCustomerDraft);
   const customerDraftRef = useRef<CustomerDraft>(initialCustomerDraft);
   const lastPersistedCustomerKey = useRef(customerDraftKey(initialCustomerDraft));
+  const customerSaveInFlight = useRef<Promise<void> | null>(null);
+  const retryCustomerSave = useRef<() => void>(() => undefined);
+  const customerSaveAlertOpen = useRef(false);
+  const sessionTransitionInFlight = useRef(false);
+  const [customerSavePending, setCustomerSavePending] = useState(false);
   const [customerFieldFocused, setCustomerFieldFocused] = useState(false);
   const [revenueText, setRevenueText] = useState(
     jobIdentity?.revenueCents != null && jobIdentity.revenueCents > 0
@@ -419,7 +425,11 @@ export function LiveSessionBottomSheet({
     if (focused !== 'longDescription') {
       setLongDescription(jobIdentity.longDescription);
     }
-    if (!customerFieldFocused) {
+    if (
+      !customerFieldFocused &&
+      !customerSaveInFlight.current &&
+      customerDraftKey(customerDraftRef.current) === lastPersistedCustomerKey.current
+    ) {
       const nextCustomer = customerDraftFromIdentity(jobIdentity);
       setCustomerDraft(nextCustomer);
       customerDraftRef.current = nextCustomer;
@@ -687,27 +697,78 @@ export function LiveSessionBottomSheet({
   }, []);
 
   const updateCustomerDraft = useCallback((patch: Partial<CustomerDraft>) => {
-    setCustomerDraft((prev) => {
-      const next = { ...prev, ...patch };
-      customerDraftRef.current = next;
-      return next;
-    });
+    const next = { ...customerDraftRef.current, ...patch };
+    customerDraftRef.current = next;
+    setCustomerDraft(next);
   }, []);
 
   const commitCustomerSnapshot = useCallback(
     async (draft?: CustomerDraft) => {
-      if (!onCustomerSnapshotSave) return;
-      const next = draft ?? customerDraftRef.current;
-      const key = customerDraftKey(next);
-      if (key === lastPersistedCustomerKey.current) return;
-      await onCustomerSnapshotSave(next);
-      lastPersistedCustomerKey.current = key;
+      if (!onCustomerSnapshotSave) return true;
+      if (draft) {
+        customerDraftRef.current = draft;
+        setCustomerDraft(draft);
+      }
+      if (customerSaveInFlight.current) {
+        try {
+          await customerSaveInFlight.current;
+          return true;
+        } catch {
+          return false;
+        }
+      }
+
+      const saveLatestDraft = async () => {
+        while (true) {
+          const next = customerDraftRef.current;
+          const key = customerDraftKey(next);
+          if (key === lastPersistedCustomerKey.current) return;
+          await onCustomerSnapshotSave(next);
+          lastPersistedCustomerKey.current = key;
+          if (customerDraftKey(customerDraftRef.current) === key) return;
+        }
+      };
+      const pending = saveLatestDraft();
+      customerSaveInFlight.current = pending;
+      setCustomerSavePending(true);
+      try {
+        await pending;
+        customerSaveAlertOpen.current = false;
+        return true;
+      } catch {
+        if (!customerSaveAlertOpen.current) {
+          customerSaveAlertOpen.current = true;
+          Alert.alert(
+            "Couldn't save customer details. Try again.",
+            undefined,
+            [
+              {
+                text: 'Try again',
+                onPress: () => {
+                  customerSaveAlertOpen.current = false;
+                  retryCustomerSave.current();
+                },
+              },
+            ],
+            { onDismiss: () => { customerSaveAlertOpen.current = false; } },
+          );
+        }
+        return false;
+      } finally {
+        if (customerSaveInFlight.current === pending) {
+          customerSaveInFlight.current = null;
+          setCustomerSavePending(false);
+        }
+      }
     },
     [onCustomerSnapshotSave],
   );
-
-  const flushPendingEdits = useCallback(() => {
+  retryCustomerSave.current = () => {
     void commitCustomerSnapshot();
+  };
+
+  const flushPendingEdits = useCallback(async () => {
+    const customerSaved = commitCustomerSnapshot();
     flushIdentity();
     for (const note of liveNotesRef.current) {
       void persistExistingNote(note.id, noteDraftsRef.current[note.id] ?? note.body);
@@ -727,6 +788,7 @@ export function LiveSessionBottomSheet({
     for (const material of composerMaterialsRef.current) {
       void persistNewMaterial(material.localId, material.description, material.totalText);
     }
+    return customerSaved;
   }, [
     commitCustomerSnapshot,
     flushIdentity,
@@ -736,17 +798,29 @@ export function LiveSessionBottomSheet({
     persistNewNote,
   ]);
 
-  const handleEndSessionPress = useCallback(() => {
+  const handleEndSessionPress = useCallback(async () => {
+    if (sessionTransitionInFlight.current) return;
+    sessionTransitionInFlight.current = true;
     dismissInlineEditing();
-    flushPendingEdits();
-    onEndSessionPress();
+    try {
+      if (!(await flushPendingEdits())) return;
+      onEndSessionPress();
+    } finally {
+      sessionTransitionInFlight.current = false;
+    }
   }, [dismissInlineEditing, flushPendingEdits, onEndSessionPress]);
 
   /** Blur + persist drafts before minimizing so X / swipe does not drop in-progress edits. */
-  const handleMinimize = useCallback(() => {
-    flushPendingEdits();
+  const handleMinimize = useCallback(async () => {
+    if (sessionTransitionInFlight.current) return;
+    sessionTransitionInFlight.current = true;
     dismissInlineEditing();
-    onMinimize();
+    try {
+      if (!(await flushPendingEdits())) return;
+      onMinimize();
+    } finally {
+      sessionTransitionInFlight.current = false;
+    }
   }, [dismissInlineEditing, flushPendingEdits, onMinimize]);
 
   const statusBarTop =
@@ -997,6 +1071,9 @@ export function LiveSessionBottomSheet({
                   void commitCustomerSnapshot(next);
                 }}
               />
+            ) : null}
+            {phase3Capture && customerSavePending ? (
+              <Text style={[typography.bodySmall, { color: fg.secondary }]}>Saving customer details…</Text>
             ) : null}
 
             <EditSheet>

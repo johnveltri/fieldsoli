@@ -76,6 +76,7 @@ export {
   getEarningsSnapshotForCurrentUser,
   getOutstandingPaymentsForCurrentUser,
   updateJobById,
+  updateLiveSessionJobIdentityById,
   bumpJobToInProgressIfNotStarted,
   tryBumpJobToInProgressIfNotStarted,
   updateJobCostsReviewed,
@@ -93,6 +94,7 @@ export {
   type EarningsSnapshotForCurrentUserResult,
   type OutstandingPaymentsForCurrentUserResult,
   type UpdateJobInput,
+  type UpdateLiveSessionJobIdentityInput,
 } from './jobs';
 export {
   createManualSession,
