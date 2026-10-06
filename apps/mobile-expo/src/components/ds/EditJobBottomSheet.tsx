@@ -44,6 +44,7 @@ type EditJobBottomSheetProps = {
   onClose?: () => void;
   onClosed?: () => void;
   onSavePress?: (values: EditJobBottomSheetValues) => void;
+  invoicingEnabled?: boolean;
   onDeletePress?: () => void;
   /** @default true */
   registerInGlobalStack?: boolean;
@@ -114,6 +115,7 @@ export function EditJobBottomSheet({
   onSavePress,
   onDeletePress,
   registerInGlobalStack = true,
+  invoicingEnabled = false,
 }: EditJobBottomSheetProps) {
   const v = { ...DEFAULT_VALUES, ...values };
   const [shortDescription, setShortDescription] = useState(v.shortDescription);
@@ -235,7 +237,8 @@ export function EditJobBottomSheet({
                     setRevenue('');
                   }
                 }}
-                placeholder="Revenue"
+                placeholder={invoicingEnabled ? 'Labor & Services' : 'Revenue'}
+                accessibilityLabel={invoicingEnabled ? 'Labor & Services' : 'Revenue'}
                 placeholderTextColor={fg.secondary}
                 keyboardType="numeric"
                 editable

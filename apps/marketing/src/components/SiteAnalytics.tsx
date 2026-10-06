@@ -11,7 +11,7 @@ import { usePathname } from "next/navigation";
 export function SiteAnalytics() {
   const pathname = usePathname();
 
-  if (pathname === "/exports/download") return null;
+  if (pathname === "/exports/download" || pathname.startsWith("/share/")) return null;
 
   return <Analytics />;
 }

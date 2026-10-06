@@ -142,7 +142,8 @@ import {
 import type { TextStyles } from '../theme/nativeTokens';
 import { useContentColumn } from '../theme/useContentColumn';
 import type { EditJobBottomSheetValues } from '../components/ds/EditJobBottomSheet';
-import { useJobDetailFullscreenEditFlag } from '../lib/featureFlags';
+import { useInvoicingFlag, useJobDetailFullscreenEditFlag } from '../lib/featureFlags';
+import { InvoicingJobControls } from '../components/invoicing/InvoicingJobControls';
 import { JobDetailEditMode } from './jobDetailEdit/JobDetailEditMode';
 import type {
   JobDetailEditFocusTarget,
@@ -391,12 +392,15 @@ export function JobDetailScreen({
   // State updates are asynchronous; this ref closes the small double-tap /
   // navigation window before the Saving render reaches the edit controls.
   const editSavingRef = useRef(false);
-  const editApi = useJobEditDraft(job);
+  const { enabled: fullscreenEditEnabled, ready: fullscreenEditReady } =
+    useJobDetailFullscreenEditFlag(sessionUserId);
+  const { enabled: invoicingFlagEnabled, ready: invoicingFlagReady } =
+    useInvoicingFlag(sessionUserId);
+  const showInvoicing = invoicingFlagReady && invoicingFlagEnabled;
+  const editApi = useJobEditDraft(job, { invoicingEnabled: showInvoicing });
   useEffect(() => {
     jobRef.current = job;
   }, [job]);
-  const { enabled: fullscreenEditEnabled, ready: fullscreenEditReady } =
-    useJobDetailFullscreenEditFlag(sessionUserId);
   const useFullscreenEdit = fullscreenEditReady && fullscreenEditEnabled;
   const { reduceMotion } = usePlatformGlass();
   const [editFocusTarget, setEditFocusTarget] = useState<JobDetailEditFocusTarget | null>(null);
@@ -707,9 +711,10 @@ export function JobDetailScreen({
   );
 
   const toEditValues = useCallback((j: JobDetailViewModel): EditJobBottomSheetValues => {
-    const revenue = j.earnings.revenueCents == null
+    const cents = showInvoicing ? j.laborServicesCents ?? null : j.earnings.revenueCents;
+    const revenue = cents == null
       ? ''
-      : (j.earnings.revenueCents / 100).toLocaleString('en-US', {
+      : (cents / 100).toLocaleString('en-US', {
           minimumFractionDigits: 2,
           maximumFractionDigits: 2,
         });
@@ -723,7 +728,7 @@ export function JobDetailScreen({
       serviceAddress: j.serviceAddress,
       revenue,
     };
-  }, []);
+  }, [showInvoicing]);
 
   const onSaveJobSheet = useCallback(
     async (values: EditJobBottomSheetValues) => {
@@ -744,7 +749,10 @@ export function JobDetailScreen({
             customerEmail: values.customerEmail.trim() || null,
             customerId: values.customerId ?? null,
             serviceAddress: values.serviceAddress.trim(),
-            revenueCents,
+            revenueCents: showInvoicing ? job.earnings.revenueCents : revenueCents,
+            ...(showInvoicing
+              ? { pricingIntent: 'labor' as const, laborServicesCents: revenueCents }
+              : {}),
             noRevenueConfirmed: job.noRevenueConfirmed,
             noMaterialsConfirmed: job.noMaterialsConfirmed,
             noOtherCostsConfirmed: job.noOtherCostsConfirmed,
@@ -795,7 +803,7 @@ export function JobDetailScreen({
         setJobSaving(false);
       }
     },
-    [invalidateJobsList, job, onCloseEditSheet, toEditValues],
+    [invalidateJobsList, job, onCloseEditSheet, showInvoicing, toEditValues],
   );
 
   // --- Session add/edit flow ---
@@ -2677,6 +2685,32 @@ export function JobDetailScreen({
     return () => onAndroidHardwareBackHandlerChange(null);
   }, [detailMode, editApi, onAndroidHardwareBackHandlerChange, onBackFromEdit]);
 
+  const saveEditDraft = useCallback(async (leave: boolean) => {
+    if (!job || editSavingRef.current) return false;
+    const payload = editApi.buildPayload();
+    if (!payload) return false;
+    editSavingRef.current = true;
+    setEditSaving(true);
+    try {
+      await applyJobDetailEdit(supabase, job.id, payload);
+      const refreshed = await fetchJobDetail(supabase, job.id);
+      if (refreshed) {
+        jobRef.current = refreshed;
+        setJob(refreshed);
+        editApi.resetFromJob(refreshed);
+      }
+      if (leave) leaveEditMode();
+      invalidateJobsList();
+      return true;
+    } catch {
+      Alert.alert("Couldn't save this job. Try again.");
+      return false;
+    } finally {
+      editSavingRef.current = false;
+      setEditSaving(false);
+    }
+  }, [editApi, invalidateJobsList, job, leaveEditMode]);
+
   const onDoneFromEdit = useCallback(async () => {
     if (!job || editSavingRef.current) return;
     const payload = editApi.buildPayload();
@@ -2974,6 +3008,16 @@ export function JobDetailScreen({
           primaryDisabled={statusActionPending}
           moreDisabled={statusActionPending}
         />
+        {showInvoicing ? (
+          <InvoicingJobControls
+            client={supabase}
+            jobId={job.id}
+            workStatus={job.workStatus}
+            typography={typography}
+            mode="view"
+            onEditDetails={() => openEditFromView('revenue', 'view_row')}
+          />
+        ) : null}
         {simplifiedView && incompletePills.length > 0 ? (
           <Text style={[typography.bodySmall, styles.incompleteReasons]}>
             {`Missing: ${incompletePills.join(', ')}`}
@@ -3271,6 +3315,20 @@ export function JobDetailScreen({
                 }}
                 editApi={editApi}
                 supabase={supabase}
+                invoicingEnabled={showInvoicing}
+                footer={
+                  showInvoicing ? (
+                    <InvoicingJobControls
+                      client={supabase}
+                      jobId={job.id}
+                      workStatus={job.workStatus}
+                      typography={typography}
+                      mode="edit"
+                      onEditDetails={() => undefined}
+                      beforeOpen={() => saveEditDraft(false)}
+                    />
+                  ) : null
+                }
               />
             </Animated.View>
           </View>
@@ -3292,6 +3350,20 @@ export function JobDetailScreen({
           }}
           editApi={editApi}
           supabase={supabase}
+          invoicingEnabled={showInvoicing}
+          footer={
+            showInvoicing ? (
+              <InvoicingJobControls
+                client={supabase}
+                jobId={job.id}
+                workStatus={job.workStatus}
+                typography={typography}
+                mode="edit"
+                onEditDetails={() => undefined}
+                beforeOpen={() => saveEditDraft(false)}
+              />
+            ) : null
+          }
         />
       ) : (
         viewScroll
@@ -3306,6 +3378,7 @@ export function JobDetailScreen({
           visible={editSheetVisible}
           onClose={onCloseEditSheet}
           onClosed={() => setEditSheetMounted(false)}
+          invoicingEnabled={showInvoicing}
           onSavePress={onSaveJobSheet}
           onDeletePress={() => {
             void onDeleteJobSheet();

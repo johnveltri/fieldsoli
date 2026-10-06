@@ -56,7 +56,7 @@
   <header>
     <p class="kicker">Canonical product source · shipped behavior only</p>
     <h1>FieldSoli current product</h1>
-    <p>Reviewed 2026-07-21 at source commit <code>50822e52f3c1b1e3ba758e02a875d624d2983024</code>.</p>
+    <p>Reviewed 2026-07-21 at source commit <code>50822e52f3c1b1e3ba758e02a875d624d2983024</code>. Estimates and invoices are recorded under approved but not shipped and are not current functionality.</p>
     <nav aria-label="Document sections">
       <a href="#purpose">Purpose</a>
       <a href="#navigation">Navigation</a>
@@ -93,7 +93,7 @@
         <div class="panel">
           <h3>Current non-goals</h3>
           <ul>
-            <li>No quoting, estimates, invoices, payment processing, dispatch, scheduling, routing, team management, or customer portal.</li>
+            <li>No payment processing, dispatch, scheduling, routing, team management, or customer portal. Estimates and invoices exist only as a fail-closed, flag-gated build and are not current functionality.</li>
             <li>No promise of offline-first synchronization.</li>
             <li>No claim that exploring Figma experiments are available in the app.</li>
           </ul>
@@ -242,7 +242,16 @@
 
     <section id="status-approved" data-status="approved-not-shipped">
       <h2>Approved but not shipped</h2>
-      <aside class="notice">No approved-but-unshipped capabilities are recorded in this product source as of 2026-07-21. An approved experiment is not current functionality until implementation and this source are updated together.</aside>
+      <aside class="notice">Estimates and invoices are implemented behind the PostHog flag <code>invoicing</code>. The flag fails closed: the new job and profile UI appears only when flag evaluation is ready and enabled. Public enablement, store submission, and production deploy remain gated. This is not current functionality.</aside>
+      <article id="capability-invoicing" data-status="approved-not-shipped">
+        <h3>Estimates, invoices, and sharing</h3>
+        <ul>
+          <li>Profile can store business defaults. Job editing can record Labor &amp; Services, material markup, and whether an other cost is billed to the customer. With the flag off, jobs keep the existing Revenue field.</li>
+          <li>A job can preview an estimate or invoice, then create and share one immutable snapshot. Sharing hands off a bearer link or an on-device PDF. The app does not collect or prove payment.</li>
+          <li>A shared link opens a no-store page on fieldsoli.com. Disabling the link, deleting the job, or deleting the account makes that link unavailable. The page does not say why.</li>
+          <li>Invoice payment wording follows the job’s paid or unpaid state. It is a projection of recorded payment status, not a receipt or a payment-processor result.</li>
+        </ul>
+      </article>
     </section>
 
     <section id="status-exploring" data-status="exploring">

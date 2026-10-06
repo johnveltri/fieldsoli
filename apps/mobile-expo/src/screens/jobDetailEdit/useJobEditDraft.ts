@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   JOB_SHORT_DESCRIPTION_MAX_LENGTH,
   type JobDetailViewModel,
@@ -54,6 +54,8 @@ export type DraftMaterialRow = DraftRowBase & {
   unitCostCents: number;
   unitCostExplicit: boolean;
   sessionId: string | null;
+  capturedMarkupBps: number | null;
+  markupOverrideBps: number | null;
 };
 
 export type DraftOtherCostRow = DraftRowBase & {
@@ -62,6 +64,7 @@ export type DraftOtherCostRow = DraftRowBase & {
   description: string;
   costCents: number;
   sessionId: string | null;
+  invoiceCustomer: boolean;
 };
 
 export type JobEditDraft = {
@@ -73,6 +76,11 @@ export type JobEditDraft = {
   customerId: string | null;
   serviceAddress: string;
   revenueCents: number | null;
+  laborServicesCents: number | null;
+  /** Set when the invoicing UI saves Labor & Services instead of Revenue. */
+  pricingIntent?: 'labor' | 'revenue';
+  pricingMode?: 'legacy' | 'component';
+  pricingNeedsReview?: boolean;
   /** Job-level “no revenue” confirmation (persisted with revenue_cents = 0). */
   noRevenueConfirmed: boolean;
   /** Job-level “no materials used” confirmation (persisted as materials_reviewed_at). */
@@ -101,6 +109,17 @@ function isoToLocalDate(iso: string): string {
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
+}
+
+function proposedLaborCents(job: JobDetailViewModel): number | null {
+  if (job.laborServicesCents != null) return job.laborServicesCents;
+  if (!job.pricingNeedsReview || job.earnings.revenueCents == null) return null;
+  const materialCost = job.materialBuckets.reduce(
+    (sum, bucket) => sum + bucket.items.reduce((inner, item) => inner + item.totalCostCents, 0),
+    0,
+  );
+  const residual = job.earnings.revenueCents - materialCost;
+  return residual >= 0 ? residual : null;
 }
 
 /** Builds an in-memory edit draft from a loaded job (excludes in-progress session). */
@@ -180,6 +199,8 @@ export function createJobEditDraft(job: JobDetailViewModel): JobEditDraft {
         unitCostCents: unitCostExplicit ? unitCostValue : 0,
         unitCostExplicit,
         sessionId: m.sessionId,
+        capturedMarkupBps: m.capturedMarkupBps ?? null,
+        markupOverrideBps: m.markupOverrideBps ?? null,
       };
     }),
   );
@@ -194,6 +215,7 @@ export function createJobEditDraft(job: JobDetailViewModel): JobEditDraft {
       description: c.description,
       costCents: c.costCents,
       sessionId: c.sessionId,
+      invoiceCustomer: c.invoiceCustomer === true,
     })),
   );
 
@@ -206,6 +228,9 @@ export function createJobEditDraft(job: JobDetailViewModel): JobEditDraft {
     customerId: job.customerId,
     serviceAddress: job.serviceAddress,
     revenueCents: job.earnings.revenueCents,
+    laborServicesCents: proposedLaborCents(job),
+    pricingMode: job.pricingMode,
+    pricingNeedsReview: job.pricingNeedsReview === true,
     noRevenueConfirmed: job.noRevenueConfirmed ?? false,
     noMaterialsConfirmed: job.noMaterialsConfirmed,
     noOtherCostsConfirmed: job.noOtherCostsConfirmed,
@@ -227,6 +252,7 @@ export function createEmptyJobEditDraft(): JobEditDraft {
     customerId: null,
     serviceAddress: '',
     revenueCents: null,
+    laborServicesCents: null,
     noRevenueConfirmed: false,
     noMaterialsConfirmed: false,
     noOtherCostsConfirmed: false,
@@ -462,6 +488,12 @@ export function buildApplyJobDetailEditPayload(
       customerId: draft.customerId,
       serviceAddress: draft.serviceAddress.trim(),
       revenueCents: draft.revenueCents,
+      ...(draft.pricingIntent === 'labor'
+        ? {
+            pricingIntent: 'labor' as const,
+            laborServicesCents: draft.laborServicesCents,
+          }
+        : {}),
       noRevenueConfirmed: draft.noRevenueConfirmed,
       noMaterialsConfirmed: draft.noMaterialsConfirmed,
       noOtherCostsConfirmed: draft.noOtherCostsConfirmed,
@@ -538,6 +570,9 @@ export function buildApplyJobDetailEditPayload(
       unitCostCents,
       unitCostExplicit,
       sessionId: row.sessionId,
+      ...(draft.pricingIntent === 'labor'
+        ? { markupOverrideBps: row.markupOverrideBps }
+        : {}),
     };
     const snap = snapshot.materials.find((m) => m.id === row.id);
     if (row.isNew) payload.materials.create.push(apiRow);
@@ -557,6 +592,7 @@ export function buildApplyJobDetailEditPayload(
       description: row.description,
       costCents: row.costCents,
       sessionId: row.sessionId,
+      ...(draft.pricingIntent === 'labor' ? { invoiceCustomer: row.invoiceCustomer } : {}),
     };
     const snap = snapshot.otherCosts.find((c) => c.id === row.id);
     if (row.isNew) payload.otherCosts.create.push(apiRow);
@@ -566,14 +602,36 @@ export function buildApplyJobDetailEditPayload(
   return payload;
 }
 
-export function useJobEditDraft(job: JobDetailViewModel | null) {
+export function useJobEditDraft(
+  job: JobDetailViewModel | null,
+  options: { invoicingEnabled?: boolean } = {},
+) {
   const [snapshot, setSnapshot] = useState<JobEditSnapshot | null>(null);
   const [draft, setDraft] = useState<JobEditDraft | null>(null);
   const [resetVersion, setResetVersion] = useState(0);
   const snapshotRef = useRef(snapshot);
   const draftRef = useRef(draft);
+  const invoicingEnabled = options.invoicingEnabled === true;
   snapshotRef.current = snapshot;
   draftRef.current = draft;
+
+  useEffect(() => {
+    if (!invoicingEnabled) return;
+    const stamp = (row: JobEditDraft | null) => {
+      if (!row || row.pricingNeedsReview || row.pricingIntent === 'labor') return row;
+      return { ...row, pricingIntent: 'labor' as const };
+    };
+    setSnapshot((prev) => {
+      const next = stamp(prev);
+      snapshotRef.current = next;
+      return next;
+    });
+    setDraft((prev) => {
+      const next = stamp(prev);
+      draftRef.current = next;
+      return next;
+    });
+  }, [invoicingEnabled]);
 
   const resetFromJob = useCallback((j: JobDetailViewModel) => {
     const next = createJobEditDraft(j);
@@ -666,6 +724,8 @@ export function useJobEditDraft(job: JobDetailViewModel | null) {
             unitCostCents: 0,
             unitCostExplicit: false,
             sessionId: null,
+            capturedMarkupBps: null,
+            markupOverrideBps: null,
           },
         ],
       };
@@ -687,6 +747,7 @@ export function useJobEditDraft(job: JobDetailViewModel | null) {
             removed: false,
             costType: '' as const,
             costTypeExplicit: false,
+            invoiceCustomer: false,
             description: '',
             costCents: 0,
             sessionId: null,

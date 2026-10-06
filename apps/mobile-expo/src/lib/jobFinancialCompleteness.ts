@@ -39,7 +39,13 @@ function hasOtherCostsComplete(job: JobDetailViewModel): boolean {
 function hasRevenueComplete(job: {
   revenueCents?: number | null;
   noRevenueConfirmed: boolean;
+  laborServicesCents?: number | null;
+  pricingMode?: 'legacy' | 'component';
 }): boolean {
+  // Unknown Labor stays incomplete. Explicit zero Labor keeps the same
+  // confirmation rule as explicit zero Revenue so backfill does not mark
+  // unconfirmed zero-revenue Jobs complete.
+  if (job.pricingMode === 'component' && job.laborServicesCents == null) return false;
   return (job.revenueCents ?? 0) > 0 || job.noRevenueConfirmed;
 }
 
@@ -49,6 +55,8 @@ export function isJobFinanciallyComplete(ctx: JobFinancialCompletenessContext): 
     hasRevenueComplete({
       revenueCents: job.earnings.revenueCents,
       noRevenueConfirmed: job.noRevenueConfirmed,
+      laborServicesCents: job.laborServicesCents,
+      pricingMode: job.pricingMode,
     }) &&
     hasUsableSession(job) &&
     hasMaterialsComplete(job) &&
@@ -66,6 +74,8 @@ export function financialCompletenessGaps(
     !hasRevenueComplete({
       revenueCents: job.earnings.revenueCents,
       noRevenueConfirmed: job.noRevenueConfirmed,
+      laborServicesCents: job.laborServicesCents,
+      pricingMode: job.pricingMode,
     })
   ) {
     gaps.push('revenue');
@@ -88,6 +98,8 @@ export function incompletePillsForJobDetail(job: JobDetailViewModel): string[] {
     !hasRevenueComplete({
       revenueCents: job.earnings.revenueCents,
       noRevenueConfirmed: job.noRevenueConfirmed,
+      laborServicesCents: job.laborServicesCents,
+      pricingMode: job.pricingMode,
     })
   ) {
     pills.push('revenue');

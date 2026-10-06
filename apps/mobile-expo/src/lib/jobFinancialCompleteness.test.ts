@@ -346,4 +346,34 @@ describe('usable rows for financial completeness', () => {
     expect(financialCompletenessGaps({ job })).toContain('session');
     expect(incompletePillsForJobDetail(job)).toContain('sessions');
   });
+
+  it('treats unknown Labor as incomplete and confirmed zero Labor as complete', () => {
+    const unknownLabor = baseJob({
+      pricingMode: 'component',
+      laborServicesCents: null,
+      earnings: {
+        revenueCents: 0,
+        materialsCents: 0,
+        otherCostsCents: 0,
+        feesCents: 0,
+        netEarningsCents: 0,
+      },
+      noRevenueConfirmed: false,
+    });
+    expect(isJobFinanciallyComplete({ job: unknownLabor })).toBe(false);
+
+    const explicitZero = baseJob({
+      pricingMode: 'component',
+      laborServicesCents: 0,
+      noRevenueConfirmed: true,
+      earnings: {
+        revenueCents: 0,
+        materialsCents: 0,
+        otherCostsCents: 0,
+        feesCents: 0,
+        netEarningsCents: 0,
+      },
+    });
+    expect(financialCompletenessGaps({ job: explicitZero })).not.toContain('revenue');
+  });
 });

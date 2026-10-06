@@ -14,6 +14,7 @@ const mockEndLiveSessionNow = jest.fn<(...args: unknown[]) => Promise<unknown>>(
 const mockRefreshLiveSession = jest.fn<(...args: unknown[]) => Promise<unknown>>();
 const mockUpdateLiveSessionJobShortDescription = jest.fn();
 let mockFullscreenEditFlagState = { enabled: true, ready: true };
+let mockInvoicingFlagState = { enabled: false, ready: true };
 let mockLiveSession: { id: string; jobId: string } | null = null;
 
 jest.mock('../lib/feedback', () => ({
@@ -572,7 +573,21 @@ jest.mock('../components/ds', () => ({
 
 jest.mock('../lib/featureFlags', () => ({
   useJobDetailFullscreenEditFlag: () => mockFullscreenEditFlagState,
+  useInvoicingFlag: () => mockInvoicingFlagState,
 }));
+
+jest.mock('../components/invoicing/InvoicingJobControls', () => {
+  const React = require('react');
+  const { Text } = require('react-native');
+  return {
+    InvoicingJobControls: ({ mode }: { mode: string }) =>
+      React.createElement(
+        Text,
+        { accessibilityLabel: mode === 'view' ? 'Share job document' : 'Generate new' },
+        mode === 'view' ? 'Share' : 'Generate new',
+      ),
+  };
+});
 
 jest.mock('./jobDetailEdit/JobDetailEditMode', () => ({
   JobDetailEditMode: ({
@@ -838,6 +853,7 @@ describe('JobDetailScreen manual session and note flows', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockFullscreenEditFlagState = { enabled: false, ready: true };
+    mockInvoicingFlagState = { enabled: false, ready: true };
     setupDefaultApiMocks(apiClient);
     apiClient.fetchJobDetail.mockResolvedValue(baseJob);
   });
@@ -2130,6 +2146,26 @@ describe('JobDetailScreen simplified view (flag on)', () => {
       expect(screen.getByText('Confirm minimum info before marking complete')).toBeTruthy(),
     );
     expect(apiClient.updateJobStatusById).not.toHaveBeenCalledWith({}, 'job-1', 'completed');
+  });
+
+  it('keeps Revenue entry and omits Share when invoicing is off', async () => {
+    mockInvoicingFlagState = { enabled: false, ready: true };
+    const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
+    await waitFor(() => expect(screen.getByText('Primary status action')).toBeTruthy());
+    expect(screen.queryByLabelText('Share job document')).toBeNull();
+  });
+
+  it('shows Share when invoicing is ready and enabled', async () => {
+    mockInvoicingFlagState = { enabled: true, ready: true };
+    const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
+    await waitFor(() => expect(screen.getByLabelText('Share job document')).toBeTruthy());
+  });
+
+  it('does not show Share while the invoicing flag is still loading', async () => {
+    mockInvoicingFlagState = { enabled: true, ready: false };
+    const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
+    await waitFor(() => expect(screen.getByText('Primary status action')).toBeTruthy());
+    expect(screen.queryByLabelText('Share job document')).toBeNull();
   });
 
   it('TEST-V09 flag off keeps ADD pills and confirm cards', async () => {

@@ -1,4 +1,4 @@
-import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { color, radius, space } from '@fieldsolo/design-system/lib/tokens';
 import type { JobDetailViewModel } from '@fieldsolo/shared-types';
+import { computeJobPricing, roundHalfUpBps } from '@fieldsolo/document-renderer';
 import {
   formatLocalDateLabel,
   formatSessionDurationLabel,
@@ -93,6 +94,9 @@ type JobDetailEditModeProps = {
   active?: boolean;
   /** When true, header chrome is rendered by JobDetailScreen. */
   hideHeader?: boolean;
+  /** When true, Revenue entry becomes Labor & Services and cost billability is shown. */
+  invoicingEnabled?: boolean;
+  footer?: ReactNode;
 };
 
 const iconColor = fg.secondary;
@@ -142,6 +146,41 @@ function JobDetailEditFocusScroller({
   }, [active, focusAnchorsRef, focusTarget, keyboardScroll, scrollContentRef, scrollRef]);
 
   return null;
+}
+
+function previewRevenueCents(draft: {
+  laborServicesCents: number | null;
+  materials: {
+    removed: boolean;
+    totalCostCents: number;
+    capturedMarkupBps: number | null;
+    markupOverrideBps: number | null;
+  }[];
+  otherCosts: { removed: boolean; costCents: number; costType: string; invoiceCustomer: boolean }[];
+}): number {
+  const priced = computeJobPricing({
+    laborServicesCents: draft.laborServicesCents,
+    taxRateBps: 0,
+    taxableCategories: [],
+    costs: [
+      ...draft.materials
+        .filter((row) => !row.removed)
+        .map((row) => ({
+          costType: 'material' as const,
+          totalCostCents: Math.max(0, row.totalCostCents),
+          capturedMarkupBps: row.capturedMarkupBps,
+          markupOverrideBps: row.markupOverrideBps,
+        })),
+      ...draft.otherCosts
+        .filter((row) => !row.removed && row.costType)
+        .map((row) => ({
+          costType: row.costType as 'other',
+          totalCostCents: Math.max(0, row.costCents),
+          invoiceCustomer: row.invoiceCustomer,
+        })),
+    ],
+  });
+  return priced.revenueCents ?? 0;
 }
 
 function parseRevenueInput(text: string): number | null {
@@ -228,6 +267,8 @@ export function JobDetailEditMode({
   focusTarget = null,
   active = true,
   hideHeader = false,
+  invoicingEnabled = false,
+  footer = null,
 }: JobDetailEditModeProps) {
   const {
     snapshot,
@@ -271,9 +312,10 @@ export function JobDetailEditMode({
     },
     [],
   );
-  const [revenueText, setRevenueText] = useState(() =>
-    revenueCentsToInput(draft?.revenueCents ?? null),
-  );
+  const pricingCents = invoicingEnabled
+    ? draft?.laborServicesCents ?? null
+    : draft?.revenueCents ?? null;
+  const [revenueText, setRevenueText] = useState(() => revenueCentsToInput(pricingCents));
   const [isRevenueFocused, setIsRevenueFocused] = useState(false);
   const revenueTextRef = useRef(revenueText);
   revenueTextRef.current = revenueText;
@@ -288,8 +330,16 @@ export function JobDetailEditMode({
   // Edit stays mounted under View; resync display when entering Edit or draft resets.
   useEffect(() => {
     if (!active || isRevenueFocused) return;
-    setRevenueText(revenueCentsToInput(draft?.revenueCents ?? null));
-  }, [active, draft?.revenueCents, draft?.noRevenueConfirmed, isRevenueFocused]);
+    const cents = invoicingEnabled ? draft?.laborServicesCents ?? null : draft?.revenueCents ?? null;
+    setRevenueText(revenueCentsToInput(cents));
+  }, [
+    active,
+    draft?.laborServicesCents,
+    draft?.noRevenueConfirmed,
+    draft?.revenueCents,
+    invoicingEnabled,
+    isRevenueFocused,
+  ]);
 
   useEffect(() => {
     setRevenueText(revenueCentsToInput(getDraftSnapshot().draft?.revenueCents ?? null));
@@ -326,6 +376,15 @@ export function JobDetailEditMode({
     (text: string) => {
       const parsed = parseRevenueInput(text);
       formatMoneyFieldOnBlur(text, setRevenueText);
+      if (invoicingEnabled) {
+        updateDraft({
+          laborServicesCents: parsed,
+          pricingIntent: 'labor',
+          pricingNeedsReview: false,
+          noRevenueConfirmed: parsed != null && parsed > 0 ? false : getDraftSnapshot().draft?.noRevenueConfirmed === true,
+        });
+        return;
+      }
       if (parsed != null && parsed > 0) {
         updateDraft({ revenueCents: parsed, noRevenueConfirmed: false });
         return;
@@ -336,7 +395,7 @@ export function JobDetailEditMode({
         noRevenueConfirmed: confirmed,
       });
     },
-    [getDraftSnapshot, updateDraft],
+    [getDraftSnapshot, invoicingEnabled, updateDraft],
   );
 
   useEffect(() => {
@@ -498,17 +557,45 @@ export function JobDetailEditMode({
           {showSection('revenue') ? (
           <View ref={setFocusAnchor('revenue')} collapsable={false}>
           <EditSheet>
+            {invoicingEnabled && draft.pricingNeedsReview ? (
+              <View>
+                <Text style={typography.body}>Review pricing</Text>
+                <Text style={typography.bodySmall}>
+                  {`Previous Revenue ${draft.revenueCents == null ? '—' : formatUsdCombined(draft.revenueCents)}`}
+                </Text>
+                {draft.laborServicesCents == null && draft.revenueCents != null ? (
+                  <Text style={typography.bodySmall}>
+                    Materials exceed the previous Revenue. Enter Labor & Services to confirm the new pricing.
+                  </Text>
+                ) : null}
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Confirm pricing"
+                  onPress={() => {
+                    updateDraft({
+                      pricingIntent: 'labor',
+                      pricingNeedsReview: false,
+                      laborServicesCents: draft.laborServicesCents,
+                    });
+                  }}
+                >
+                  <Text style={typography.body}>Confirm pricing</Text>
+                </Pressable>
+              </View>
+            ) : null}
             <EditIconRow icon={<JobDetailIconSectionOtherCosts color={iconColor} />}>
               <EditFieldInput
                 typography={typography}
-                placeholder="Revenue"
+                placeholder={invoicingEnabled ? 'Labor & Services' : 'Revenue'}
+                accessibilityLabel={invoicingEnabled ? 'Labor & Services' : 'Revenue'}
                 value={revenueText}
                 keyboardType="decimal-pad"
                 inputMode="decimal"
                 onFocus={() => {
                   setIsRevenueFocused(true);
-                  if (draft.revenueCents != null && draft.revenueCents > 0) {
-                    setRevenueText(centsToEditText(draft.revenueCents));
+                  const cents = invoicingEnabled ? draft.laborServicesCents : draft.revenueCents;
+                  if (cents != null && cents > 0) {
+                    setRevenueText(centsToEditText(cents));
                   }
                 }}
                 onBlur={() => {
@@ -524,7 +611,12 @@ export function JobDetailEditMode({
                 }}
               />
             </EditIconRow>
-            {(draft.revenueCents ?? 0) <= 0 ? (
+            {invoicingEnabled ? (
+              <Text style={typography.bodySmall}>
+                {`Revenue ${formatUsdCombined(previewRevenueCents(draft))}`}
+              </Text>
+            ) : null}
+            {(invoicingEnabled ? (draft.laborServicesCents ?? 0) : (draft.revenueCents ?? 0)) <= 0 ? (
               <EditConfirmNoneRow
                 typography={typography}
                 confirmed={draft.noRevenueConfirmed}
@@ -534,10 +626,23 @@ export function JobDetailEditMode({
                 onToggle={() => {
                   if (saving) return;
                   if (draft.noRevenueConfirmed) {
-                    updateDraft({ noRevenueConfirmed: false, revenueCents: null });
+                    updateDraft(
+                      invoicingEnabled
+                        ? { noRevenueConfirmed: false, laborServicesCents: null, pricingIntent: 'labor' }
+                        : { noRevenueConfirmed: false, revenueCents: null },
+                    );
                     setRevenueText('');
                   } else {
-                    updateDraft({ noRevenueConfirmed: true, revenueCents: 0 });
+                    updateDraft(
+                      invoicingEnabled
+                        ? {
+                            noRevenueConfirmed: true,
+                            laborServicesCents: 0,
+                            pricingIntent: 'labor',
+                            pricingNeedsReview: false,
+                          }
+                        : { noRevenueConfirmed: true, revenueCents: 0 },
+                    );
                     setRevenueText('');
                   }
                 }}
@@ -591,6 +696,7 @@ export function JobDetailEditMode({
                   onChange={(patch) => updateMaterial(row.id, patch)}
                   onOpenPicker={openPicker}
                   registerFieldFlusher={registerFieldFlusher}
+                  invoicingEnabled={invoicingEnabled}
                 />
                 </View>
               ))}
@@ -635,6 +741,7 @@ export function JobDetailEditMode({
                   onChange={(patch) => updateOtherCost(row.id, patch)}
                   onOpenPicker={openPicker}
                   registerFieldFlusher={registerFieldFlusher}
+                  invoicingEnabled={invoicingEnabled}
                 />
                 </View>
               ))}
@@ -708,6 +815,7 @@ export function JobDetailEditMode({
             </Text>
           </Pressable>
           ) : null}
+          {footer}
         </View>
       </EditModeScrollView>
       </EditKeyboardScrollProvider>
@@ -815,6 +923,7 @@ function MaterialEditBlock({
   onChange,
   onOpenPicker,
   registerFieldFlusher,
+  invoicingEnabled = false,
 }: {
   row: DraftMaterialRow;
   typography: TextStyles;
@@ -824,6 +933,7 @@ function MaterialEditBlock({
   onChange: (patch: Partial<DraftMaterialRow>) => void;
   onOpenPicker: (target: EditPickerTarget) => void;
   registerFieldFlusher: (flush: () => void) => () => void;
+  invoicingEnabled?: boolean;
 }) {
   const [totalCostText, setTotalCostText] = useState(() =>
     revenueCentsToInput(row.totalCostCents),
@@ -1022,6 +1132,36 @@ function MaterialEditBlock({
           }
         />
       </EditIconRow>
+      {invoicingEnabled ? (
+        <EditIconRow icon={<JobDetailIconSectionMaterials color={iconColor} />}>
+          <EditFieldInput
+            typography={typography}
+            placeholder="Markup"
+            accessibilityLabel="Markup"
+            keyboardType="decimal-pad"
+            value={String(((row.markupOverrideBps ?? row.capturedMarkupBps ?? 0) / 100).toString())}
+            onChangeText={(text) => {
+              const trimmed = text.trim();
+              if (!/^\d+(\.\d{0,2})?$/.test(trimmed)) return;
+              onChange({ markupOverrideBps: Math.round(Number(trimmed) * 100) });
+            }}
+          />
+          <Text style={typography.bodySmall}>Customer price includes markup.</Text>
+          <Text style={typography.bodySmall}>
+            {`Customer price ${formatUsdCombined(
+              row.totalCostCents +
+                roundHalfUpBps(row.totalCostCents, row.markupOverrideBps ?? row.capturedMarkupBps ?? 0),
+            )}`}
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Reset to original markup"
+            onPress={() => onChange({ markupOverrideBps: null })}
+          >
+            <Text style={typography.body}>Reset to original markup</Text>
+          </Pressable>
+        </EditIconRow>
+      ) : null}
     </EntityBlock>
   );
 }
@@ -1035,6 +1175,7 @@ function OtherCostEditBlock({
   onChange,
   onOpenPicker,
   registerFieldFlusher,
+  invoicingEnabled = false,
 }: {
   row: DraftOtherCostRow;
   typography: TextStyles;
@@ -1044,6 +1185,7 @@ function OtherCostEditBlock({
   onChange: (patch: Partial<DraftOtherCostRow>) => void;
   onOpenPicker: (target: EditPickerTarget) => void;
   registerFieldFlusher: (flush: () => void) => () => void;
+  invoicingEnabled?: boolean;
 }) {
   const [amountText, setAmountText] = useState(() => revenueCentsToInput(row.costCents));
   const [isAmountFocused, setIsAmountFocused] = useState(false);
@@ -1115,6 +1257,19 @@ function OtherCostEditBlock({
           }
         />
       </EditIconRow>
+      {invoicingEnabled ? (
+        <Pressable
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: row.invoiceCustomer }}
+          accessibilityLabel="Invoice customer"
+          onPress={() => onChange({ invoiceCustomer: !row.invoiceCustomer })}
+        >
+          <Text style={typography.body}>
+            {row.invoiceCustomer ? 'Invoice customer' : 'Invoice customer'}
+          </Text>
+          <Text style={typography.bodySmall}>Adds this cost to the customer’s estimate or invoice.</Text>
+        </Pressable>
+      ) : null}
     </EntityBlock>
   );
 }

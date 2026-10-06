@@ -21,6 +21,7 @@ export type CreateOtherCostInput = {
   costType: OtherCostTypeDb;
   description: string;
   costCents: number;
+  invoiceCustomer?: boolean;
 };
 
 export type UpdateOtherCostInput = {
@@ -29,6 +30,7 @@ export type UpdateOtherCostInput = {
   costCents?: number;
   sessionId?: SessionId | null;
   jobId?: JobId | null;
+  invoiceCustomer?: boolean;
 };
 
 export const OTHER_COST_TYPE_VALUES = [
@@ -86,6 +88,7 @@ export async function createOtherCost(
     cost_type: input.costType,
     job_id: input.sessionId ? null : (input.jobId ?? null),
     session_id: input.sessionId ?? null,
+    ...(input.invoiceCustomer !== undefined ? { invoice_customer: input.invoiceCustomer } : {}),
   };
 
   const { data, error } = await client
@@ -111,6 +114,9 @@ export async function updateOtherCost(
   }
   if (input.description !== undefined) {
     patch.description = normalizeOptionalDescription(input.description);
+  }
+  if (input.invoiceCustomer !== undefined) {
+    patch.invoice_customer = input.invoiceCustomer;
   }
   if (input.costCents !== undefined) {
     assertCostNonNegative(input.costCents);

@@ -1,6 +1,9 @@
 import { describe, expect, it } from '@jest/globals';
 
-import { isJobDetailFullscreenEditDevOverrideEnabled } from './devOverrides';
+import {
+  isInvoicingDevOverrideEnabled,
+  isJobDetailFullscreenEditDevOverrideEnabled,
+} from './devOverrides';
 
 describe('isJobDetailFullscreenEditDevOverrideEnabled', () => {
   it('is enabled only in development dev builds with env true', () => {
@@ -28,6 +31,30 @@ describe('isJobDetailFullscreenEditDevOverrideEnabled', () => {
       isJobDetailFullscreenEditDevOverrideEnabled({
         dev: false,
         environment: 'development',
+        envValue: 'true',
+      }),
+    ).toBe(false);
+  });
+
+  it('enables invoicing only for development dev builds', () => {
+    expect(
+      isInvoicingDevOverrideEnabled({
+        dev: true,
+        environment: 'development',
+        envValue: 'true',
+      }),
+    ).toBe(true);
+    expect(
+      isInvoicingDevOverrideEnabled({
+        dev: false,
+        environment: 'development',
+        envValue: 'true',
+      }),
+    ).toBe(false);
+    expect(
+      isInvoicingDevOverrideEnabled({
+        dev: true,
+        environment: 'production',
         envValue: 'true',
       }),
     ).toBe(false);

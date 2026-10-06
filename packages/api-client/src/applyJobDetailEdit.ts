@@ -12,6 +12,9 @@ export type ApplyJobDetailEditJobPatch = {
   customerId: string | null;
   serviceAddress: string;
   revenueCents: number | null;
+  /** Present only when the invoicing UI saves Labor & Services. */
+  laborServicesCents?: number | null;
+  pricingIntent?: 'labor' | 'revenue';
   noRevenueConfirmed: boolean;
   noMaterialsConfirmed: boolean;
   noOtherCostsConfirmed: boolean;
@@ -45,6 +48,7 @@ export type ApplyJobDetailEditMaterialRow = {
   unitCostExplicit: boolean;
   totalCostCents: number;
   sessionId: string | null;
+  markupOverrideBps?: number | null;
 };
 
 export type ApplyJobDetailEditOtherCostRow = {
@@ -54,6 +58,7 @@ export type ApplyJobDetailEditOtherCostRow = {
   description: string;
   costCents: number;
   sessionId: string | null;
+  invoiceCustomer?: boolean;
 };
 
 export type ApplyJobDetailEditPayload = {
@@ -122,6 +127,12 @@ function toRpcPayload(payload: ApplyJobDetailEditPayload): Record<string, unknow
       customerId: payload.job.customerId,
       serviceAddress: payload.job.serviceAddress,
       revenueCents: payload.job.revenueCents,
+      ...(payload.job.pricingIntent === 'labor'
+        ? {
+            pricingIntent: 'labor' as const,
+            laborServicesCents: payload.job.laborServicesCents ?? null,
+          }
+        : {}),
       noRevenueConfirmed: payload.job.noRevenueConfirmed,
       noMaterialsConfirmed: payload.job.noMaterialsConfirmed,
       noOtherCostsConfirmed: payload.job.noOtherCostsConfirmed,

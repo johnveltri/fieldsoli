@@ -71,6 +71,7 @@ export type LiveSessionJobIdentityPatch = {
   shortDescription?: string;
   longDescription?: string;
   revenueCents?: number | null;
+  laborServicesCents?: number | null;
 };
 
 export type LiveSessionInlineNote = {
@@ -118,6 +119,8 @@ type LiveSessionBottomSheetProps = {
   onEndSessionPress: () => void;
   /** Phase 3 capture surface (inline identity + flat list). */
   phase3Capture?: boolean;
+  /** When true, the money field is Labor & Services. */
+  invoicingEnabled?: boolean;
   jobIdentity?: LiveSessionJobIdentity;
   onJobIdentityChange?: (patch: LiveSessionJobIdentityPatch) => void;
   onCustomerSnapshotSave?: (draft: CustomerDraft) => void | Promise<void>;
@@ -206,6 +209,7 @@ export function LiveSessionBottomSheet({
   onEditJobPress,
   onEndSessionPress,
   phase3Capture = false,
+  invoicingEnabled = false,
   jobIdentity,
   onJobIdentityChange,
   onCustomerSnapshotSave,
@@ -1080,7 +1084,8 @@ export function LiveSessionBottomSheet({
               <EditIconRow icon={<JobDetailIconSectionOtherCosts color={iconColor} />}>
                 <EditFieldInput
                   typography={typography}
-                  placeholder="Revenue"
+                  placeholder={invoicingEnabled ? 'Labor & Services' : 'Revenue'}
+                  accessibilityLabel={invoicingEnabled ? 'Labor & Services' : 'Revenue'}
                   value={revenueText}
                   keyboardType="decimal-pad"
                   inputMode="decimal"
@@ -1097,7 +1102,9 @@ export function LiveSessionBottomSheet({
                       cents != null && cents > 0 ? formatUsdCombined(cents) : '';
                     setRevenueText(formatted);
                     draftRef.current = { ...draftRef.current, revenueText: formatted };
-                    flushIdentity({ revenueCents: cents });
+                    flushIdentity(
+                      invoicingEnabled ? { laborServicesCents: cents } : { revenueCents: cents },
+                    );
                   }}
                 />
               </EditIconRow>

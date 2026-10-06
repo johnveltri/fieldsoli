@@ -37,6 +37,9 @@ type JobRow = {
   job_work_status: JobWorkStatusDb;
   job_payment_state: JobPaymentState | null;
   revenue_cents: number | null;
+  labor_services_cents?: number | null;
+  pricing_mode?: string | null;
+  pricing_needs_review?: boolean | null;
   collected_cents: number | null;
   updated_at: string;
   last_worked_at: string | null;
@@ -80,12 +83,15 @@ type MaterialRow = {
   cost_type_explicit?: boolean | null;
   quantity_explicit?: boolean | null;
   unit_cost_explicit?: boolean | null;
+  captured_markup_bps?: number | null;
+  markup_override_bps?: number | null;
+  invoice_customer?: boolean | null;
   created_at: string;
   updated_at: string;
 };
 
 const JOB_DETAIL_JOB_SELECT_BASE =
-  'id, short_description, long_description, customer_name, customer_phone, customer_email, customer_id, service_address, job_type, job_work_status, job_payment_state, revenue_cents, collected_cents, updated_at, last_worked_at, materials_reviewed_at, other_costs_reviewed_at, no_revenue_confirmed_at';
+  'id, short_description, long_description, customer_name, customer_phone, customer_email, customer_id, service_address, job_type, job_work_status, job_payment_state, revenue_cents, labor_services_cents, pricing_mode, pricing_needs_review, collected_cents, updated_at, last_worked_at, materials_reviewed_at, other_costs_reviewed_at, no_revenue_confirmed_at';
 
 const OTHER_COST_TYPE_LABELS: Record<string, string> = {
   helper_labor: 'Helper Labor',
@@ -289,6 +295,8 @@ function materialLine(row: MaterialRow): JobDetailMaterialLine {
     totalCostCents: row.total_cost_cents,
     quantityLabel: qtyLabel,
     priceLabel: formatUsd(row.total_cost_cents),
+    capturedMarkupBps: row.captured_markup_bps ?? null,
+    markupOverrideBps: row.markup_override_bps ?? null,
   };
 }
 
@@ -307,6 +315,7 @@ function otherCostLine(row: MaterialRow): JobDetailOtherCostLine {
     typeLabel,
     description,
     costCents: row.total_cost_cents,
+    invoiceCustomer: row.invoice_customer === true,
     priceLabel: formatUsd(row.total_cost_cents),
   };
 }
@@ -539,6 +548,9 @@ export async function fetchJobDetail(
     customerEmail: j.customer_email ?? '',
     customerId: j.customer_id ?? null,
     serviceAddress: j.service_address ?? '',
+    laborServicesCents: j.labor_services_cents ?? null,
+    pricingMode: j.pricing_mode === 'component' ? 'component' : 'legacy',
+    pricingNeedsReview: j.pricing_needs_review === true,
     jobType: j.job_type ?? '',
     lastWorkedLabel,
     workStatus: mapWorkStatus(j),

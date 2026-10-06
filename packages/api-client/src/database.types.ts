@@ -187,14 +187,17 @@ export type Database = {
       }
       job_costs: {
         Row: {
+          captured_markup_bps: number | null
           cost_type: string
           cost_type_explicit: boolean
+          invoice_customer: boolean
           created_at: string
           deleted_at: string | null
           description: string | null
           id: string
           incurred_on: string | null
           job_id: string | null
+          markup_override_bps: number | null
           quantity: number | null
           quantity_explicit: boolean
           session_id: string | null
@@ -206,6 +209,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          captured_markup_bps?: number | null
           cost_type?: string
           cost_type_explicit?: boolean
           created_at?: string
@@ -213,7 +217,9 @@ export type Database = {
           description?: string | null
           id?: string
           incurred_on?: string | null
+          invoice_customer?: boolean
           job_id?: string | null
+          markup_override_bps?: number | null
           quantity?: number | null
           quantity_explicit?: boolean
           session_id?: string | null
@@ -225,6 +231,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          captured_markup_bps?: number | null
           cost_type?: string
           cost_type_explicit?: boolean
           created_at?: string
@@ -232,7 +239,9 @@ export type Database = {
           description?: string | null
           id?: string
           incurred_on?: string | null
+          invoice_customer?: boolean
           job_id?: string | null
+          markup_override_bps?: number | null
           quantity?: number | null
           quantity_explicit?: boolean
           session_id?: string | null
@@ -365,8 +374,12 @@ export type Database = {
           job_work_status: Database["public"]["Enums"]["job_work_status_enum"]
           last_worked_at: string | null
           list_recency_at: string | null
+          labor_services_cents: number | null
           long_description: string | null
           materials_reviewed_at: string | null
+          pricing_mode: string
+          pricing_needs_review: boolean
+          pricing_revision: number
           no_revenue_confirmed_at: string | null
           no_revenue_marked_paid: boolean
           other_costs_reviewed_at: string | null
@@ -395,12 +408,16 @@ export type Database = {
           job_work_status?: Database["public"]["Enums"]["job_work_status_enum"]
           last_worked_at?: string | null
           list_recency_at?: string | null
+          labor_services_cents?: number | null
           long_description?: string | null
           materials_reviewed_at?: string | null
           no_revenue_confirmed_at?: string | null
           no_revenue_marked_paid?: boolean
           other_costs_reviewed_at?: string | null
           paid_at?: string | null
+          pricing_mode?: string
+          pricing_needs_review?: boolean
+          pricing_revision?: number
           revenue_cents?: number | null
           service_address?: string | null
           short_description: string
@@ -425,12 +442,16 @@ export type Database = {
           job_work_status?: Database["public"]["Enums"]["job_work_status_enum"]
           last_worked_at?: string | null
           list_recency_at?: string | null
+          labor_services_cents?: number | null
           long_description?: string | null
           materials_reviewed_at?: string | null
           no_revenue_confirmed_at?: string | null
           no_revenue_marked_paid?: boolean
           other_costs_reviewed_at?: string | null
           paid_at?: string | null
+          pricing_mode?: string
+          pricing_needs_review?: boolean
+          pricing_revision?: number
           revenue_cents?: number | null
           service_address?: string | null
           short_description?: string
@@ -707,6 +728,57 @@ export type Database = {
         }
         Relationships: []
       }
+      business_settings: {
+        Row: {
+          address: string | null
+          business_name: string | null
+          email: string | null
+          estimate_expiration_days: number | null
+          license: string | null
+          material_markup_bps: number
+          payment_terms: string
+          phone: string | null
+          settings_revision: number
+          tax_rate_bps: number
+          taxable_categories: string[]
+          updated_at: string
+          user_id: string
+          website: string | null
+        }
+        Insert: {
+          address?: string | null
+          business_name?: string | null
+          email?: string | null
+          estimate_expiration_days?: number | null
+          license?: string | null
+          material_markup_bps?: number
+          payment_terms?: string
+          phone?: string | null
+          settings_revision?: number
+          tax_rate_bps?: number
+          taxable_categories?: string[]
+          updated_at?: string
+          user_id: string
+          website?: string | null
+        }
+        Update: {
+          address?: string | null
+          business_name?: string | null
+          email?: string | null
+          estimate_expiration_days?: number | null
+          license?: string | null
+          material_markup_bps?: number
+          payment_terms?: string
+          phone?: string | null
+          settings_revision?: number
+          tax_rate_bps?: number
+          taxable_categories?: string[]
+          updated_at?: string
+          user_id?: string
+          website?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -726,6 +798,45 @@ export type Database = {
       }
       apply_job_detail_edit_atomic: {
         Args: { p_job_id: string; p_payload: Json }
+        Returns: Json
+      }
+      create_financial_document: {
+        Args: {
+          p_fingerprint: string
+          p_job_id: string
+          p_request_key: string
+          p_timezone: string
+          p_type: string
+        }
+        Returns: Json
+      }
+      list_financial_documents: {
+        Args: { p_job_id: string }
+        Returns: Json
+      }
+      preview_financial_document: {
+        Args: { p_job_id: string; p_timezone: string; p_type: string }
+        Returns: Json
+      }
+      read_financial_document: {
+        Args: { p_document_id: string }
+        Returns: Json
+      }
+      resolve_shared_financial_document: {
+        Args: { p_token: string }
+        Returns: Json
+      }
+      revoke_owner_document_links: {
+        Args: Record<string, never>
+        Returns: undefined
+      }
+      set_financial_document_controls: {
+        Args: {
+          p_archived: boolean
+          p_document_id: string
+          p_expected_revision: number
+          p_link_enabled: boolean
+        }
         Returns: Json
       }
       claim_job_export_queue_messages: {

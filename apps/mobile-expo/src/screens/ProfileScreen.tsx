@@ -23,6 +23,8 @@ import {
 import { color } from '@fieldsolo/design-system/lib/tokens';
 
 import { CanvasTiledBackground } from '../components/CanvasTiledBackground';
+import { useInvoicingFlag } from '../lib/featureFlags';
+import { BusinessSettingsScreen } from './BusinessSettingsScreen';
 import { shellBottomNavOuterHeight } from '../components/platform/shellDockMetrics';
 import {
   ChangePasswordBottomSheet,
@@ -105,6 +107,9 @@ export function ProfileScreen({ onBack, onBackToHome = onBack }: ProfileScreenPr
   const scrollY = useMemo(() => new Animated.Value(0), []);
   const [scrollContentHeight, setScrollContentHeight] = useState(0);
   const { signOut, session, updatePassword, deleteAccount } = useAuth();
+  const { enabled: invoicingEnabled, ready: invoicingReady } = useInvoicingFlag(session?.user.id);
+  const showInvoicing = invoicingReady && invoicingEnabled;
+  const [businessScreen, setBusinessScreen] = useState<null | 'business' | 'settings'>(null);
 
   const [fontsLoaded] = useFonts(fieldsoloExpoFontAssets);
 
@@ -506,6 +511,16 @@ export function ProfileScreen({ onBack, onBackToHome = onBack }: ProfileScreenPr
     </>
   );
 
+  if (fontsLoaded && businessScreen) {
+    return (
+      <BusinessSettingsScreen
+        typography={typography}
+        mode={businessScreen}
+        onBack={() => setBusinessScreen(null)}
+      />
+    );
+  }
+
   if (!fontsLoaded) {
     return (
       <View style={styles.root}>
@@ -559,6 +574,27 @@ export function ProfileScreen({ onBack, onBackToHome = onBack }: ProfileScreenPr
               onActionPress={openEditProfile}
             />
             <ProfileRowsCard typography={typography} rows={personalInfoRows} />
+
+            {showInvoicing ? (
+              <>
+                <ProfileSectionHeader typography={typography} title="Business" />
+                <ProfileRowsCard
+                  typography={typography}
+                  rows={[
+                    {
+                      kind: 'link',
+                      label: 'Business info',
+                      onPress: () => setBusinessScreen('business'),
+                    },
+                    {
+                      kind: 'link',
+                      label: 'Estimate & Invoice Settings',
+                      onPress: () => setBusinessScreen('settings'),
+                    },
+                  ]}
+                />
+              </>
+            ) : null}
 
             <Pressable
               accessibilityRole="button"

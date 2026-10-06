@@ -9,6 +9,7 @@
     "src"
   ],
   "dependencies": {
+    "@fieldsolo/document-renderer": "*",
     "@fieldsolo/shared-types": "*",
     "@supabase/supabase-js": "^2.49.4",
     "libphonenumber-js": "^1.12.9"
