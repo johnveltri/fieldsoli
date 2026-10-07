@@ -161,6 +161,7 @@ type PlatformPrimaryActionProps = {
   onSelectMenuItem: (id: PrimaryActionMenuItemId) => void;
   /** Diameter of the circular FAB. */
   size: number;
+  accessibilityLabel?: string;
 };
 
 export function PlatformPrimaryAction({
@@ -170,6 +171,7 @@ export function PlatformPrimaryAction({
   onClose,
   onSelectMenuItem,
   size,
+  accessibilityLabel = 'Primary action',
 }: PlatformPrimaryActionProps) {
   const iconSize = Math.max(22, Math.round(size * 0.4));
   const lastPressAt = useRef(0);
@@ -198,7 +200,7 @@ export function PlatformPrimaryAction({
       ) : null}
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={open ? 'Close primary actions' : 'Primary action'}
+        accessibilityLabel={open ? 'Close primary actions' : accessibilityLabel}
         accessibilityState={{ expanded: open }}
         android_ripple={{
           color: 'rgba(255, 255, 255, 0.22)',

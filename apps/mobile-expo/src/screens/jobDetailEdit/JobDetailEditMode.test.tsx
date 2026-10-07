@@ -1,3 +1,4 @@
+import { Text } from 'react-native';
 import React, { useEffect } from 'react';
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
 import type { JobDetailViewModel } from '@fieldsolo/shared-types';
@@ -42,7 +43,7 @@ const job = {
   noOtherCostsConfirmed: false,
 } as unknown as JobDetailViewModel;
 
-function Harness({ onDirtyBack }: { onDirtyBack: (dirty: boolean) => void }) {
+function Harness({ onDirtyBack, docsOnly = false }: { onDirtyBack: (dirty: boolean) => void; docsOnly?: boolean }) {
   const editApi = useJobEditDraft(job);
 
   useEffect(() => {
@@ -57,7 +58,8 @@ function Harness({ onDirtyBack }: { onDirtyBack: (dirty: boolean) => void }) {
       bottomInset={0}
       columnStyle={{}}
       saving={false}
-      focusTarget="materials"
+      focusTarget={docsOnly ? 'docs' : 'materials'}
+      footer={<Text>Docs management</Text>}
       onBack={() => {
         onDirtyBack(editApi.isDirty());
         editApi.discardDraft();
@@ -70,6 +72,12 @@ function Harness({ onDirtyBack }: { onDirtyBack: (dirty: boolean) => void }) {
 }
 
 describe('JobDetailEditMode buffered numeric fields', () => {
+  it('opens Docs management without unrelated edit fields for a Docs entry', async () => {
+    const screen = render(<Harness docsOnly onDirtyBack={() => {}} />);
+    await screen.findByText('Docs management');
+    expect(screen.queryByLabelText('Job title')).toBeNull();
+    expect(screen.queryByLabelText('Unit price')).toBeNull();
+  });
   it('flushes a focused value before Back checks dirty and restores it after discard', async () => {
     const onDirtyBack = jest.fn();
     const screen = render(<Harness onDirtyBack={onDirtyBack} />);

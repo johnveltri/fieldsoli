@@ -14,6 +14,7 @@ const mockEndLiveSessionNow = jest.fn<(...args: unknown[]) => Promise<unknown>>(
 const mockRefreshLiveSession = jest.fn<(...args: unknown[]) => Promise<unknown>>();
 const mockUpdateLiveSessionJobShortDescription = jest.fn();
 let mockFullscreenEditFlagState = { enabled: true, ready: true };
+const mockOpenDocumentPreview = jest.fn();
 let mockInvoicingFlagState = { enabled: false, ready: true };
 let mockLiveSession: { id: string; jobId: string } | null = null;
 
@@ -578,14 +579,14 @@ jest.mock('../lib/featureFlags', () => ({
 
 jest.mock('../components/invoicing/InvoicingJobControls', () => {
   const React = require('react');
-  const { Text } = require('react-native');
+  const { Text, View } = require('react-native');
   return {
-    InvoicingJobControls: ({ mode }: { mode: string }) =>
-      React.createElement(
-        Text,
-        { accessibilityLabel: mode === 'view' ? 'Share job document' : 'Generate new' },
-        mode === 'view' ? 'Share' : 'Generate new',
-      ),
+    InvoicingJobControls: React.forwardRef(({ mode, onManageDocs }: { mode: string; onManageDocs?: () => void }, ref: unknown) => {
+      React.useImperativeHandle(ref, () => ({ openPreview: mockOpenDocumentPreview }));
+      return React.createElement(View, null,
+        React.createElement(Text, null, 'Docs'),
+        React.createElement(Text, { accessibilityLabel: mode === 'view' ? 'Manage documents' : 'Generate new', onPress: onManageDocs }, mode === 'view' ? 'Saved document' : 'Generate new'));
+    }),
   };
 });
 
@@ -2159,6 +2160,10 @@ describe('JobDetailScreen simplified view (flag on)', () => {
     mockInvoicingFlagState = { enabled: true, ready: true };
     const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
     await waitFor(() => expect(screen.getByLabelText('Share job document')).toBeTruthy());
+    fireEvent.press(screen.getByLabelText('Share job document'));
+    expect(mockOpenDocumentPreview).toHaveBeenCalledTimes(1);
+    fireEvent.press(screen.getByLabelText('Manage documents'));
+    await waitFor(() => expect(screen.getByTestId('edit-focus-target').props.children).toBe('\"docs\"'));
   });
 
   it('does not show Share while the invoicing flag is still loading', async () => {
