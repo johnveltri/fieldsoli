@@ -24,6 +24,9 @@ import * as Clipboard from 'expo-clipboard';
 import * as MailComposer from 'expo-mail-composer';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import { Asset } from 'expo-asset';
+import { File } from 'expo-file-system';
+import { Ubuntu_400Regular, Ubuntu_500Medium } from '@expo-google-fonts/ubuntu';
 import {
   createFinancialDocument,
   deviceIanaTimeZone,
@@ -41,6 +44,7 @@ import {
   renderDocumentPreview,
   unsupportedRendererHtml,
   RENDERER_VERSION,
+  type PreviewFontData,
 } from '@fieldsolo/document-renderer';
 import type { FieldSoloSupabaseClient } from '@fieldsolo/api-client';
 
@@ -90,11 +94,32 @@ type Props = {
   beforeOpen?: () => Promise<boolean>;
 };
 
+let previewFontDataPromise: Promise<PreviewFontData> | null = null;
+
+function loadPreviewFontData(): Promise<PreviewFontData> {
+  if (!previewFontDataPromise) {
+    previewFontDataPromise = Promise.all([
+      Asset.fromModule(Ubuntu_400Regular).downloadAsync(),
+      Asset.fromModule(Ubuntu_500Medium).downloadAsync(),
+    ]).then(async ([bodyAsset, bodyBoldAsset]) => {
+      if (!bodyAsset.localUri || !bodyBoldAsset.localUri) {
+        throw new Error('preview_font_asset_unavailable');
+      }
+      const [body, bodyBold] = await Promise.all([
+        new File(bodyAsset.localUri).base64(),
+        new File(bodyBoldAsset.localUri).base64(),
+      ]);
+      return { body, bodyBold };
+    });
+  }
+  return previewFontDataPromise;
+}
+
 function htmlFor(record: {
   rendererVersion: number;
   payload: DocumentPreview['payload'];
   paymentProjection: DocumentPreview['paymentProjection'];
-}, presentation: 'document' | 'preview' = 'document') {
+}, presentation: 'document' | 'preview' = 'document', fonts?: PreviewFontData) {
   if (record.rendererVersion !== RENDERER_VERSION)
     return unsupportedRendererHtml();
   const payload =
@@ -109,11 +134,15 @@ function htmlFor(record: {
             record.payload.customerPhone,
         }
       : record.payload;
-  return (presentation === 'preview' ? renderDocumentPreview : renderDocument)(
-    record.rendererVersion,
-    payload,
-    record.paymentProjection,
-  );
+  if (presentation === 'preview') {
+    return renderDocumentPreview(
+      record.rendererVersion,
+      payload,
+      record.paymentProjection,
+      fonts,
+    );
+  }
+  return renderDocument(record.rendererVersion, payload, record.paymentProjection);
 }
 
 export type InvoicingJobControlsHandle = { openPreview: () => void };
@@ -148,11 +177,35 @@ export const InvoicingJobControls = forwardRef<
   );
   const [saved, setSaved] = useState<FinancialDocumentRecord | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewFonts, setPreviewFonts] = useState<PreviewFontData | null>(null);
+  const [previewFontsReady, setPreviewFontsReady] = useState(false);
   const [businessOpen, setBusinessOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [requestKey, setRequestKey] = useState<string | null>(null);
   const [offline, setOffline] = useState(false);
+
+  useEffect(() => {
+    if (!previewOpen) return;
+    let cancelled = false;
+    setPreviewFontsReady(false);
+    void loadPreviewFontData()
+      .then((fonts) => {
+        if (!cancelled) {
+          setPreviewFonts(fonts);
+          setPreviewFontsReady(true);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setPreviewFonts(null);
+          setPreviewFontsReady(true);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [previewOpen]);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -656,20 +709,28 @@ export const InvoicingJobControls = forwardRef<
           ) : null}
           <View style={styles.paperWrap}>
             <View style={styles.paper}>
-              <WebView
-                originWhitelist={['*']}
-                source={{
-                  html: saved
-                    ? htmlFor(saved, 'preview')
-                    : preview
-                      ? htmlFor({
-                          ...preview,
-                          paymentProjection: preview.paymentProjection,
-                        }, 'preview')
-                      : '<html><body></body></html>',
-                }}
-                style={styles.web}
-              />
+              {previewFontsReady ? (
+                <WebView
+                  originWhitelist={['*']}
+                  source={{
+                    html: saved
+                      ? htmlFor(saved, 'preview', previewFonts ?? undefined)
+                      : preview
+                        ? htmlFor(
+                            {
+                              ...preview,
+                              paymentProjection: preview.paymentProjection,
+                            },
+                            'preview',
+                            previewFonts ?? undefined,
+                          )
+                        : '<html><body></body></html>',
+                  }}
+                  style={styles.web}
+                />
+              ) : (
+                <ActivityIndicator size="small" color={fg.primary} />
+              )}
             </View>
           </View>
           {!saved && preview && preview.gaps.length === 0 ? (

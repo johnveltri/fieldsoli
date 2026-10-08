@@ -41,6 +41,7 @@ export type DocumentPayload = {
 };
 
 export type PaymentProjection = 'paid' | 'unpaid' | null;
+export type PreviewFontData = { body: string; bodyBold: string };
 
 const PAYMENT_TERMS_LABEL: Record<PaymentTerms, string> = {
   due_on_receipt: 'Due upon receipt',
@@ -221,6 +222,7 @@ export function renderDocumentPreview(
   version: number,
   payload: DocumentPayload,
   paymentProjection: PaymentProjection,
+  fonts?: PreviewFontData,
 ): string {
   if (version !== RENDERER_VERSION)
     throw new Error("unsupported_renderer_version");
@@ -235,41 +237,46 @@ export function renderDocumentPreview(
   const notes = payload.longDescription?.trim()
     ? `<section class="notes"><h2>Client notes</h2><p>${escapeHtml(payload.longDescription)}</p></section>`
     : "";
+  const fontFaces = fonts
+    ? `@font-face { font-family: FieldSoliUbuntu; src: url(data:font/ttf;base64,${fonts.body}) format("truetype"); }\n@font-face { font-family: FieldSoliUbuntuMedium; src: url(data:font/ttf;base64,${fonts.bodyBold}) format("truetype"); }`
+    : "";
   return `<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>${escapeHtml(title)}</title><style>
+${fontFaces}
 :root {
   color-scheme: light;
   --table-header-background: #333;
-  --font-body: "Ubuntu_400Regular", sans-serif;
-  --font-bold: "Ubuntu_500Medium", sans-serif;
+  --font-body: ${fonts ? "FieldSoliUbuntu" : '"Ubuntu_400Regular", sans-serif'};
+  --font-bold: ${fonts ? "FieldSoliUbuntuMedium" : '"Ubuntu_500Medium", sans-serif'};
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; background: #fff; color: #111; }
 body { font-family: var(--font-body); font-size: 14px; line-height: 1.4; }
 .page { max-width: 816px; margin: auto; padding: 28px 20px 36px; }
 h1, h2, p { margin: 0; }
+h1, h2, th { font-weight: normal; }
 p { overflow-wrap: anywhere; }
 .header { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; align-items: start; }
-.business h1 { font-family: var(--font-bold); font-size: 18px; font-weight: 600; line-height: 1.4; margin-bottom: 10px; }
+.business h1 { font-family: var(--font-bold); font-size: 18px; font-weight: normal; line-height: 1.4; margin-bottom: 10px; }
 .business p, .recipient p { margin-top: 2px; white-space: pre-wrap; }
 .recipient { margin-top: 24px; }
-h2 { font-family: var(--font-body); font-size: 14px; line-height: 1.4; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 7px; }
-.recipient .name { font-family: var(--font-bold); font-size: 18px; font-weight: 600; line-height: 1.4; margin-bottom: 4px; }
+h2 { font-family: var(--font-body); font-size: 14px; font-weight: normal; line-height: 1.4; margin-bottom: 7px; }
+.recipient .name { font-family: var(--font-bold); font-size: 18px; line-height: 1.4; margin-bottom: 4px; }
 .document-summary { background: #f3f3f3; }
 .document-title { background: var(--table-header-background); color: #fff; padding: 10px 12px; }
-.document-title h2 { font-family: var(--font-bold); font-size: 18px; font-weight: 600; line-height: 1.4; text-transform: none; letter-spacing: 0; margin: 0; overflow-wrap: anywhere; }
+.document-title h2 { font-family: var(--font-bold); font-size: 18px; font-weight: normal; line-height: 1.4; margin: 0; overflow-wrap: anywhere; }
 .document-title p { font-size: 14px; line-height: 1.4; margin-top: 3px; }
 .summary-row { display: flex; justify-content: space-between; gap: 16px; padding: 7px 12px; }
 .summary-row span:last-child { text-align: right; overflow-wrap: anywhere; min-width: 0; }
 .document-summary .summary-row { font-size: 14px; line-height: 1.4; }
 .document-summary .summary-row span:first-child { flex-shrink: 0; }
-.summary-total { background: var(--table-header-background); color: #fff; font-family: var(--font-bold); font-size: 18px; font-weight: 600; line-height: 1.4; }
+.summary-total { background: var(--table-header-background); color: #fff; font-family: var(--font-bold); font-size: 18px; line-height: 1.4; }
 .services { margin-top: 30px; }
-.services h2 { font-family: var(--font-bold); font-size: 18px; font-weight: 600; line-height: 1.4; text-transform: none; letter-spacing: 0; margin-bottom: 12px; overflow-wrap: anywhere; }
+.services h2 { font-family: var(--font-bold); font-size: 18px; font-weight: normal; line-height: 1.4; margin-bottom: 12px; overflow-wrap: anywhere; }
 table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-th { background: var(--table-header-background); color: #fff; font-family: var(--font-body); font-size: 14px; line-height: 1.4; text-transform: uppercase; letter-spacing: .04em; }
+th { background: var(--table-header-background); color: #fff; font-family: var(--font-body); font-size: 14px; font-weight: normal; line-height: 1.4; }
 th, td { padding: 11px 10px; text-align: left; vertical-align: top; overflow-wrap: anywhere; }
 td { border-bottom: 1px solid #ddd; }
 .amount { width: 36%; text-align: right; font-variant-numeric: tabular-nums; }
@@ -278,7 +285,7 @@ td { border-bottom: 1px solid #ddd; }
 .notes p { white-space: pre-wrap; }
 .totals { grid-column: 2; }
 .totals .summary-row { padding: 8px 0; border-bottom: 1px solid #e5e5e5; }
-.totals .final { font-family: var(--font-bold); font-size: 18px; font-weight: 600; line-height: 1.4; border-top: 2px solid #333; border-bottom: 0; margin-top: 3px; padding-top: 12px; }
+.totals .final { font-family: var(--font-bold); font-size: 18px; line-height: 1.4; border-top: 2px solid #333; border-bottom: 0; margin-top: 3px; padding-top: 12px; }
 @media (max-width: 540px) {
   .page { padding: 22px 18px 30px; }
   .header { grid-template-columns: minmax(0, 1fr); gap: 22px; }
