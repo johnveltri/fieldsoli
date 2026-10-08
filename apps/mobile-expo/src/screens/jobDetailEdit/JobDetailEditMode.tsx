@@ -5,6 +5,7 @@ import {
   Keyboard,
   Pressable,
   StyleSheet,
+  Switch,
   Text,
   View,
   type ScrollView,
@@ -53,7 +54,7 @@ import {
 } from '../../components/figma-icons/JobDetailScreenIcons';
 import { formatUsdCombined } from '../../lib/formatUsd';
 import { otherCostTypeLabel, type JobOtherCostType } from '../../lib/otherCostTypes';
-import { bg, cardShadowRn, fg } from '../../theme/nativeTokens';
+import { bg, border, cardShadowRn, fg } from '../../theme/nativeTokens';
 import type { TextStyles } from '../../theme/nativeTokens';
 import {
   JobDetailEditPickers,
@@ -558,8 +559,8 @@ export function JobDetailEditMode({
           <View ref={setFocusAnchor('revenue')} collapsable={false}>
           <EditSheet>
             {invoicingEnabled && draft.pricingNeedsReview ? (
-              <View>
-                <Text style={typography.body}>Review pricing</Text>
+              <View style={invoicingStyles.notice}>
+                <Text style={typography.bodyBold}>Review pricing</Text>
                 <Text style={typography.bodySmall}>
                   {`Previous Revenue ${draft.revenueCents == null ? '—' : formatUsdCombined(draft.revenueCents)}`}
                 </Text>
@@ -579,7 +580,7 @@ export function JobDetailEditMode({
                     });
                   }}
                 >
-                  <Text style={typography.body}>Confirm pricing</Text>
+                  <Text style={[typography.bodyBold, invoicingStyles.action]}>Confirm pricing</Text>
                 </Pressable>
               </View>
             ) : null}
@@ -612,9 +613,10 @@ export function JobDetailEditMode({
               />
             </EditIconRow>
             {invoicingEnabled ? (
-              <Text style={typography.bodySmall}>
-                {`Revenue ${formatUsdCombined(previewRevenueCents(draft))}`}
-              </Text>
+              <View style={invoicingStyles.totalRow}>
+                <Text style={[typography.bodySmall, { color: fg.secondary }]}>Revenue</Text>
+                <Text style={typography.bodyBold}>{formatUsdCombined(previewRevenueCents(draft))}</Text>
+              </View>
             ) : null}
             {(invoicingEnabled ? (draft.laborServicesCents ?? 0) : (draft.revenueCents ?? 0)) <= 0 ? (
               <EditConfirmNoneRow
@@ -798,6 +800,8 @@ export function JobDetailEditMode({
           </View>
           ) : null}
 
+          {showSection('docs') && footer ? <View ref={setFocusAnchor('docs')} collapsable={false}>{footer}</View> : null}
+
           {editSections === 'all' ? (
           <Pressable
             accessibilityRole="button"
@@ -815,7 +819,6 @@ export function JobDetailEditMode({
             </Text>
           </Pressable>
           ) : null}
-          {footer}
         </View>
       </EditModeScrollView>
       </EditKeyboardScrollProvider>
@@ -1134,32 +1137,28 @@ function MaterialEditBlock({
       </EditIconRow>
       {invoicingEnabled ? (
         <EditIconRow icon={<JobDetailIconSectionMaterials color={iconColor} />}>
-          <EditFieldInput
-            typography={typography}
-            placeholder="Markup"
-            accessibilityLabel="Markup"
-            keyboardType="decimal-pad"
-            value={String(((row.markupOverrideBps ?? row.capturedMarkupBps ?? 0) / 100).toString())}
-            onChangeText={(text) => {
-              const trimmed = text.trim();
-              if (!/^\d+(\.\d{0,2})?$/.test(trimmed)) return;
-              onChange({ markupOverrideBps: Math.round(Number(trimmed) * 100) });
-            }}
-          />
-          <Text style={typography.bodySmall}>Customer price includes markup.</Text>
-          <Text style={typography.bodySmall}>
-            {`Customer price ${formatUsdCombined(
-              row.totalCostCents +
-                roundHalfUpBps(row.totalCostCents, row.markupOverrideBps ?? row.capturedMarkupBps ?? 0),
-            )}`}
-          </Text>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Reset to original markup"
-            onPress={() => onChange({ markupOverrideBps: null })}
-          >
-            <Text style={typography.body}>Reset to original markup</Text>
-          </Pressable>
+          <View style={invoicingStyles.pricingFields}>
+            <Text style={[typography.bodySmall, { color: fg.secondary }]}>Material markup</Text>
+            <View style={invoicingStyles.totalRowInline}>
+              <EditFieldInput typography={typography} placeholder="Markup" accessibilityLabel="Markup percentage"
+                style={{ flex: 1, minWidth: 0, width: 'auto' }}
+                keyboardType="decimal-pad" value={String((row.markupOverrideBps ?? row.capturedMarkupBps ?? 0) / 100)}
+                onChangeText={(text) => {
+                  const trimmed = text.trim();
+                  if (!/^\d+(\.\d{0,2})?$/.test(trimmed)) return;
+                  onChange({ markupOverrideBps: Math.round(Number(trimmed) * 100) });
+                }} />
+              <Text style={typography.body}>%</Text>
+            </View>
+            <Text style={[typography.bodySmall, { color: fg.secondary }]}>
+              {`Customer price ${formatUsdCombined(row.totalCostCents + roundHalfUpBps(row.totalCostCents, row.markupOverrideBps ?? row.capturedMarkupBps ?? 0))}`}
+            </Text>
+            <Text style={[typography.bodySmall, { color: fg.secondary }]}>Customer price includes markup.</Text>
+            <Pressable accessibilityRole="button" accessibilityLabel="Reset to original markup"
+              onPress={() => onChange({ markupOverrideBps: null })} style={invoicingStyles.reset}>
+              <Text style={[typography.bodySmall, invoicingStyles.action]}>Reset to original markup</Text>
+            </Pressable>
+          </View>
         </EditIconRow>
       ) : null}
     </EntityBlock>
@@ -1258,17 +1257,15 @@ function OtherCostEditBlock({
         />
       </EditIconRow>
       {invoicingEnabled ? (
-        <Pressable
-          accessibilityRole="checkbox"
-          accessibilityState={{ checked: row.invoiceCustomer }}
-          accessibilityLabel="Invoice customer"
-          onPress={() => onChange({ invoiceCustomer: !row.invoiceCustomer })}
-        >
-          <Text style={typography.body}>
-            {row.invoiceCustomer ? 'Invoice customer' : 'Invoice customer'}
-          </Text>
-          <Text style={typography.bodySmall}>Adds this cost to the customer’s estimate or invoice.</Text>
-        </Pressable>
+        <View style={invoicingStyles.billableRow}>
+          <View style={invoicingStyles.billableLabel}>
+            <Text style={typography.body}>Invoice customer</Text>
+            <Text style={[typography.bodySmall, { color: fg.secondary }]}>Adds this cost to the customer’s estimate or invoice.</Text>
+          </View>
+          <Switch accessibilityLabel="Invoice customer" value={row.invoiceCustomer}
+            trackColor={{ false: border.subtle, true: color('Brand/Accent') }} thumbColor={bg.surfaceWhite}
+            onValueChange={(value) => onChange({ invoiceCustomer: value })} />
+        </View>
       ) : null}
     </EntityBlock>
   );
@@ -1359,4 +1356,15 @@ const styles = StyleSheet.create({
     minHeight: 44,
     justifyContent: 'center',
   },
+});
+
+const invoicingStyles = StyleSheet.create({
+  notice: { padding: space('Spacing/16'), gap: space('Spacing/8'), backgroundColor: bg.subtle },
+  action: { color: color('Brand/Primary') },
+  totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: space('Spacing/16'), paddingVertical: space('Spacing/12'), gap: space('Spacing/12') },
+  totalRowInline: { flexDirection: 'row', alignItems: 'center', gap: space('Spacing/8') },
+  pricingFields: { width: '100%', gap: space('Spacing/4') },
+  reset: { minHeight: 44, justifyContent: 'center' },
+  billableRow: { flexDirection: 'row', alignItems: 'center', padding: space('Spacing/16'), gap: space('Spacing/12') },
+  billableLabel: { flex: 1, gap: space('Spacing/4') },
 });

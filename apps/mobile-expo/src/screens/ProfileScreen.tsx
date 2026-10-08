@@ -179,7 +179,7 @@ export function ProfileScreen({ onBack, onBackToHome = onBack }: ProfileScreenPr
   const [saving, setSaving] = useState(false);
 
   const profileSheetsMounted =
-    editProfileMounted || changePasswordMounted || deleteAccountMounted;
+    editProfileMounted || changePasswordMounted || deleteAccountMounted || businessScreen != null;
   const shellChrome = useShellChromeOptional();
   useEffect(() => {
     shellChrome?.setProfileSheetsMounted(profileSheetsMounted);

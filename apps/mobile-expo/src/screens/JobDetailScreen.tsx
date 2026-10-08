@@ -143,7 +143,9 @@ import type { TextStyles } from '../theme/nativeTokens';
 import { useContentColumn } from '../theme/useContentColumn';
 import type { EditJobBottomSheetValues } from '../components/ds/EditJobBottomSheet';
 import { useInvoicingFlag, useJobDetailFullscreenEditFlag } from '../lib/featureFlags';
-import { InvoicingJobControls } from '../components/invoicing/InvoicingJobControls';
+import { shellDockRowHeight } from '../components/platform/shellDockMetrics';
+import { JobDocumentFab } from '../components/invoicing/JobDocumentFab';
+import { InvoicingJobControls, type InvoicingJobControlsHandle } from '../components/invoicing/InvoicingJobControls';
 import { JobDetailEditMode } from './jobDetailEdit/JobDetailEditMode';
 import type {
   JobDetailEditFocusTarget,
@@ -387,6 +389,7 @@ export function JobDetailScreen({
   const [editSheetMounted, setEditSheetMounted] = useState(false);
   const [editSheetVisible, setEditSheetVisible] = useState(false);
   type DetailMode = 'view' | 'edit';
+  const documentControlsRef = useRef<InvoicingJobControlsHandle>(null);
   const [detailMode, setDetailMode] = useState<DetailMode>('view');
   const [editSaving, setEditSaving] = useState(false);
   // State updates are asynchronous; this ref closes the small double-tap /
@@ -3008,16 +3011,6 @@ export function JobDetailScreen({
           primaryDisabled={statusActionPending}
           moreDisabled={statusActionPending}
         />
-        {showInvoicing ? (
-          <InvoicingJobControls
-            client={supabase}
-            jobId={job.id}
-            workStatus={job.workStatus}
-            typography={typography}
-            mode="view"
-            onEditDetails={() => openEditFromView('revenue', 'view_row')}
-          />
-        ) : null}
         {simplifiedView && incompletePills.length > 0 ? (
           <Text style={[typography.bodySmall, styles.incompleteReasons]}>
             {`Missing: ${incompletePills.join(', ')}`}
@@ -3213,6 +3206,21 @@ export function JobDetailScreen({
           showNoteIcon={false}
         />
       )}
+      {showInvoicing ? (
+        <InvoicingJobControls
+          ref={documentControlsRef}
+          client={supabase}
+          jobId={job.id}
+          workStatus={job.workStatus}
+          typography={typography}
+          mode="view"
+          onEditDetails={onEdit}
+          onManageDocs={() => {
+            if (useFullscreenEdit) openEditFromView('docs', 'view_row');
+            else onEdit();
+          }}
+        />
+      ) : null}
     </View>
   );
 
@@ -3230,7 +3238,7 @@ export function JobDetailScreen({
       contentContainerStyle={{
         width: '100%',
         paddingTop: viewScrollPaddingTop,
-        paddingBottom: space('Spacing/20') + bottomInset,
+        paddingBottom: space('Spacing/20') + bottomInset + (showInvoicing ? shellDockRowHeight() + space('Spacing/16') : 0),
         alignItems: 'stretch',
       }}
       keyboardShouldPersistTaps="handled"
@@ -3368,6 +3376,10 @@ export function JobDetailScreen({
       ) : (
         viewScroll
       )}
+
+      {showInvoicing && detailMode === 'view' ? (
+        <JobDocumentFab bottomInset={bottomInset} onShare={() => documentControlsRef.current?.openPreview()} />
+      ) : null}
 
       {editSheetMounted ? (
         <EditJobBottomSheet
