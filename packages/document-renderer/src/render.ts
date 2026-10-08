@@ -10,6 +10,11 @@ export type DocumentLine = {
   label: string;
   amountCents: number;
   category?: OtherCostCategory;
+  details?: {
+    quantity: number;
+    unit: string | null;
+    unitPriceCents: number | null;
+  };
 };
 
 export type DocumentPayload = {
@@ -88,6 +93,17 @@ function formatDate(isoDate: string): string {
   }).format(new Date(Date.UTC(year, month - 1, day)));
 }
 
+function materialDetails(details: NonNullable<DocumentLine['details']>): string {
+  const quantity = new Intl.NumberFormat('en-US', { maximumFractionDigits: 3 }).format(
+    details.quantity,
+  );
+  const unit = details.unit ? ` ${details.unit}` : '';
+  const unitPrice =
+    details.unitPriceCents != null ? ` @ ${formatUsd(details.unitPriceCents)}` : '';
+  const label = `${quantity}${unit}${unitPrice}`;
+  return `<div class="line-details">${escapeHtml(label)}</div>`;
+}
+
 function textBlock(label: string, value: string | null | undefined): string {
   const trimmed = value?.trim() ?? '';
   if (!trimmed) return '';
@@ -111,6 +127,7 @@ h2 { font-size: 20px; line-height: 1.3; margin-top: 28px; }
 table { width: 100%; border-collapse: collapse; margin-top: 20px; }
 th, td { text-align: left; vertical-align: top; padding: 8px 0; border-bottom: 1px solid #000; }
 th { font-family: ui-monospace, Menlo, monospace; font-size: 12px; font-weight: 600; }
+.line-details { color: #6F6A65; font-size: 12px; line-height: 1.35; margin-top: 2px; }
 td.amount, th.amount { text-align: right; white-space: nowrap; }
 .totals { margin-top: 12px; }
 .totals div { display: flex; justify-content: space-between; gap: 16px; padding: 6px 0; }
@@ -143,8 +160,10 @@ export function renderDocument(
       : '';
   const lines = payload.lines
     .map(
-      (line) =>
-        `<tr><td>${escapeHtml(line.label)}</td><td class="amount">${escapeHtml(formatUsd(line.amountCents))}</td></tr>`,
+      (line) => {
+        const details = line.details ? materialDetails(line.details) : '';
+        return `<tr><td>${escapeHtml(line.label)}${details}</td><td class="amount">${escapeHtml(formatUsd(line.amountCents))}</td></tr>`;
+      },
     )
     .join('');
   const identity = [
@@ -288,6 +307,7 @@ table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 th { background: var(--table-header-background); color: #fff; font-family: var(--font-bold); font-size: 12px; font-weight: normal; line-height: 1.25; letter-spacing: .04em; text-transform: uppercase; }
 th, td { padding: 11px 10px; text-align: left; vertical-align: top; overflow-wrap: anywhere; }
 td { border-bottom: 1px solid #ddd; }
+.line-details { color: #6F6A65; font-size: 12px; line-height: 1.35; margin-top: 2px; }
 .amount { width: 36%; text-align: right; }
 .footer { display: flex; flex-direction: column; gap: 24px; margin-top: 24px; align-items: stretch; }
 .notes { padding: 8px 10px 0; }
@@ -318,7 +338,7 @@ ${!estimate && payload.paymentTerms ? row("Terms", PAYMENT_TERMS_LABEL[payload.p
 </section></header>
 <section class="services"><h2>${escapeHtml(payload.shortDescription)}</h2>
 <table aria-label="Services and charges"><thead><tr><th scope="col">Product / Service</th><th scope="col" class="amount">Total</th></tr></thead><tbody>
-${payload.lines.map((line) => `<tr><td>${escapeHtml(line.label)}</td><td class="amount">${formatUsd(line.amountCents)}</td></tr>`).join("")}
+${payload.lines.map((line) => `<tr><td>${escapeHtml(line.label)}${line.details ? materialDetails(line.details) : ""}</td><td class="amount">${formatUsd(line.amountCents)}</td></tr>`).join("")}
 </tbody></table></section>
 <div class="footer">${notes}<section class="totals" aria-label="Totals">
 ${row("Subtotal", formatUsd(payload.subtotalCents))}${row("Tax", formatUsd(payload.taxCents))}

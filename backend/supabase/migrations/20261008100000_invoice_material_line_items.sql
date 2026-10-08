@@ -62,7 +62,19 @@ begin
     'amountCents', c.total_cost_cents + private.round_half_up_bps(
       c.total_cost_cents,
       coalesce(c.markup_override_bps, c.captured_markup_bps, 0)
-    )
+    ),
+    'details', case
+      when coalesce(c.quantity_explicit, true) and c.quantity is not null then jsonb_build_object(
+        'quantity', c.quantity,
+        'unit', nullif(btrim(c.unit), ''),
+        'unitPriceCents', case
+          when coalesce(c.unit_cost_explicit, true) and coalesce(c.unit_cost_cents, 0) > 0
+            then c.unit_cost_cents
+          else null
+        end
+      )
+      else null
+    end
   ) order by c.created_at, c.id), '[]'::jsonb)
   into v_materials
   from private.included_job_costs(p_job_id) c
