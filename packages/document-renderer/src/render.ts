@@ -293,7 +293,7 @@ td { border-bottom: 1px solid #ddd; }
 .notes { padding-top: 8px; }
 .notes p { white-space: pre-wrap; }
 .totals { width: 100%; }
-.totals .summary-row { padding: 8px 0; border-bottom: 1px solid #e5e5e5; }
+.totals .summary-row { padding: 8px 10px; border-bottom: 1px solid #e5e5e5; }
 .totals .final { font-family: var(--font-bold); font-size: 18px; line-height: 1.4; border-top: 2px solid #333; border-bottom: 0; margin-top: 3px; padding-top: 12px; }
 @media (max-width: 540px) {
   .page { padding: 22px 18px 150px; }
