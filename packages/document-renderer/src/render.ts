@@ -247,7 +247,7 @@ export function renderDocumentPreview(
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; background: #fff; color: #111; }
-body { font-family: var(--font-body); font-size: 16px; line-height: 1.4; }
+body { font-family: var(--font-body); font-size: 14px; line-height: 1.4; }
 .page { max-width: 816px; margin: auto; padding: 28px 20px 36px; }
 h1, h2, p { margin: 0; }
 p { overflow-wrap: anywhere; }
