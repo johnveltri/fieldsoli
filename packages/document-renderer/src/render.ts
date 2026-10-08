@@ -271,7 +271,7 @@ p { overflow-wrap: anywhere; }
 .recipient { margin-top: 24px; }
 h2 { font-family: var(--font-body); font-size: 14px; font-weight: normal; line-height: 1.4; margin-bottom: 7px; }
 .recipient h2, .notes h2 { font-family: var(--font-label); font-size: 12px; line-height: 1.25; letter-spacing: .05em; text-transform: uppercase; }
-.recipient .name { font-family: var(--font-body); font-size: 14px; line-height: 1.4; margin-bottom: 4px; }
+.recipient .name { font-family: var(--font-body); font-size: 16px; line-height: 1.4; margin-bottom: 4px; }
 .document-summary { background: #f3f3f3; }
 .document-title { background: var(--table-header-background); color: #fff; padding: 10px 12px; }
 .document-title h2 { font-family: var(--font-bold); font-size: 18px; font-weight: normal; line-height: 1.4; margin: 0; overflow-wrap: anywhere; }
@@ -290,7 +290,7 @@ th, td { padding: 11px 10px; text-align: left; vertical-align: top; overflow-wra
 td { border-bottom: 1px solid #ddd; }
 .amount { width: 36%; text-align: right; }
 .footer { display: flex; flex-direction: column; gap: 24px; margin-top: 24px; align-items: stretch; }
-.notes { padding-top: 8px; }
+.notes { padding: 8px 10px 0; }
 .notes p { white-space: pre-wrap; }
 .totals { width: 100%; }
 .totals .summary-row { padding: 8px 10px; border-bottom: 1px solid #e5e5e5; }
