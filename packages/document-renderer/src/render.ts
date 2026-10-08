@@ -289,10 +289,10 @@ th { background: var(--table-header-background); color: #fff; font-family: var(-
 th, td { padding: 11px 10px; text-align: left; vertical-align: top; overflow-wrap: anywhere; }
 td { border-bottom: 1px solid #ddd; }
 .amount { width: 36%; text-align: right; }
-.footer { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; margin-top: 24px; align-items: start; }
+.footer { display: flex; flex-direction: column; gap: 24px; margin-top: 24px; align-items: stretch; }
 .notes { padding-top: 8px; }
 .notes p { white-space: pre-wrap; }
-.totals { grid-column: 2; }
+.totals { width: 100%; }
 .totals .summary-row { padding: 8px 0; border-bottom: 1px solid #e5e5e5; }
 .totals .final { font-family: var(--font-bold); font-size: 18px; line-height: 1.4; border-top: 2px solid #333; border-bottom: 0; margin-top: 3px; padding-top: 12px; }
 @media (max-width: 540px) {
@@ -300,9 +300,7 @@ td { border-bottom: 1px solid #ddd; }
   .header { grid-template-columns: minmax(0, 1fr); gap: 22px; }
   .recipient { margin-top: 18px; }
   .document-summary { width: 100%; }
-  .footer { display: flex; flex-direction: column-reverse; gap: 24px; }
-  .totals { width: 100%; }
-  .notes { width: 100%; }
+  .footer { gap: 24px; }
 }
 </style></head><body><article class="page">
 <header class="header"><div>
