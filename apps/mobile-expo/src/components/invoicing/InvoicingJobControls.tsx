@@ -26,7 +26,12 @@ import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { Asset } from 'expo-asset';
 import { File } from 'expo-file-system';
-import { Ubuntu_400Regular, Ubuntu_500Medium } from '@expo-google-fonts/ubuntu';
+import { PTSerif_700Bold } from '@expo-google-fonts/pt-serif';
+import {
+  Ubuntu_400Regular,
+  Ubuntu_500Medium,
+  Ubuntu_700Bold,
+} from '@expo-google-fonts/ubuntu';
 import {
   createFinancialDocument,
   deviceIanaTimeZone,
@@ -101,15 +106,24 @@ function loadPreviewFontData(): Promise<PreviewFontData> {
     previewFontDataPromise = Promise.all([
       Asset.fromModule(Ubuntu_400Regular).downloadAsync(),
       Asset.fromModule(Ubuntu_500Medium).downloadAsync(),
-    ]).then(async ([bodyAsset, bodyBoldAsset]) => {
-      if (!bodyAsset.localUri || !bodyBoldAsset.localUri) {
+      Asset.fromModule(Ubuntu_700Bold).downloadAsync(),
+      Asset.fromModule(PTSerif_700Bold).downloadAsync(),
+    ]).then(async ([bodyAsset, bodyBoldAsset, labelAsset, displayAsset]) => {
+      if (
+        !bodyAsset.localUri ||
+        !bodyBoldAsset.localUri ||
+        !labelAsset.localUri ||
+        !displayAsset.localUri
+      ) {
         throw new Error('preview_font_asset_unavailable');
       }
-      const [body, bodyBold] = await Promise.all([
+      const [body, bodyBold, label, display] = await Promise.all([
         new File(bodyAsset.localUri).base64(),
         new File(bodyBoldAsset.localUri).base64(),
+        new File(labelAsset.localUri).base64(),
+        new File(displayAsset.localUri).base64(),
       ]);
-      return { body, bodyBold };
+      return { body, bodyBold, label, display };
     });
   }
   return previewFontDataPromise;
