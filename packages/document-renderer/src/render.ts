@@ -266,23 +266,24 @@ h1, h2, p { margin: 0; }
 h1, h2, th { font-weight: normal; }
 p { overflow-wrap: anywhere; }
 .header { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; align-items: start; }
-.business h1 { font-family: var(--font-display); font-size: 24px; font-weight: normal; line-height: 1; margin-bottom: 10px; }
+.business h1 { font-family: var(--font-display); font-size: 20px; font-weight: normal; line-height: 1; margin-bottom: 10px; }
 .business p, .recipient p { margin-top: 2px; white-space: pre-wrap; }
 .recipient { margin-top: 24px; }
 h2 { font-family: var(--font-body); font-size: 14px; font-weight: normal; line-height: 1.4; margin-bottom: 7px; }
 .recipient h2, .notes h2 { font-family: var(--font-label); font-size: 12px; line-height: 1.25; letter-spacing: .05em; text-transform: uppercase; }
-.recipient .name { font-family: var(--font-bold); font-size: 18px; line-height: 1.4; margin-bottom: 4px; }
+.recipient .name { font-family: var(--font-body); font-size: 14px; line-height: 1.4; margin-bottom: 4px; }
 .document-summary { background: #f3f3f3; }
 .document-title { background: var(--table-header-background); color: #fff; padding: 10px 12px; }
-.document-title h2 { font-family: var(--font-display); font-size: 20px; font-weight: normal; line-height: 1; margin: 0; overflow-wrap: anywhere; }
+.document-title h2 { font-family: var(--font-bold); font-size: 18px; font-weight: normal; line-height: 1.4; margin: 0; overflow-wrap: anywhere; }
 .document-title p { font-size: 14px; line-height: 1.4; margin-top: 3px; }
+.document-title .payment-status { font-family: var(--font-label); font-size: 12px; line-height: 1.25; letter-spacing: .05em; text-transform: uppercase; }
 .summary-row { display: flex; justify-content: space-between; gap: 16px; padding: 7px 12px; }
 .summary-row span:last-child { text-align: right; overflow-wrap: anywhere; min-width: 0; }
 .document-summary .summary-row { font-size: 14px; line-height: 1.4; }
 .document-summary .summary-row span:first-child { flex-shrink: 0; }
 .summary-total { background: var(--table-header-background); color: #fff; font-family: var(--font-bold); font-size: 18px; line-height: 1.4; }
 .services { margin-top: 30px; }
-.services h2 { font-family: var(--font-display); font-size: 20px; font-weight: normal; line-height: 1; margin-bottom: 12px; overflow-wrap: anywhere; }
+.services h2 { font-family: var(--font-bold); font-size: 18px; font-weight: normal; line-height: 1.4; margin-bottom: 12px; overflow-wrap: anywhere; }
 table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 th { background: var(--table-header-background); color: #fff; font-family: var(--font-bold); font-size: 12px; font-weight: normal; line-height: 1.25; letter-spacing: .04em; text-transform: uppercase; }
 th, td { padding: 11px 10px; text-align: left; vertical-align: top; overflow-wrap: anywhere; }
@@ -311,7 +312,7 @@ ${detail(payload.businessAddress)}${detail(payload.businessPhone)}${detail(paylo
 <section class="recipient"><h2>Recipient</h2>${payload.customerName.trim() ? `<p class="name">${escapeHtml(payload.customerName.trim())}</p>` : ""}
 ${detail(payload.serviceAddress)}${detail(payload.customerPhone)}${detail(payload.customerEmail)}</section>
 </div><section class="document-summary" aria-label="Document summary">
-<div class="document-title"><h2>${escapeHtml(title)}</h2>${payload.documentNumber == null ? "<p>Number assigned on creation</p>" : ""}${!estimate ? `<p>${paid ? "Paid" : "Unpaid"}</p>` : ""}</div>
+<div class="document-title"><h2>${escapeHtml(title)}</h2>${payload.documentNumber == null ? "<p>Number assigned on creation</p>" : ""}${!estimate ? `<p class="payment-status">${paid ? "Paid" : "Unpaid"}</p>` : ""}</div>
 ${row("Issued", formatDate(payload.issueDate))}
 ${estimate ? (payload.validUntil ? row("Valid until", formatDate(payload.validUntil)) : "") : payload.dueDate ? row("Due", formatDate(payload.dueDate)) : ""}
 ${!estimate && payload.paymentTerms ? row("Terms", PAYMENT_TERMS_LABEL[payload.paymentTerms]) : ""}
