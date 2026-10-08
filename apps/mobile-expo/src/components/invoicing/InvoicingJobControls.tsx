@@ -28,6 +28,7 @@ import {
   createFinancialDocument,
   deviceIanaTimeZone,
   FinancialDocumentError,
+  formatCustomerPhoneDisplay,
   listFinancialDocuments,
   previewFinancialDocument,
   setFinancialDocumentControls,
@@ -95,9 +96,21 @@ function htmlFor(record: {
 }, presentation: 'document' | 'preview' = 'document') {
   if (record.rendererVersion !== RENDERER_VERSION)
     return unsupportedRendererHtml();
+  const payload =
+    presentation === 'preview'
+      ? {
+          ...record.payload,
+          businessPhone:
+            formatCustomerPhoneDisplay(record.payload.businessPhone) ??
+            record.payload.businessPhone,
+          customerPhone:
+            formatCustomerPhoneDisplay(record.payload.customerPhone) ??
+            record.payload.customerPhone,
+        }
+      : record.payload;
   return (presentation === 'preview' ? renderDocumentPreview : renderDocument)(
     record.rendererVersion,
-    record.payload,
+    payload,
     record.paymentProjection,
   );
 }
