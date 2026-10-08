@@ -73,6 +73,7 @@ import {
   type BusinessSettingsScreenHandle,
 } from '../../screens/BusinessSettingsScreen';
 import { BottomSheetShell } from '../ds/BottomSheetShell';
+import { FullWidthFab } from '../ds/FullWidthFab';
 import { ProfileRowsCard } from '../ds/ProfileRowsCard';
 import { useContentColumn } from '../../theme/useContentColumn';
 import type { TextStyles } from '../../theme/nativeTokens';
@@ -543,7 +544,6 @@ export const InvoicingJobControls = forwardRef<
             styles.preview,
             {
               paddingTop: insets.top + space('Spacing/12'),
-              paddingBottom: insets.bottom + space('Spacing/12'),
             },
           ]}
         >
@@ -654,7 +654,7 @@ export const InvoicingJobControls = forwardRef<
               </View>
             </View>
           ) : null}
-          <View style={[columnStyle, styles.paperWrap]}>
+          <View style={styles.paperWrap}>
             <View style={styles.paper}>
               <WebView
                 originWhitelist={['*']}
@@ -673,37 +673,34 @@ export const InvoicingJobControls = forwardRef<
             </View>
           </View>
           {!saved && preview && preview.gaps.length === 0 ? (
-            <View style={columnStyle}>
-              <Pressable
-                accessibilityRole="button"
-                disabled={!!busy}
-                accessibilityState={{ disabled: !!busy }}
-                onPress={() => void createAndShare()}
-                style={[styles.share, !!busy && styles.pressed]}
-              >
-                <Text style={[typography.body, styles.shareLabel]}>
-                  {busy === 'Creating…'
-                    ? 'Creating…'
+            <View pointerEvents="box-none" style={styles.fabOverlay}>
+              <FullWidthFab
+                typography={typography}
+                label={
+                  busy === 'Creating…'
+                    ? 'CREATING…'
                     : previewType === 'estimate'
-                      ? 'Create & Share Estimate'
-                      : 'Create & Share Invoice'}
-                </Text>
-              </Pressable>
+                      ? 'CREATE & SHARE ESTIMATE'
+                      : 'CREATE & SHARE INVOICE'
+                }
+                onPress={() => void createAndShare()}
+                disabled={!!busy}
+                includeSafeArea
+              />
             </View>
           ) : null}
           {saved ? (
-            <View style={columnStyle}>
-              <Pressable
-                accessibilityRole="button"
+            <View pointerEvents="box-none" style={styles.fabOverlay}>
+              <FullWidthFab
+                typography={typography}
+                label={
+                  saved.documentType === 'estimate'
+                    ? 'SHARE ESTIMATE'
+                    : 'SHARE INVOICE'
+                }
                 onPress={() => setShareOpen(true)}
-                style={styles.share}
-              >
-                <Text style={[typography.body, styles.shareLabel]}>
-                  {saved.documentType === 'estimate'
-                    ? 'Share Estimate'
-                    : 'Share Invoice'}
-                </Text>
-              </Pressable>
+                includeSafeArea
+              />
             </View>
           ) : null}
           <Modal
@@ -874,14 +871,6 @@ const styles = StyleSheet.create({
   secondary: { color: fg.secondary },
   accent: { color: color('Brand/Primary') },
   pressed: { opacity: 0.75 },
-  share: {
-    minHeight: 52,
-    backgroundColor: color('Brand/Primary'),
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radius('Radius/12'),
-    padding: space('Spacing/12'),
-  },
   shareLabel: { color: bg.surfaceWhite },
   preview: {
     flex: 1,
@@ -920,14 +909,19 @@ const styles = StyleSheet.create({
     gap: space('Spacing/4'),
   },
   textAction: { minHeight: 44, justifyContent: 'center' },
-  paperWrap: { flex: 1 },
+  paperWrap: { flex: 1, width: '100%' },
   paper: {
     flex: 1,
-    borderRadius: radius('Radius/16'),
-    borderWidth: 1,
-    borderColor: border.subtle,
     overflow: 'hidden',
-    backgroundColor: bg.surfaceWhite,
+    backgroundColor: 'transparent',
+  },
+  fabOverlay: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 2,
+    elevation: 2,
   },
   web: { flex: 1, backgroundColor: bg.surfaceWhite },
   sheet: { padding: space('Spacing/20'), gap: space('Spacing/12') },
