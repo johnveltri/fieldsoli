@@ -261,7 +261,7 @@ ${fontFaces}
 * { box-sizing: border-box; }
 html, body { margin: 0; background: #fff; color: #111; }
 body { font-family: var(--font-body); font-size: 14px; line-height: 1.4; }
-.page { max-width: 816px; margin: auto; padding: 28px 20px 36px; }
+.page { max-width: 816px; margin: auto; padding: 28px 20px 150px; }
 h1, h2, p { margin: 0; }
 h1, h2, th { font-weight: normal; }
 p { overflow-wrap: anywhere; }
@@ -296,7 +296,7 @@ td { border-bottom: 1px solid #ddd; }
 .totals .summary-row { padding: 8px 0; border-bottom: 1px solid #e5e5e5; }
 .totals .final { font-family: var(--font-bold); font-size: 18px; line-height: 1.4; border-top: 2px solid #333; border-bottom: 0; margin-top: 3px; padding-top: 12px; }
 @media (max-width: 540px) {
-  .page { padding: 22px 18px 30px; }
+  .page { padding: 22px 18px 150px; }
   .header { grid-template-columns: minmax(0, 1fr); gap: 22px; }
   .recipient { margin-top: 18px; }
   .document-summary { width: 100%; }
