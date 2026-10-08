@@ -1,12 +1,12 @@
-import { OTHER_COST_LABELS, type OtherCostCategory } from "./pricing";
+import { OTHER_COST_LABELS, type OtherCostCategory } from './pricing';
 
 export const RENDERER_VERSION = 1;
 
-export type DocumentType = "estimate" | "invoice";
-export type PaymentTerms = "due_on_receipt" | "net_7" | "net_15" | "net_30";
+export type DocumentType = 'estimate' | 'invoice';
+export type PaymentTerms = 'due_on_receipt' | 'net_7' | 'net_15' | 'net_30';
 
 export type DocumentLine = {
-  kind: "labor" | "materials" | "other";
+  kind: 'labor' | 'materials' | 'other';
   label: string;
   amountCents: number;
   category?: OtherCostCategory;
@@ -33,58 +33,58 @@ export type DocumentPayload = {
   taxRateBps: number;
   taxCents: number;
   totalCents: number;
-  currency: "USD";
+  currency: 'USD';
   issueDate: string;
   validUntil: string | null;
   dueDate: string | null;
   paymentTerms: PaymentTerms | null;
 };
 
-export type PaymentProjection = "paid" | "unpaid" | null;
+export type PaymentProjection = 'paid' | 'unpaid' | null;
 
 const PAYMENT_TERMS_LABEL: Record<PaymentTerms, string> = {
-  due_on_receipt: "Due upon receipt",
-  net_7: "Net 7",
-  net_15: "Net 15",
-  net_30: "Net 30",
+  due_on_receipt: 'Due upon receipt',
+  net_7: 'Net 7',
+  net_15: 'Net 15',
+  net_30: 'Net 30',
 };
 
 export function escapeHtml(value: string): string {
   return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
 }
 
 export function formatUsd(cents: number): string {
-  const sign = cents < 0 ? "-" : "";
+  const sign = cents < 0 ? '-' : '';
   const abs = Math.abs(cents);
   const dollars = Math.floor(abs / 100);
   const remainder = abs % 100;
-  return `${sign}$${dollars.toLocaleString("en-US")}.${String(remainder).padStart(2, "0")}`;
+  return `${sign}$${dollars.toLocaleString('en-US')}.${String(remainder).padStart(2, '0')}`;
 }
 
 export function formatDocumentNumber(value: number | null): string {
-  if (value == null) return "Number assigned on creation";
-  return String(value).padStart(5, "0");
+  if (value == null) return 'Number assigned on creation';
+  return String(value).padStart(5, '0');
 }
 
 function formatDate(isoDate: string): string {
-  const [year, month, day] = isoDate.split("-").map((part) => Number(part));
+  const [year, month, day] = isoDate.split('-').map((part) => Number(part));
   if (!year || !month || !day) return isoDate;
-  return new Intl.DateTimeFormat("en-US", {
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-    timeZone: "UTC",
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+    timeZone: 'UTC',
   }).format(new Date(Date.UTC(year, month - 1, day)));
 }
 
 function textBlock(label: string, value: string | null | undefined): string {
-  const trimmed = value?.trim() ?? "";
-  if (!trimmed) return "";
+  const trimmed = value?.trim() ?? '';
+  if (!trimmed) return '';
   return `<p class="meta"><span>${escapeHtml(label)}</span> ${escapeHtml(trimmed)}</p>`;
 }
 
@@ -124,62 +124,56 @@ export function renderDocument(
   paymentProjection: PaymentProjection,
 ): string {
   if (version !== RENDERER_VERSION) {
-    throw new Error("unsupported_renderer_version");
+    throw new Error('unsupported_renderer_version');
   }
-  const typeLabel =
-    payload.documentType === "estimate" ? "Estimate" : "Invoice";
+  const typeLabel = payload.documentType === 'estimate' ? 'Estimate' : 'Invoice';
   const numberLabel = `${typeLabel} #${formatDocumentNumber(payload.documentNumber)}`;
-  const paid =
-    payload.documentType === "invoice" && paymentProjection === "paid";
+  const paid = payload.documentType === 'invoice' && paymentProjection === 'paid';
   const finalLabel =
-    payload.documentType === "estimate"
-      ? "Total"
-      : paid
-        ? "Total"
-        : "Amount Due";
+    payload.documentType === 'estimate' ? 'Total' : paid ? 'Total' : 'Amount Due';
   const status =
-    payload.documentType === "invoice"
-      ? `<p class="badge">${paid ? "Paid" : "Unpaid"}</p>`
-      : "";
+    payload.documentType === 'invoice'
+      ? `<p class="badge">${paid ? 'Paid' : 'Unpaid'}</p>`
+      : '';
   const lines = payload.lines
     .map(
       (line) =>
         `<tr><td>${escapeHtml(line.label)}</td><td class="amount">${escapeHtml(formatUsd(line.amountCents))}</td></tr>`,
     )
-    .join("");
+    .join('');
   const identity = [
-    textBlock("Address", payload.businessAddress),
-    textBlock("Phone", payload.businessPhone),
-    textBlock("Email", payload.businessEmail),
-    textBlock("Website", payload.businessWebsite),
-    textBlock("License", payload.businessLicense),
-  ].join("");
+    textBlock('Address', payload.businessAddress),
+    textBlock('Phone', payload.businessPhone),
+    textBlock('Email', payload.businessEmail),
+    textBlock('Website', payload.businessWebsite),
+    textBlock('License', payload.businessLicense),
+  ].join('');
   const customer = [
     payload.customerName.trim()
       ? `<p>${escapeHtml(payload.customerName.trim())}</p>`
-      : "",
-    textBlock("Phone", payload.customerPhone),
-    textBlock("Email", payload.customerEmail),
-    textBlock("Service address", payload.serviceAddress),
-  ].join("");
+      : '',
+    textBlock('Phone', payload.customerPhone),
+    textBlock('Email', payload.customerEmail),
+    textBlock('Service address', payload.serviceAddress),
+  ].join('');
   const longDescription = payload.longDescription?.trim()
     ? `<p>${escapeHtml(payload.longDescription)}</p>`
-    : "";
+    : '';
   const dateRow =
-    payload.documentType === "estimate"
+    payload.documentType === 'estimate'
       ? `<div><span>Estimate date</span><span>${escapeHtml(formatDate(payload.issueDate))}</span></div>${
           payload.validUntil
             ? `<div><span>Valid until</span><span>${escapeHtml(formatDate(payload.validUntil))}</span></div>`
-            : ""
+            : ''
         }`
       : `<div><span>Invoice date</span><span>${escapeHtml(formatDate(payload.issueDate))}</span></div>${
           payload.dueDate
             ? `<div><span>Due date</span><span>${escapeHtml(formatDate(payload.dueDate))}</span></div>`
-            : ""
+            : ''
         }${
           payload.paymentTerms
             ? `<div><span>Payment terms</span><span>${escapeHtml(PAYMENT_TERMS_LABEL[payload.paymentTerms])}</span></div>`
-            : ""
+            : ''
         }`;
 
   return `<!DOCTYPE html>
@@ -196,7 +190,7 @@ export function renderDocument(
 <h1>${escapeHtml(payload.documentNumber == null ? typeLabel : numberLabel)}</h1>
 ${status}
 <section class="identity">
-<h2>${escapeHtml(payload.businessName.trim() || "Business")}</h2>
+<h2>${escapeHtml(payload.businessName.trim() || 'Business')}</h2>
 ${identity}
 </section>
 <section class="customer">
