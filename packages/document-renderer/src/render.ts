@@ -111,6 +111,12 @@ function lineDetails(line: DocumentLine): string {
   return line.details ? materialDetails(line.details) : '';
 }
 
+function lineRow(line: DocumentLine): string {
+  const details = lineDetails(line);
+  const amountClass = details ? 'amount with-details' : 'amount';
+  return `<tr><td>${escapeHtml(line.label)}${details}</td><td class="${amountClass}">${escapeHtml(formatUsd(line.amountCents))}</td></tr>`;
+}
+
 function textBlock(label: string, value: string | null | undefined): string {
   const trimmed = value?.trim() ?? '';
   if (!trimmed) return '';
@@ -136,6 +142,7 @@ th, td { text-align: left; vertical-align: top; padding: 8px 0; border-bottom: 1
 th { font-family: ui-monospace, Menlo, monospace; font-size: 12px; font-weight: 600; }
 .line-details { color: #6F6A65; font-size: 12px; line-height: 1.35; margin-top: 2px; }
 td.amount, th.amount { text-align: right; white-space: nowrap; }
+td.amount.with-details { vertical-align: middle; }
 .totals { margin-top: 12px; }
 .totals div { display: flex; justify-content: space-between; gap: 16px; padding: 6px 0; }
 .totals .final { border-top: 2px solid #000; font-weight: 700; margin-top: 4px; padding-top: 10px; }
@@ -166,12 +173,7 @@ export function renderDocument(
       ? `<p class="badge">${paid ? 'Paid' : 'Unpaid'}</p>`
       : '';
   const lines = payload.lines
-    .map(
-      (line) => {
-        const details = lineDetails(line);
-        return `<tr><td>${escapeHtml(line.label)}${details}</td><td class="amount">${escapeHtml(formatUsd(line.amountCents))}</td></tr>`;
-      },
-    )
+    .map(lineRow)
     .join('');
   const identity = [
     textBlock('Address', payload.businessAddress),
@@ -316,6 +318,7 @@ th, td { padding: 11px 10px; text-align: left; vertical-align: top; overflow-wra
 td { border-bottom: 1px solid #ddd; }
 .line-details { color: #6F6A65; font-size: 12px; line-height: 1.35; margin-top: 2px; }
 .amount { width: 36%; text-align: right; }
+td.amount.with-details { vertical-align: middle; }
 .footer { display: flex; flex-direction: row; gap: 24px; margin-top: 24px; align-items: flex-start; }
 .notes, .totals { flex: 1; min-width: 0; }
 .notes { padding: 8px 10px 0; }
@@ -347,7 +350,7 @@ ${!estimate && payload.paymentTerms ? row("Terms", PAYMENT_TERMS_LABEL[payload.p
 </section></header>
 <section class="services"><h2>${escapeHtml(payload.shortDescription)}</h2>
 <table aria-label="Services and charges"><thead><tr><th scope="col">Product / Service</th><th scope="col" class="amount">Total</th></tr></thead><tbody>
-${payload.lines.map((line) => `<tr><td>${escapeHtml(line.label)}${lineDetails(line)}</td><td class="amount">${formatUsd(line.amountCents)}</td></tr>`).join("")}
+${payload.lines.map(lineRow).join("")}
 </tbody></table></section>
 <div class="footer">${notes}<section class="totals" aria-label="Totals">
 ${row("Subtotal", formatUsd(payload.subtotalCents))}${row("Tax", formatUsd(payload.taxCents))}
