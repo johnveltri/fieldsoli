@@ -10,7 +10,7 @@ import {
   ActivityIndicator,
   Animated,
   Easing,
-  Platform,
+  useWindowDimensions,
   Alert,
   Linking,
   Modal,
@@ -210,34 +210,34 @@ export const InvoicingJobControls = forwardRef<
   );
   const [saved, setSaved] = useState<FinancialDocumentRecord | null>(null);
   const [previewOpen, setPreviewOpenState] = useState(false);
-  const previewOpacity = useRef(new Animated.Value(0)).current;
-  useEffect(() => () => previewOpacity.stopAnimation(), [previewOpacity]);
+  const { height: previewWindowHeight } = useWindowDimensions();
+  const previewTranslateY = useRef(new Animated.Value(previewWindowHeight)).current;
+  useEffect(() => () => previewTranslateY.stopAnimation(), [previewTranslateY]);
   const { reduceMotion } = usePlatformGlass();
-  const previewFadeDuration = reduceMotion || Platform.OS === 'android' ? 0 : 500;
   const animatePreviewIn = useCallback(() => {
-    Animated.timing(previewOpacity, {
-      toValue: 1,
-      duration: previewFadeDuration,
+    Animated.timing(previewTranslateY, {
+      toValue: 0,
+      duration: reduceMotion ? 0 : 240,
       easing: Easing.out(Easing.cubic),
-      useNativeDriver: false,
+      useNativeDriver: true,
     }).start();
-  }, [previewOpacity, previewFadeDuration]);
+  }, [previewTranslateY, reduceMotion]);
   const setPreviewOpen = useCallback((open: boolean) => {
-    previewOpacity.stopAnimation();
+    previewTranslateY.stopAnimation();
     if (open) {
-      previewOpacity.setValue(0);
+      previewTranslateY.setValue(previewWindowHeight);
       setPreviewOpenState(true);
       return;
     }
-    Animated.timing(previewOpacity, {
-      toValue: 0,
-      duration: previewFadeDuration,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: false,
+    Animated.timing(previewTranslateY, {
+      toValue: previewWindowHeight,
+      duration: reduceMotion ? 0 : 210,
+      easing: Easing.in(Easing.cubic),
+      useNativeDriver: true,
     }).start(({ finished }) => {
       if (finished) setPreviewOpenState(false);
     });
-  }, [previewOpacity, previewFadeDuration]);
+  }, [previewTranslateY, previewWindowHeight, reduceMotion]);
   const [previewHeight, setPreviewHeight] = useState(600);
   const [previewFonts, setPreviewFonts] = useState<PreviewFontData | null>(null);
   const [previewFontsReady, setPreviewFontsReady] = useState(false);
@@ -661,7 +661,7 @@ export const InvoicingJobControls = forwardRef<
             styles.preview,
             {
               paddingTop: Math.max(insets.top - space('Spacing/8'), 0) + space('Spacing/4'),
-              opacity: previewOpacity,
+              transform: [{ translateY: previewTranslateY }],
             },
           ]}
         >

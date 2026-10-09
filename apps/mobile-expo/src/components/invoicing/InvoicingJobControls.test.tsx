@@ -1,7 +1,7 @@
 import React, { createRef } from 'react';
-import { StyleSheet } from 'react-native';
+import { Animated, StyleSheet } from 'react-native';
 import { act, fireEvent, render, waitFor, within } from '@testing-library/react-native';
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import type {
   DocumentPreview,
   FinancialDocumentRecord,
@@ -81,10 +81,16 @@ const props = {
   typography,
   onEditDetails: jest.fn(),
 };
+const timing = Animated.timing;
 
 describe('InvoicingJobControls', () => {
+  afterEach(() => jest.restoreAllMocks());
   beforeEach(() => {
     jest.clearAllMocks();
+    // Jest has no native animation host to send the completion callback.
+    jest.spyOn(Animated, 'timing').mockImplementation((value, config) =>
+      timing(value, { ...config, useNativeDriver: false }),
+    );
     mockList.mockResolvedValue([doc]);
     mockPreview.mockResolvedValue({
       payload,
