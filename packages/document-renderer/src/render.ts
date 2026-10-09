@@ -321,7 +321,7 @@ td { border-bottom: 1px solid #ddd; }
 td.amount.with-details { vertical-align: middle; }
 .footer { display: flex; flex-direction: row; gap: 24px; margin-top: 24px; align-items: flex-start; }
 .notes, .totals { flex: 1; min-width: 0; }
-.notes { padding: 8px 10px 0; }
+.notes { padding: 8px 0 0; }
 .notes p { white-space: pre-wrap; }
 .totals { width: 100%; }
 .totals .summary-row { padding: 8px 10px; border-bottom: 1px solid #e5e5e5; }
