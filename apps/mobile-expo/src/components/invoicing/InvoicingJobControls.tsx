@@ -660,7 +660,7 @@ export const InvoicingJobControls = forwardRef<
           style={[
             styles.preview,
             {
-              paddingTop: insets.top,
+              paddingTop: Math.max(insets.top - space('Spacing/8'), 0) + space('Spacing/4'),
               opacity: previewOpacity,
             },
           ]}
@@ -669,6 +669,8 @@ export const InvoicingJobControls = forwardRef<
             <PlatformHeaderAction
               accessibilityLabel="Close preview"
               onPress={() => setPreviewOpen(false)}
+              useFloatingChrome={false}
+              style={styles.previewCloseButton}
             >
               <JobDetailIconTopClose color={fg.primary} />
             </PlatformHeaderAction>
@@ -992,7 +994,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: bg.canvasWarm,
   },
-  previewCloseHeader: { paddingVertical: space('Spacing/12'), alignItems: 'flex-start' },
+  previewCloseHeader: { paddingBottom: space('Spacing/4'), alignItems: 'flex-start' },
+  previewCloseButton: {
+    width: 44,
+    height: 44,
+    borderRadius: radius('Radius/Full'),
+    backgroundColor: bg.surfaceWhite,
+  },
   previewScroll: { flex: 1, width: '100%', backgroundColor: bg.surfaceWhite },
   previewContent: { paddingTop: space('Spacing/12'), gap: space('Spacing/12') },
   previewBar: {
