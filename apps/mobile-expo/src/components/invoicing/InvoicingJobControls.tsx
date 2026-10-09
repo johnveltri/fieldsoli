@@ -84,6 +84,7 @@ import {
 import { BottomSheetShell } from '../ds/BottomSheetShell';
 import { FullWidthFab } from '../ds/FullWidthFab';
 import { ProfileRowsCard } from '../ds/ProfileRowsCard';
+import { SegmentedControl } from '../ds/SegmentedControl';
 import { useContentColumn } from '../../theme/useContentColumn';
 import type { TextStyles } from '../../theme/nativeTokens';
 
@@ -622,52 +623,19 @@ export const InvoicingJobControls = forwardRef<
               <TopHeaderBackIcon size={28} color={fg.primary} />
             </PlatformHeaderAction>
             {!saved ? (
-              <View style={styles.selector}>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityState={{
-                    selected: previewType === 'estimate',
-                    disabled: !!busy,
-                  }}
-                  disabled={!!busy}
-                  style={[
-                    styles.segment,
-                    previewType === 'estimate' && styles.segmentSelected,
-                  ]}
-                  onPress={() => void switchType('estimate')}
-                >
-                  <Text
-                    style={[
-                      typography.bodyBold,
-                      previewType === 'estimate' && styles.shareLabel,
-                    ]}
-                  >
-                    Estimate
-                  </Text>
-                </Pressable>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityState={{
-                    selected: previewType === 'invoice',
-                    disabled: !!busy,
-                  }}
-                  disabled={!!busy}
-                  style={[
-                    styles.segment,
-                    previewType === 'invoice' && styles.segmentSelected,
-                  ]}
-                  onPress={() => void switchType('invoice')}
-                >
-                  <Text
-                    style={[
-                      typography.bodyBold,
-                      previewType === 'invoice' && styles.shareLabel,
-                    ]}
-                  >
-                    Invoice
-                  </Text>
-                </Pressable>
-              </View>
+              <SegmentedControl
+                accessibilityLabel="Document type"
+                value={previewType}
+                options={[
+                  { value: 'estimate', label: 'Estimate' },
+                  { value: 'invoice', label: 'Invoice' },
+                ]}
+                onValueChange={(type) => void switchType(type)}
+                labelStyle={typography.statusPillLabel}
+                disabled={!!busy}
+                fill={false}
+                style={styles.previewSelector}
+              />
             ) : (
               <Text style={typography.body}>
                 {documentNumberLabel(saved.documentType, saved.documentNumber)}
@@ -946,7 +914,6 @@ const styles = StyleSheet.create({
   secondary: { color: fg.secondary },
   accent: { color: color('Brand/Primary') },
   pressed: { opacity: 0.75 },
-  shareLabel: { color: bg.surfaceWhite },
   preview: {
     flex: 1,
     backgroundColor: bg.canvasWarm,
@@ -959,20 +926,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: space('Spacing/8'),
   },
-  selector: {
-    flexDirection: 'row',
-    backgroundColor: bg.subtle,
-    borderRadius: radius('Radius/12'),
-    padding: space('Spacing/4'),
-    flexShrink: 1,
-  },
-  segment: {
-    minHeight: 44,
-    justifyContent: 'center',
-    borderRadius: radius('Radius/12'),
-    paddingHorizontal: space('Spacing/12'),
-  },
-  segmentSelected: { backgroundColor: fg.primary },
+  previewSelector: { width: 320, maxWidth: '100%', flexShrink: 1 },
   loadingLabel: { color: fg.secondary, textAlign: 'center' },
   gapWrap: { flexShrink: 1 },
   gapCard: {
