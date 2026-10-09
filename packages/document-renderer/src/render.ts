@@ -316,7 +316,8 @@ th, td { padding: 11px 10px; text-align: left; vertical-align: top; overflow-wra
 td { border-bottom: 1px solid #ddd; }
 .line-details { color: #6F6A65; font-size: 12px; line-height: 1.35; margin-top: 2px; }
 .amount { width: 36%; text-align: right; }
-.footer { display: flex; flex-direction: column; gap: 24px; margin-top: 24px; align-items: stretch; }
+.footer { display: flex; flex-direction: row; gap: 24px; margin-top: 24px; align-items: flex-start; }
+.notes, .totals { flex: 1; min-width: 0; }
 .notes { padding: 8px 10px 0; }
 .notes p { white-space: pre-wrap; }
 .totals { width: 100%; }
@@ -327,7 +328,8 @@ td { border-bottom: 1px solid #ddd; }
   .header { grid-template-columns: minmax(0, 1fr); gap: 22px; }
   .recipient { margin-top: 18px; }
   .document-summary { width: 100%; }
-  .footer { gap: 24px; }
+  .footer { flex-direction: column; gap: 24px; }
+  .notes, .totals { width: 100%; }
 }
 </style></head><body><article class="page">
 <header class="header"><div>
