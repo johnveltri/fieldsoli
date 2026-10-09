@@ -62,6 +62,7 @@ jest.mock('../components/shell/ShellBottomNav', () => ({
 jest.mock('../components/ds', () => {
   const { Text, View, Pressable } = require('react-native');
   return {
+    SegmentedControl: jest.requireActual<typeof import('../components/ds/SegmentedControl')>('../components/ds/SegmentedControl').SegmentedControl,
     SectionHeader: ({ title }: { title: string }) => <Text>{title}</Text>,
     ViewNotesBuckets: ({
       buckets,

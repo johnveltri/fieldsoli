@@ -8,6 +8,9 @@ import {
 } from 'react';
 import {
   ActivityIndicator,
+  Animated,
+  Easing,
+  useWindowDimensions,
   Alert,
   Linking,
   Modal,
@@ -24,10 +27,19 @@ import * as Clipboard from 'expo-clipboard';
 import * as MailComposer from 'expo-mail-composer';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import { Asset } from 'expo-asset';
+import { File } from 'expo-file-system';
+import { PTSerif_700Bold } from '@expo-google-fonts/pt-serif';
+import {
+  Ubuntu_400Regular,
+  Ubuntu_500Medium,
+  Ubuntu_700Bold,
+} from '@expo-google-fonts/ubuntu';
 import {
   createFinancialDocument,
   deviceIanaTimeZone,
   FinancialDocumentError,
+  formatCustomerPhoneDisplay,
   listFinancialDocuments,
   previewFinancialDocument,
   setFinancialDocumentControls,
@@ -37,8 +49,10 @@ import {
 } from '@fieldsolo/api-client';
 import {
   renderDocument,
+  renderDocumentPreview,
   unsupportedRendererHtml,
   RENDERER_VERSION,
+  type PreviewFontData,
 } from '@fieldsolo/document-renderer';
 import type { FieldSoloSupabaseClient } from '@fieldsolo/api-client';
 
@@ -65,13 +79,17 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PlatformHeaderAction } from '../platform/PlatformHeaderAction';
 import { TopHeaderBackIcon } from '../figma-icons/TopHeaderIcons';
+import { JobDetailIconTopClose } from '../figma-icons/JobDetailScreenIcons';
+import { usePlatformGlass } from '../platform/usePlatformGlass';
 import { ProfileChevronRightIcon } from '../figma-icons/ProfileScreenIcons';
 import {
   BusinessSettingsScreen,
   type BusinessSettingsScreenHandle,
 } from '../../screens/BusinessSettingsScreen';
 import { BottomSheetShell } from '../ds/BottomSheetShell';
+import { FullWidthFab } from '../ds/FullWidthFab';
 import { ProfileRowsCard } from '../ds/ProfileRowsCard';
+import { SegmentedControl } from '../ds/SegmentedControl';
 import { useContentColumn } from '../../theme/useContentColumn';
 import type { TextStyles } from '../../theme/nativeTokens';
 
@@ -87,19 +105,78 @@ type Props = {
   beforeOpen?: () => Promise<boolean>;
 };
 
+let previewFontDataPromise: Promise<PreviewFontData> | null = null;
+
+function loadPreviewFontData(): Promise<PreviewFontData> {
+  if (!previewFontDataPromise) {
+    previewFontDataPromise = Promise.all([
+      Asset.fromModule(Ubuntu_400Regular).downloadAsync(),
+      Asset.fromModule(Ubuntu_500Medium).downloadAsync(),
+      Asset.fromModule(Ubuntu_700Bold).downloadAsync(),
+      Asset.fromModule(PTSerif_700Bold).downloadAsync(),
+    ]).then(async ([bodyAsset, bodyBoldAsset, labelAsset, displayAsset]) => {
+      if (
+        !bodyAsset.localUri ||
+        !bodyBoldAsset.localUri ||
+        !labelAsset.localUri ||
+        !displayAsset.localUri
+      ) {
+        throw new Error('preview_font_asset_unavailable');
+      }
+      const [body, bodyBold, label, display] = await Promise.all([
+        new File(bodyAsset.localUri).base64(),
+        new File(bodyBoldAsset.localUri).base64(),
+        new File(labelAsset.localUri).base64(),
+        new File(displayAsset.localUri).base64(),
+      ]);
+      return { body, bodyBold, label, display };
+    });
+  }
+  return previewFontDataPromise;
+}
+
 function htmlFor(record: {
   rendererVersion: number;
   payload: DocumentPreview['payload'];
   paymentProjection: DocumentPreview['paymentProjection'];
-}) {
+}, presentation: 'document' | 'preview' = 'document', fonts?: PreviewFontData) {
   if (record.rendererVersion !== RENDERER_VERSION)
     return unsupportedRendererHtml();
-  return renderDocument(
-    record.rendererVersion,
-    record.payload,
-    record.paymentProjection,
-  );
+  const payload =
+    presentation === 'preview'
+      ? {
+          ...record.payload,
+          businessPhone:
+            formatCustomerPhoneDisplay(record.payload.businessPhone) ??
+            record.payload.businessPhone,
+          customerPhone:
+            formatCustomerPhoneDisplay(record.payload.customerPhone) ??
+            record.payload.customerPhone,
+        }
+      : record.payload;
+  if (presentation === 'preview') {
+    return renderDocumentPreview(
+      record.rendererVersion,
+      payload,
+      record.paymentProjection,
+      fonts,
+    );
+  }
+  return renderDocument(record.rendererVersion, payload, record.paymentProjection);
 }
+
+const REPORT_PREVIEW_HEIGHT = `
+(function () {
+  const page = document.querySelector('.page') || document.body;
+  const report = () => window.ReactNativeWebView.postMessage(JSON.stringify({
+    type: 'preview-height', height: Math.ceil(page.getBoundingClientRect().height)
+  }));
+  new ResizeObserver(report).observe(page);
+  if (document.fonts) document.fonts.ready.then(report);
+  report();
+})();
+true;
+`;
 
 export type InvoicingJobControlsHandle = { openPreview: () => void };
 
@@ -123,6 +200,7 @@ export const InvoicingJobControls = forwardRef<
   const { columnStyle } = useContentColumn();
   const businessScreenRef = useRef<BusinessSettingsScreenHandle>(null);
   const updatingDocumentRef = useRef<string | null>(null);
+  const previewRequestRef = useRef(0);
   const [updatingDocument, setUpdatingDocument] = useState<string | null>(null);
   const [documents, setDocuments] = useState<FinancialDocumentRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -132,12 +210,65 @@ export const InvoicingJobControls = forwardRef<
     defaultDocumentType(workStatus),
   );
   const [saved, setSaved] = useState<FinancialDocumentRecord | null>(null);
-  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewOpen, setPreviewOpenState] = useState(false);
+  const { height: previewWindowHeight } = useWindowDimensions();
+  const previewTranslateY = useRef(new Animated.Value(previewWindowHeight)).current;
+  useEffect(() => () => previewTranslateY.stopAnimation(), [previewTranslateY]);
+  const { reduceMotion } = usePlatformGlass();
+  const animatePreviewIn = useCallback(() => {
+    Animated.timing(previewTranslateY, {
+      toValue: 0,
+      duration: reduceMotion ? 0 : 240,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [previewTranslateY, reduceMotion]);
+  const setPreviewOpen = useCallback((open: boolean) => {
+    previewTranslateY.stopAnimation();
+    if (open) {
+      previewTranslateY.setValue(previewWindowHeight);
+      setPreviewOpenState(true);
+      return;
+    }
+    Animated.timing(previewTranslateY, {
+      toValue: previewWindowHeight,
+      duration: reduceMotion ? 0 : 210,
+      easing: Easing.in(Easing.cubic),
+      useNativeDriver: true,
+    }).start(({ finished }) => {
+      if (finished) setPreviewOpenState(false);
+    });
+  }, [previewTranslateY, previewWindowHeight, reduceMotion]);
+  const [previewHeight, setPreviewHeight] = useState(600);
+  const [previewFonts, setPreviewFonts] = useState<PreviewFontData | null>(null);
+  const [previewFontsReady, setPreviewFontsReady] = useState(false);
   const [businessOpen, setBusinessOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [requestKey, setRequestKey] = useState<string | null>(null);
   const [offline, setOffline] = useState(false);
+
+  useEffect(() => {
+    if (!previewOpen) return;
+    let cancelled = false;
+    setPreviewFontsReady(false);
+    void loadPreviewFontData()
+      .then((fonts) => {
+        if (!cancelled) {
+          setPreviewFonts(fonts);
+          setPreviewFontsReady(true);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setPreviewFonts(null);
+          setPreviewFontsReady(true);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [previewOpen]);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -165,6 +296,7 @@ export const InvoicingJobControls = forwardRef<
     setSaved(null);
     setPreview(null);
     setOffline(false);
+    const request = ++previewRequestRef.current;
     setBusy('Loading');
     setPreviewType(defaultDocumentType(workStatus));
     try {
@@ -173,37 +305,44 @@ export const InvoicingJobControls = forwardRef<
         type: defaultDocumentType(workStatus),
         timezone: deviceIanaTimeZone(),
       });
-      setPreview(next);
-      setOffline(false);
+      if (request === previewRequestRef.current) {
+        setPreview(next);
+        setOffline(false);
+      }
     } catch {
-      setOffline(true);
-      Alert.alert('Could not load this document.', 'Retry');
+      if (request === previewRequestRef.current) {
+        setOffline(true);
+        Alert.alert('Could not load this document.', 'Retry');
+      }
     } finally {
-      setBusy(null);
+      if (request === previewRequestRef.current) setBusy(null);
     }
-  }, [beforeOpen, client, jobId, workStatus]);
+  }, [beforeOpen, client, jobId, workStatus, setPreviewOpen]);
 
   const switchType = useCallback(
     async (type: 'estimate' | 'invoice') => {
       if (saved) return;
-      setBusy('Loading');
+      const request = ++previewRequestRef.current;
+      setPreviewType(type);
+      setBusy(null);
       try {
-        setPreview(
-          await previewFinancialDocument(client, {
-            jobId,
-            type,
-            timezone: deviceIanaTimeZone(),
-          }),
-        );
-        setPreviewType(type);
-        setOffline(false);
+        const next = await previewFinancialDocument(client, {
+          jobId,
+          type,
+          timezone: deviceIanaTimeZone(),
+        });
+        if (request === previewRequestRef.current) {
+          setPreview(next);
+          setOffline(false);
+        }
       } catch {
-        Alert.alert('Could not load this document.', 'Retry');
-      } finally {
-        setBusy(null);
+        if (request === previewRequestRef.current) {
+          setPreviewType(preview?.payload.documentType ?? defaultDocumentType(workStatus));
+          Alert.alert('Could not load this document.', 'Retry');
+        }
       }
     },
-    [client, jobId, saved],
+    [client, jobId, preview, saved, workStatus],
   );
 
   const createAndShare = useCallback(async () => {
@@ -440,6 +579,7 @@ export const InvoicingJobControls = forwardRef<
                   onManageDocs();
                   return;
                 }
+                previewRequestRef.current += 1;
                 setSaved(doc);
                 setPreviewOpen(true);
                 setShareOpen(false);
@@ -521,175 +661,171 @@ export const InvoicingJobControls = forwardRef<
 
       <Modal
         visible={previewOpen}
-        animationType="slide"
+        transparent
+        animationType="none"
+        onShow={animatePreviewIn}
         onRequestClose={() => setPreviewOpen(false)}
       >
-        <View
+        <Animated.View
           style={[
             styles.preview,
             {
-              paddingTop: insets.top + space('Spacing/12'),
-              paddingBottom: insets.bottom + space('Spacing/12'),
+              paddingTop: Math.max(insets.top - space('Spacing/8'), 0) + space('Spacing/4'),
+              transform: [{ translateY: previewTranslateY }],
             },
           ]}
         >
-          <View style={[columnStyle, styles.previewBar]}>
+          <View style={[columnStyle, styles.previewCloseHeader]}>
             <PlatformHeaderAction
-              accessibilityLabel="Back"
+              accessibilityLabel="Close preview"
               onPress={() => setPreviewOpen(false)}
+              useFloatingChrome={false}
+              style={styles.previewCloseButton}
             >
-              <TopHeaderBackIcon size={28} color={fg.primary} />
+              <JobDetailIconTopClose color={fg.primary} />
             </PlatformHeaderAction>
+          </View>
+          <ScrollView
+            testID="document-preview-scroll"
+            style={styles.previewScroll}
+            contentContainerStyle={styles.previewContent}
+          >
             {!saved ? (
-              <View style={styles.selector}>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityState={{
-                    selected: previewType === 'estimate',
-                    disabled: !!busy,
-                  }}
-                  disabled={!!busy}
-                  style={[
-                    styles.segment,
-                    previewType === 'estimate' && styles.segmentSelected,
+              <View style={[columnStyle, styles.previewBar]}>
+                <SegmentedControl
+                  accessibilityLabel="Document type"
+                  value={previewType}
+                  options={[
+                    { value: 'estimate', label: 'Estimate' },
+                    { value: 'invoice', label: 'Invoice' },
                   ]}
-                  onPress={() => void switchType('estimate')}
-                >
-                  <Text
-                    style={[
-                      typography.bodyBold,
-                      previewType === 'estimate' && styles.shareLabel,
-                    ]}
-                  >
-                    Estimate
-                  </Text>
-                </Pressable>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityState={{
-                    selected: previewType === 'invoice',
-                    disabled: !!busy,
-                  }}
-                  disabled={!!busy}
-                  style={[
-                    styles.segment,
-                    previewType === 'invoice' && styles.segmentSelected,
-                  ]}
-                  onPress={() => void switchType('invoice')}
-                >
-                  <Text
-                    style={[
-                      typography.bodyBold,
-                      previewType === 'invoice' && styles.shareLabel,
-                    ]}
-                  >
-                    Invoice
-                  </Text>
-                </Pressable>
+                  onValueChange={(type) => void switchType(type)}
+                  labelStyle={typography.statusPillLabel}
+                  disabled={busy != null && busy !== 'Loading'}
+                  fill={false}
+                  style={styles.previewSelector}
+                />
               </View>
-            ) : (
-              <Text style={typography.body}>
-                {documentNumberLabel(saved.documentType, saved.documentNumber)}
-              </Text>
-            )}
-          </View>
-          {busy ? (
-            <Text
-              accessibilityLiveRegion="polite"
-              style={[typography.bodySmall, styles.loadingLabel]}
-            >
-              {busy}
-            </Text>
-          ) : null}
-          {preview && !saved && preview.gaps.length > 0 ? (
-            <View style={[columnStyle, styles.gapWrap]}>
-              <View style={styles.gapCard}>
-                <Text style={typography.bodyBold}>
-                  Complete these details before sharing:
-                </Text>
-                {gapLabels(preview.gaps).map((label) => (
-                  <Text key={label} style={typography.body}>
-                    {label}
-                  </Text>
-                ))}
-                {preview.gaps.includes('business_name') ? (
-                  <Pressable
-                    accessibilityRole="button"
-                    style={styles.textAction}
-                    onPress={() => setBusinessOpen(true)}
-                  >
-                    <Text style={[typography.bodyBold, styles.accent]}>
-                      Edit business info
-                    </Text>
-                  </Pressable>
-                ) : null}
-                {preview.gaps.some((gap) => gap !== 'business_name') ? (
-                  <Pressable
-                    accessibilityRole="button"
-                    style={styles.textAction}
-                    onPress={() => {
-                      setPreviewOpen(false);
-                      onEditDetails();
-                    }}
-                  >
-                    <Text style={[typography.bodyBold, styles.accent]}>
-                      Edit Job details
-                    </Text>
-                  </Pressable>
-                ) : null}
-              </View>
-            </View>
-          ) : null}
-          <View style={[columnStyle, styles.paperWrap]}>
-            <View style={styles.paper}>
-              <WebView
-                originWhitelist={['*']}
-                source={{
-                  html: saved
-                    ? htmlFor(saved)
-                    : preview
-                      ? htmlFor({
-                          ...preview,
-                          paymentProjection: preview.paymentProjection,
-                        })
-                      : '<html><body></body></html>',
-                }}
-                style={styles.web}
-              />
-            </View>
-          </View>
-          {!saved && preview && preview.gaps.length === 0 ? (
-            <View style={columnStyle}>
-              <Pressable
-                accessibilityRole="button"
-                disabled={!!busy}
-                accessibilityState={{ disabled: !!busy }}
-                onPress={() => void createAndShare()}
-                style={[styles.share, !!busy && styles.pressed]}
+            ) : null}
+            {busy ? (
+              <Text
+                accessibilityLiveRegion="polite"
+                style={[typography.bodySmall, styles.loadingLabel]}
               >
-                <Text style={[typography.body, styles.shareLabel]}>
-                  {busy === 'Creating…'
-                    ? 'Creating…'
+                {busy}
+              </Text>
+            ) : null}
+            {preview && !saved && preview.gaps.length > 0 ? (
+              <View style={[columnStyle, styles.gapWrap]}>
+                <View style={styles.gapCard}>
+                  <Text style={typography.bodyBold}>
+                    Complete these details before sharing:
+                  </Text>
+                  {gapLabels(preview.gaps).map((label) => (
+                    <Text key={label} style={typography.body}>
+                      {label}
+                    </Text>
+                  ))}
+                  {preview.gaps.includes('business_name') ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      style={styles.textAction}
+                      onPress={() => setBusinessOpen(true)}
+                    >
+                      <Text style={[typography.bodyBold, styles.accent]}>
+                        Edit business info
+                      </Text>
+                    </Pressable>
+                  ) : null}
+                  {preview.gaps.some((gap) => gap !== 'business_name') ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      style={styles.textAction}
+                      onPress={() => {
+                        setPreviewOpen(false);
+                        onEditDetails();
+                      }}
+                    >
+                      <Text style={[typography.bodyBold, styles.accent]}>
+                        Edit Job details
+                      </Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+              </View>
+            ) : null}
+            <View style={styles.paperWrap}>
+              <View style={styles.paper}>
+                {previewFontsReady ? (
+                  <WebView
+                    testID="document-preview-html"
+                    originWhitelist={['*']}
+                    source={{
+                      html: saved
+                        ? htmlFor(saved, 'preview', previewFonts ?? undefined)
+                        : preview
+                          ? htmlFor(
+                              {
+                                ...preview,
+                                paymentProjection: preview.paymentProjection,
+                              },
+                              'preview',
+                              previewFonts ?? undefined,
+                            )
+                          : '<html><body></body></html>',
+                    }}
+                    scrollEnabled={false}
+                    containerStyle={{ flex: 0, height: previewHeight }}
+                    injectedJavaScript={REPORT_PREVIEW_HEIGHT}
+                    onMessage={(event) => {
+                      try {
+                        const message = JSON.parse(event.nativeEvent.data);
+                        if (message.type === 'preview-height' &&
+                            Number.isFinite(message.height) && message.height > 0) {
+                          setPreviewHeight((height) =>
+                            Math.abs(height - message.height) > 1 ? message.height : height);
+                        }
+                      } catch {
+                        // Ignore messages unrelated to document sizing.
+                      }
+                    }}
+                    style={[styles.web, { height: previewHeight }]}
+                  />
+                ) : (
+                  <ActivityIndicator size="small" color={fg.primary} />
+                )}
+              </View>
+            </View>
+          </ScrollView>
+          {!saved && preview && preview.gaps.length === 0 ? (
+            <View pointerEvents="box-none" style={styles.fabOverlay}>
+              <FullWidthFab
+                typography={typography}
+                label={
+                  busy === 'Creating…'
+                    ? 'CREATING…'
                     : previewType === 'estimate'
-                      ? 'Create & Share Estimate'
-                      : 'Create & Share Invoice'}
-                </Text>
-              </Pressable>
+                      ? 'CREATE & SHARE ESTIMATE'
+                      : 'CREATE & SHARE INVOICE'
+                }
+                onPress={() => void createAndShare()}
+                disabled={!!busy}
+                includeSafeArea
+              />
             </View>
           ) : null}
           {saved ? (
-            <View style={columnStyle}>
-              <Pressable
-                accessibilityRole="button"
+            <View pointerEvents="box-none" style={styles.fabOverlay}>
+              <FullWidthFab
+                typography={typography}
+                label={
+                  saved.documentType === 'estimate'
+                    ? 'SHARE ESTIMATE'
+                    : 'SHARE INVOICE'
+                }
                 onPress={() => setShareOpen(true)}
-                style={styles.share}
-              >
-                <Text style={[typography.body, styles.shareLabel]}>
-                  {saved.documentType === 'estimate'
-                    ? 'Share Estimate'
-                    : 'Share Invoice'}
-                </Text>
-              </Pressable>
+                includeSafeArea
+              />
             </View>
           ) : null}
           <Modal
@@ -808,7 +944,7 @@ export const InvoicingJobControls = forwardRef<
               </BottomSheetShell>
             </GestureHandlerRootView>
           </Modal>
-        </View>
+        </Animated.View>
       </Modal>
     </View>
   );
@@ -860,41 +996,25 @@ const styles = StyleSheet.create({
   secondary: { color: fg.secondary },
   accent: { color: color('Brand/Primary') },
   pressed: { opacity: 0.75 },
-  share: {
-    minHeight: 52,
-    backgroundColor: color('Brand/Primary'),
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radius('Radius/12'),
-    padding: space('Spacing/12'),
-  },
-  shareLabel: { color: bg.surfaceWhite },
   preview: {
     flex: 1,
     backgroundColor: bg.canvasWarm,
-    gap: space('Spacing/12'),
   },
+  previewCloseHeader: { paddingBottom: space('Spacing/4'), alignItems: 'flex-start' },
+  previewCloseButton: {
+    width: 44,
+    height: 44,
+    borderRadius: radius('Radius/Full'),
+    backgroundColor: bg.surfaceWhite,
+  },
+  previewScroll: { flex: 1, width: '100%', backgroundColor: bg.surfaceWhite },
+  previewContent: { paddingTop: space('Spacing/12'), gap: space('Spacing/12') },
   previewBar: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: 'column',
+    alignItems: 'flex-start',
     gap: space('Spacing/8'),
   },
-  selector: {
-    flexDirection: 'row',
-    backgroundColor: bg.subtle,
-    borderRadius: radius('Radius/12'),
-    padding: space('Spacing/4'),
-    flexShrink: 1,
-  },
-  segment: {
-    minHeight: 44,
-    justifyContent: 'center',
-    borderRadius: radius('Radius/12'),
-    paddingHorizontal: space('Spacing/12'),
-  },
-  segmentSelected: { backgroundColor: fg.primary },
+  previewSelector: { width: 320, maxWidth: '100%', alignSelf: 'center' },
   loadingLabel: { color: fg.secondary, textAlign: 'center' },
   gapWrap: { flexShrink: 1 },
   gapCard: {
@@ -906,16 +1026,20 @@ const styles = StyleSheet.create({
     gap: space('Spacing/4'),
   },
   textAction: { minHeight: 44, justifyContent: 'center' },
-  paperWrap: { flex: 1 },
+  paperWrap: { width: '100%' },
   paper: {
-    flex: 1,
-    borderRadius: radius('Radius/16'),
-    borderWidth: 1,
-    borderColor: border.subtle,
     overflow: 'hidden',
-    backgroundColor: bg.surfaceWhite,
+    backgroundColor: 'transparent',
   },
-  web: { flex: 1, backgroundColor: bg.surfaceWhite },
+  fabOverlay: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 2,
+    elevation: 2,
+  },
+  web: { width: '100%', backgroundColor: bg.surfaceWhite },
   sheet: { padding: space('Spacing/20'), gap: space('Spacing/12') },
   destinations: { gap: space('Spacing/8') },
   destination: {

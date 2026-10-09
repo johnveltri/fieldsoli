@@ -643,6 +643,7 @@ declare
   v_settings public.business_settings%rowtype;
   v_summary record;
   v_lines jsonb := '[]'::jsonb;
+  v_materials jsonb;
   v_other jsonb;
   v_subtotal bigint;
   v_taxable bigint := 0;
@@ -681,14 +682,36 @@ begin
       'kind', 'labor', 'label', 'Labor & Services', 'amountCents', coalesce(v_job.labor_services_cents, 0)
     ));
   end if;
-  if v_summary.material_charge <> 0 then
-    v_lines := v_lines || jsonb_build_array(jsonb_build_object(
-      'kind', 'materials', 'label', 'Materials', 'amountCents', v_summary.material_charge
-    ));
-  end if;
+  select coalesce(jsonb_agg(jsonb_build_object(
+    'kind', 'materials',
+    'label', coalesce(nullif(btrim(c.description), ''), 'Materials'),
+    'amountCents', c.total_cost_cents + private.round_half_up_bps(
+      c.total_cost_cents,
+      coalesce(c.markup_override_bps, c.captured_markup_bps, 0)
+    ),
+    'details', case
+      when coalesce(c.quantity_explicit, true) and c.quantity is not null then jsonb_build_object(
+        'quantity', c.quantity,
+        'unit', nullif(btrim(c.unit), ''),
+        'unitPriceCents', case
+          when coalesce(c.unit_cost_explicit, true) and coalesce(c.unit_cost_cents, 0) > 0
+            then c.unit_cost_cents + private.round_half_up_bps(
+              c.unit_cost_cents, coalesce(c.markup_override_bps, c.captured_markup_bps, 0)
+            )
+          else null
+        end
+      )
+      else null
+    end
+  ) order by c.created_at, c.id), '[]'::jsonb)
+  into v_materials
+  from private.included_job_costs(p_job_id) c
+  where c.cost_type = 'material' and c.total_cost_cents > 0;
+  v_lines := v_lines || coalesce(v_materials, '[]'::jsonb);
+
   select coalesce(jsonb_agg(jsonb_build_object(
     'kind', 'other',
-    'label', case category
+    'label', case c.cost_type
       when 'helper_labor' then 'Helper labor'
       when 'equipment_rental' then 'Equipment rental'
       when 'permit' then 'Permit'
@@ -696,16 +719,13 @@ begin
       when 'travel_parking' then 'Travel & parking'
       else 'Other'
     end,
-    'category', category,
-    'amountCents', amount
-  ) order by category), '[]'::jsonb)
+    'category', c.cost_type,
+    'description', nullif(btrim(c.description), ''),
+    'amountCents', c.total_cost_cents
+  ) order by c.cost_type, c.created_at, c.id), '[]'::jsonb)
   into v_other
-  from (
-    select c.cost_type as category, sum(c.total_cost_cents)::bigint as amount
-    from private.included_job_costs(p_job_id) c
-    where c.cost_type <> 'material' and c.invoice_customer and c.total_cost_cents > 0
-    group by c.cost_type
-  ) grouped;
+  from private.included_job_costs(p_job_id) c
+  where c.cost_type <> 'material' and c.invoice_customer and c.total_cost_cents > 0;
   v_lines := v_lines || coalesce(v_other, '[]'::jsonb);
 
   if p_type = 'estimate' then
@@ -770,7 +790,7 @@ begin
   select * into v_job from public.jobs where id = p_job_id and user_id = p_user_id;
   select settings_revision into v_revision from public.business_settings where user_id = p_user_id;
   select coalesce(string_agg(
-    concat_ws(':', c.id::text, c.total_cost_cents::text, coalesce(c.markup_override_bps::text, c.captured_markup_bps::text, '0'), c.invoice_customer::text, c.cost_type),
+    concat_ws(':', c.id::text, c.total_cost_cents::text, coalesce(c.markup_override_bps::text, c.captured_markup_bps::text, '0'), c.invoice_customer::text, c.cost_type, coalesce(c.description, ''), c.quantity::text, c.unit, c.unit_cost_cents::text, c.quantity_explicit::text, c.unit_cost_explicit::text),
     ',' order by c.id
   ), '')
   into v_costs
@@ -826,6 +846,7 @@ declare
   v_gaps text[];
   v_payload jsonb;
   v_state text;
+  v_number integer;
 begin
   if v_user_id is null then
     raise exception 'financial_document:unauthorized' using errcode = 'P0001';
@@ -842,7 +863,12 @@ begin
   end if;
   v_issue := (now() at time zone p_timezone)::date;
   v_gaps := private.document_readiness(p_job_id, v_user_id);
-  v_payload := private.build_document_payload(p_job_id, v_user_id, p_type, null, v_issue, p_timezone);
+  select coalesce((
+    select next_number
+    from public.financial_document_counters
+    where user_id = v_user_id and document_type = p_type
+  ), 1) into v_number;
+  v_payload := private.build_document_payload(p_job_id, v_user_id, p_type, v_number, v_issue, p_timezone);
   select job_payment_state into v_state from public.jobs where id = p_job_id;
   return jsonb_build_object(
     'status', 'ok',

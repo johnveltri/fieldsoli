@@ -84,6 +84,7 @@ export { SessionAddToSessionTiles } from './SessionAddToSessionTiles';
 export { SessionAttachmentList } from './SessionAttachmentList';
 export { SessionCard } from './SessionCard';
 export { SectionHeader } from './SectionHeader';
+export { SegmentedControl, type SegmentedControlOption } from './SegmentedControl';
 export {
   ViewMaterialsBuckets,
   ViewNotesBuckets,

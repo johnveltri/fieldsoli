@@ -10,6 +10,12 @@ export type DocumentLine = {
   label: string;
   amountCents: number;
   category?: OtherCostCategory;
+  description?: string | null;
+  details?: {
+    quantity: number;
+    unit: string | null;
+    unitPriceCents: number | null;
+  };
 };
 
 export type DocumentPayload = {
@@ -41,6 +47,12 @@ export type DocumentPayload = {
 };
 
 export type PaymentProjection = 'paid' | 'unpaid' | null;
+export type PreviewFontData = {
+  body: string;
+  bodyBold: string;
+  label: string;
+  display: string;
+};
 
 const PAYMENT_TERMS_LABEL: Record<PaymentTerms, string> = {
   due_on_receipt: 'Due upon receipt',
@@ -82,6 +94,29 @@ function formatDate(isoDate: string): string {
   }).format(new Date(Date.UTC(year, month - 1, day)));
 }
 
+function materialDetails(details: NonNullable<DocumentLine['details']>): string {
+  const quantity = new Intl.NumberFormat('en-US', { maximumFractionDigits: 3 }).format(
+    details.quantity,
+  );
+  const unit = details.unit ? ` ${details.unit}` : '';
+  const unitPrice =
+    details.unitPriceCents != null ? ` @ ${formatUsd(details.unitPriceCents)}` : '';
+  const label = `${quantity}${unit}${unitPrice}`;
+  return `<div class="line-details">${escapeHtml(label)}</div>`;
+}
+
+function lineDetails(line: DocumentLine): string {
+  const description = line.description?.trim();
+  if (description) return `<div class="line-details">${escapeHtml(description)}</div>`;
+  return line.details ? materialDetails(line.details) : '';
+}
+
+function lineRow(line: DocumentLine): string {
+  const details = lineDetails(line);
+  const amountClass = details ? 'amount with-details' : 'amount';
+  return `<tr><td>${escapeHtml(line.label)}${details}</td><td class="${amountClass}">${escapeHtml(formatUsd(line.amountCents))}</td></tr>`;
+}
+
 function textBlock(label: string, value: string | null | undefined): string {
   const trimmed = value?.trim() ?? '';
   if (!trimmed) return '';
@@ -105,7 +140,9 @@ h2 { font-size: 20px; line-height: 1.3; margin-top: 28px; }
 table { width: 100%; border-collapse: collapse; margin-top: 20px; }
 th, td { text-align: left; vertical-align: top; padding: 8px 0; border-bottom: 1px solid #000; }
 th { font-family: ui-monospace, Menlo, monospace; font-size: 12px; font-weight: 600; }
+.line-details { color: #6F6A65; font-size: 12px; line-height: 1.35; margin-top: 2px; }
 td.amount, th.amount { text-align: right; white-space: nowrap; }
+td.amount.with-details { vertical-align: middle; }
 .totals { margin-top: 12px; }
 .totals div { display: flex; justify-content: space-between; gap: 16px; padding: 6px 0; }
 .totals .final { border-top: 2px solid #000; font-weight: 700; margin-top: 4px; padding-top: 10px; }
@@ -136,10 +173,7 @@ export function renderDocument(
       ? `<p class="badge">${paid ? 'Paid' : 'Unpaid'}</p>`
       : '';
   const lines = payload.lines
-    .map(
-      (line) =>
-        `<tr><td>${escapeHtml(line.label)}</td><td class="amount">${escapeHtml(formatUsd(line.amountCents))}</td></tr>`,
-    )
+    .map(lineRow)
     .join('');
   const identity = [
     textBlock('Address', payload.businessAddress),
@@ -214,6 +248,118 @@ ${dateRow}
 </article>
 </body>
 </html>`;
+}
+
+/** Presentation used only by the in-app WebView; saved document rendering stays versioned. */
+export function renderDocumentPreview(
+  version: number,
+  payload: DocumentPayload,
+  paymentProjection: PaymentProjection,
+  fonts?: PreviewFontData,
+): string {
+  if (version !== RENDERER_VERSION)
+    throw new Error("unsupported_renderer_version");
+  const estimate = payload.documentType === "estimate";
+  const paid = !estimate && paymentProjection === "paid";
+  const title = `${estimate ? "Estimate" : "Invoice"}${payload.documentNumber == null ? "" : ` #${formatDocumentNumber(payload.documentNumber)}`}`;
+  const finalLabel = estimate || paid ? "Total" : "Amount Due";
+  const detail = (value: string | null) =>
+    value?.trim() ? `<p>${escapeHtml(value.trim())}</p>` : "";
+  const row = (label: string, value: string) =>
+    `<div class="summary-row"><span>${escapeHtml(label)}</span><span>${escapeHtml(value)}</span></div>`;
+  const notes = payload.longDescription?.trim()
+    ? `<section class="notes"><h2>Client notes</h2><p>${escapeHtml(payload.longDescription)}</p></section>`
+    : "";
+  const fontFaces = fonts
+    ? `@font-face { font-family: FieldSoliUbuntu; src: url(data:font/ttf;base64,${fonts.body}) format("truetype"); }\n@font-face { font-family: FieldSoliUbuntuMedium; src: url(data:font/ttf;base64,${fonts.bodyBold}) format("truetype"); }\n@font-face { font-family: FieldSoliUbuntuBold; src: url(data:font/ttf;base64,${fonts.label}) format("truetype"); }\n@font-face { font-family: FieldSoliPTSerifBold; src: url(data:font/ttf;base64,${fonts.display}) format("truetype"); }`
+    : "";
+  return `<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>${escapeHtml(title)}</title><style>
+${fontFaces}
+:root {
+  color-scheme: light;
+  --table-header-background: #333;
+  --font-body: ${fonts ? "FieldSoliUbuntu" : '"Ubuntu_400Regular", sans-serif'};
+  --font-bold: ${fonts ? "FieldSoliUbuntuMedium" : '"Ubuntu_500Medium", sans-serif'};
+  --font-label: ${fonts ? "FieldSoliUbuntuBold" : '"Ubuntu_700Bold", sans-serif'};
+  --font-display: ${fonts ? "FieldSoliPTSerifBold" : '"PTSerif_700Bold", serif'};
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: #fff; color: #111; }
+body { font-family: var(--font-body); font-size: 14px; line-height: 1.4; }
+.page { max-width: 816px; margin: auto; padding: 28px 20px 150px; }
+h1, h2, p { margin: 0; }
+h1, h2, th { font-weight: normal; }
+p { overflow-wrap: anywhere; }
+.header { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+.business h1 { font-family: var(--font-display); font-size: 20px; font-weight: normal; line-height: 1; margin-bottom: 10px; }
+.business p, .recipient p { margin-top: 2px; white-space: pre-wrap; }
+.recipient { margin-top: 24px; }
+h2 { font-family: var(--font-body); font-size: 14px; font-weight: normal; line-height: 1.4; margin-bottom: 7px; }
+.recipient h2, .notes h2 { font-family: var(--font-label); font-size: 12px; line-height: 1.25; letter-spacing: .05em; text-transform: uppercase; }
+.recipient .name { font-family: var(--font-body); font-size: 16px; line-height: 1.4; margin-bottom: 4px; }
+.document-summary { background: #f3f3f3; }
+.document-title { background: var(--table-header-background); color: #fff; padding: 10px 12px; }
+.document-title-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.document-title-row h2 { min-width: 0; }
+.document-title h2 { font-family: var(--font-bold); font-size: 18px; font-weight: normal; line-height: 1.4; margin: 0; overflow-wrap: anywhere; }
+.document-title .pending-label { font-family: var(--font-body); font-size: 14px; line-height: 1.4; letter-spacing: 0; text-transform: none; }
+.document-title p { font-size: 14px; line-height: 1.4; margin-top: 3px; }
+.document-title .payment-status { font-family: var(--font-label); font-size: 12px; line-height: 1.25; letter-spacing: .05em; text-transform: uppercase; }
+.summary-row { display: flex; justify-content: space-between; gap: 16px; padding: 7px 12px; }
+.summary-row span:last-child { text-align: right; overflow-wrap: anywhere; min-width: 0; }
+.document-summary .summary-row { font-size: 14px; line-height: 1.4; }
+.document-summary .summary-row span:first-child { flex-shrink: 0; }
+.summary-total { background: var(--table-header-background); color: #fff; font-family: var(--font-bold); font-size: 18px; line-height: 1.4; }
+.services { margin-top: 30px; }
+.services h2 { font-family: var(--font-bold); font-size: 18px; font-weight: normal; line-height: 1.4; margin-bottom: 12px; overflow-wrap: anywhere; }
+table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+th { background: var(--table-header-background); color: #fff; font-family: var(--font-bold); font-size: 12px; font-weight: normal; line-height: 1.25; letter-spacing: .04em; text-transform: uppercase; }
+th, td { padding: 11px 10px; text-align: left; vertical-align: top; overflow-wrap: anywhere; }
+td { border-bottom: 1px solid #ddd; }
+.line-details { color: #6F6A65; font-size: 12px; line-height: 1.35; margin-top: 2px; }
+.amount { width: 36%; text-align: right; }
+td.amount.with-details { vertical-align: middle; }
+.footer { display: flex; flex-direction: row; gap: 24px; margin-top: 24px; align-items: flex-start; }
+.notes, .totals { flex: 1; min-width: 0; }
+.notes { padding: 8px 0 0; }
+.notes p { white-space: pre-wrap; }
+.totals { width: 100%; }
+.totals .summary-row { padding: 8px 10px; border-bottom: 1px solid #e5e5e5; }
+.totals .final { font-family: var(--font-bold); font-size: 18px; line-height: 1.4; border-top: 2px solid #333; border-bottom: 0; margin-top: 3px; padding-top: 12px; }
+@media (max-width: 540px) {
+  .page { padding: 22px 18px 150px; }
+  .header { grid-template-columns: minmax(0, 1fr); gap: 22px; }
+  .recipient { margin-top: 18px; }
+  .document-summary { width: 100%; }
+  .footer { flex-direction: column; gap: 24px; }
+  .notes, .totals { width: 100%; }
+}
+</style></head><body><article class="page">
+<header class="header"><div>
+<section class="business"><h1>${escapeHtml(payload.businessName.trim() || "Business")}</h1>
+${detail(payload.businessAddress)}${detail(payload.businessPhone)}${detail(payload.businessEmail)}${detail(payload.businessWebsite)}${payload.businessLicense?.trim() ? detail(`License # ${payload.businessLicense.trim()}`) : ""}
+</section>
+<section class="recipient"><h2>Recipient</h2>${payload.customerName.trim() ? `<p class="name">${escapeHtml(payload.customerName.trim())}</p>` : ""}
+${detail(payload.serviceAddress)}${detail(payload.customerPhone)}${detail(payload.customerEmail)}</section>
+</div><section class="document-summary" aria-label="Document summary">
+<div class="document-title"><div class="document-title-row"><h2>${escapeHtml(title)}${payload.documentNumber == null ? "" : '<span class="pending-label"> (pending)</span>'}</h2></div>${!estimate ? `<p class="payment-status">${paid ? "Paid" : "Unpaid"}</p>` : ""}</div>
+${row("Issued", formatDate(payload.issueDate))}
+${estimate ? (payload.validUntil ? row("Valid until", formatDate(payload.validUntil)) : "") : payload.dueDate ? row("Due", formatDate(payload.dueDate)) : ""}
+${!estimate && payload.paymentTerms ? row("Terms", PAYMENT_TERMS_LABEL[payload.paymentTerms]) : ""}
+<div class="summary-row summary-total"><span>${finalLabel}</span><span>${formatUsd(payload.totalCents)}</span></div>
+</section></header>
+<section class="services"><h2>${escapeHtml(payload.shortDescription)}</h2>
+<table aria-label="Services and charges"><thead><tr><th scope="col">Product / Service</th><th scope="col" class="amount">Total</th></tr></thead><tbody>
+${payload.lines.map(lineRow).join("")}
+</tbody></table></section>
+<div class="footer">${notes}<section class="totals" aria-label="Totals">
+${row("Subtotal", formatUsd(payload.subtotalCents))}${row("Tax", formatUsd(payload.taxCents))}
+<div class="summary-row final"><span>${finalLabel}</span><span>${formatUsd(payload.totalCents)}</span></div>
+</section></div>
+</article></body></html>`;
 }
 
 export function unsupportedRendererHtml(): string {

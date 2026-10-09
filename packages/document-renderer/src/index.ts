@@ -1,5 +1,5 @@
-export { RENDERER_VERSION, escapeHtml, formatDocumentNumber, formatUsd, renderDocument, unsupportedRendererHtml } from './render';
-export type { DocumentLine, DocumentPayload, DocumentType, PaymentProjection, PaymentTerms } from './render';
+export { RENDERER_VERSION, escapeHtml, formatDocumentNumber, formatUsd, renderDocument, renderDocumentPreview, unsupportedRendererHtml } from './render';
+export type { DocumentLine, DocumentPayload, DocumentType, PaymentProjection, PaymentTerms, PreviewFontData } from './render';
 export { roundHalfUpBps } from './money';
 export {
   OTHER_COST_CATEGORIES,
