@@ -200,6 +200,7 @@ export const InvoicingJobControls = forwardRef<
   const { columnStyle } = useContentColumn();
   const businessScreenRef = useRef<BusinessSettingsScreenHandle>(null);
   const updatingDocumentRef = useRef<string | null>(null);
+  const previewRequestRef = useRef(0);
   const [updatingDocument, setUpdatingDocument] = useState<string | null>(null);
   const [documents, setDocuments] = useState<FinancialDocumentRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -295,6 +296,7 @@ export const InvoicingJobControls = forwardRef<
     setSaved(null);
     setPreview(null);
     setOffline(false);
+    const request = ++previewRequestRef.current;
     setBusy('Loading');
     setPreviewType(defaultDocumentType(workStatus));
     try {
@@ -303,37 +305,44 @@ export const InvoicingJobControls = forwardRef<
         type: defaultDocumentType(workStatus),
         timezone: deviceIanaTimeZone(),
       });
-      setPreview(next);
-      setOffline(false);
+      if (request === previewRequestRef.current) {
+        setPreview(next);
+        setOffline(false);
+      }
     } catch {
-      setOffline(true);
-      Alert.alert('Could not load this document.', 'Retry');
+      if (request === previewRequestRef.current) {
+        setOffline(true);
+        Alert.alert('Could not load this document.', 'Retry');
+      }
     } finally {
-      setBusy(null);
+      if (request === previewRequestRef.current) setBusy(null);
     }
   }, [beforeOpen, client, jobId, workStatus, setPreviewOpen]);
 
   const switchType = useCallback(
     async (type: 'estimate' | 'invoice') => {
       if (saved) return;
-      setBusy('Loading');
+      const request = ++previewRequestRef.current;
+      setPreviewType(type);
+      setBusy(null);
       try {
-        setPreview(
-          await previewFinancialDocument(client, {
-            jobId,
-            type,
-            timezone: deviceIanaTimeZone(),
-          }),
-        );
-        setPreviewType(type);
-        setOffline(false);
+        const next = await previewFinancialDocument(client, {
+          jobId,
+          type,
+          timezone: deviceIanaTimeZone(),
+        });
+        if (request === previewRequestRef.current) {
+          setPreview(next);
+          setOffline(false);
+        }
       } catch {
-        Alert.alert('Could not load this document.', 'Retry');
-      } finally {
-        setBusy(null);
+        if (request === previewRequestRef.current) {
+          setPreviewType(preview?.payload.documentType ?? defaultDocumentType(workStatus));
+          Alert.alert('Could not load this document.', 'Retry');
+        }
       }
     },
-    [client, jobId, saved],
+    [client, jobId, preview, saved, workStatus],
   );
 
   const createAndShare = useCallback(async () => {
@@ -570,6 +579,7 @@ export const InvoicingJobControls = forwardRef<
                   onManageDocs();
                   return;
                 }
+                previewRequestRef.current += 1;
                 setSaved(doc);
                 setPreviewOpen(true);
                 setShareOpen(false);
@@ -680,8 +690,8 @@ export const InvoicingJobControls = forwardRef<
             style={styles.previewScroll}
             contentContainerStyle={styles.previewContent}
           >
-            <View style={[columnStyle, styles.previewBar]}>
-              {!saved ? (
+            {!saved ? (
+              <View style={[columnStyle, styles.previewBar]}>
                 <SegmentedControl
                   accessibilityLabel="Document type"
                   value={previewType}
@@ -691,16 +701,12 @@ export const InvoicingJobControls = forwardRef<
                   ]}
                   onValueChange={(type) => void switchType(type)}
                   labelStyle={typography.statusPillLabel}
-                  disabled={!!busy}
+                  disabled={busy != null && busy !== 'Loading'}
                   fill={false}
                   style={styles.previewSelector}
                 />
-              ) : (
-                <Text style={typography.body}>
-                  {documentNumberLabel(saved.documentType, saved.documentNumber)}
-                </Text>
-              )}
-            </View>
+              </View>
+            ) : null}
             {busy ? (
               <Text
                 accessibilityLiveRegion="polite"
