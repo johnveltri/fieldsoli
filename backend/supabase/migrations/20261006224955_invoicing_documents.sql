@@ -846,6 +846,7 @@ declare
   v_gaps text[];
   v_payload jsonb;
   v_state text;
+  v_number integer;
 begin
   if v_user_id is null then
     raise exception 'financial_document:unauthorized' using errcode = 'P0001';
@@ -862,7 +863,12 @@ begin
   end if;
   v_issue := (now() at time zone p_timezone)::date;
   v_gaps := private.document_readiness(p_job_id, v_user_id);
-  v_payload := private.build_document_payload(p_job_id, v_user_id, p_type, null, v_issue, p_timezone);
+  select coalesce((
+    select next_number
+    from public.financial_document_counters
+    where user_id = v_user_id and document_type = p_type
+  ), 1) into v_number;
+  v_payload := private.build_document_payload(p_job_id, v_user_id, p_type, v_number, v_issue, p_timezone);
   select job_payment_state into v_state from public.jobs where id = p_job_id;
   return jsonb_build_object(
     'status', 'ok',
