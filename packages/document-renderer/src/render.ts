@@ -10,6 +10,7 @@ export type DocumentLine = {
   label: string;
   amountCents: number;
   category?: OtherCostCategory;
+  description?: string | null;
   details?: {
     quantity: number;
     unit: string | null;
@@ -104,6 +105,12 @@ function materialDetails(details: NonNullable<DocumentLine['details']>): string 
   return `<div class="line-details">${escapeHtml(label)}</div>`;
 }
 
+function lineDetails(line: DocumentLine): string {
+  const description = line.description?.trim();
+  if (description) return `<div class="line-details">${escapeHtml(description)}</div>`;
+  return line.details ? materialDetails(line.details) : '';
+}
+
 function textBlock(label: string, value: string | null | undefined): string {
   const trimmed = value?.trim() ?? '';
   if (!trimmed) return '';
@@ -161,7 +168,7 @@ export function renderDocument(
   const lines = payload.lines
     .map(
       (line) => {
-        const details = line.details ? materialDetails(line.details) : '';
+        const details = lineDetails(line);
         return `<tr><td>${escapeHtml(line.label)}${details}</td><td class="amount">${escapeHtml(formatUsd(line.amountCents))}</td></tr>`;
       },
     )
@@ -338,7 +345,7 @@ ${!estimate && payload.paymentTerms ? row("Terms", PAYMENT_TERMS_LABEL[payload.p
 </section></header>
 <section class="services"><h2>${escapeHtml(payload.shortDescription)}</h2>
 <table aria-label="Services and charges"><thead><tr><th scope="col">Product / Service</th><th scope="col" class="amount">Total</th></tr></thead><tbody>
-${payload.lines.map((line) => `<tr><td>${escapeHtml(line.label)}${line.details ? materialDetails(line.details) : ""}</td><td class="amount">${formatUsd(line.amountCents)}</td></tr>`).join("")}
+${payload.lines.map((line) => `<tr><td>${escapeHtml(line.label)}${lineDetails(line)}</td><td class="amount">${formatUsd(line.amountCents)}</td></tr>`).join("")}
 </tbody></table></section>
 <div class="footer">${notes}<section class="totals" aria-label="Totals">
 ${row("Subtotal", formatUsd(payload.subtotalCents))}${row("Tax", formatUsd(payload.taxCents))}
