@@ -1,5 +1,6 @@
 import React, { createRef } from 'react';
-import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
+import { StyleSheet } from 'react-native';
+import { act, fireEvent, render, waitFor, within } from '@testing-library/react-native';
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import type {
   DocumentPreview,
@@ -43,6 +44,7 @@ jest.mock('../ds/BottomSheetShell', () => ({
 jest.mock('@fieldsolo/document-renderer', () => ({
   RENDERER_VERSION: 1,
   renderDocument: () => '<html></html>',
+  renderDocumentPreview: () => '<html></html>',
 }));
 
 const typography = createTextStyles({
@@ -51,7 +53,18 @@ const typography = createTextStyles({
   sansSemi: 'semi',
   sansBold: 'bold',
 });
+const payload: DocumentPreview['payload'] = {
+  schemaVersion: 1, documentType: 'estimate', documentNumber: 1,
+  businessName: 'Example Business', businessAddress: null, businessPhone: null,
+  businessEmail: null, businessWebsite: null, businessLicense: null,
+  customerName: 'Customer', customerPhone: null, customerEmail: null,
+  serviceAddress: null, shortDescription: 'Repair', longDescription: null,
+  lines: [], subtotalCents: 0, taxRateBps: 0, taxCents: 0, totalCents: 0,
+  currency: 'USD', issueDate: '2026-10-08', validUntil: null, dueDate: null,
+  paymentTerms: null,
+};
 const doc = {
+  payload,
   id: 'doc-1',
   documentType: 'estimate',
   documentNumber: 1,
@@ -74,6 +87,7 @@ describe('InvoicingJobControls', () => {
     jest.clearAllMocks();
     mockList.mockResolvedValue([doc]);
     mockPreview.mockResolvedValue({
+      payload,
       gaps: ['labor'],
       rendererVersion: 1,
     } as DocumentPreview);
@@ -155,6 +169,21 @@ describe('InvoicingJobControls', () => {
     expect(screen.queryByRole('button', { name: 'Estimate' })).toBeNull();
   });
 
+  it('scrolls the document selector with the height-sized invoice', async () => {
+    const ref = createRef<InvoicingJobControlsHandle>();
+    const screen = render(<InvoicingJobControls {...props} ref={ref} mode="view" />);
+    await screen.findByLabelText('Edit Estimate #00001');
+    await act(async () => { ref.current?.openPreview(); });
+    const scroll = screen.getByTestId('document-preview-scroll');
+    expect(within(scroll).getByRole('button', { name: 'Estimate' })).toBeTruthy();
+    const html = await screen.findByTestId('document-preview-html');
+    expect(html.props.scrollEnabled).toBe(false);
+    fireEvent(html, 'message', { nativeEvent: { data: JSON.stringify({
+      type: 'preview-height', height: 1234,
+    }) } });
+    expect(StyleSheet.flatten(screen.getByTestId('document-preview-html').props.style).height).toBe(1234);
+  });
+
   it('keeps the displayed type selected when loading another type fails', async () => {
     const ref = createRef<InvoicingJobControlsHandle>();
     const screen = render(
@@ -180,6 +209,7 @@ describe('InvoicingJobControls', () => {
 
   it('routes a missing Business name to Business Info and refreshes the preview on return', async () => {
     mockPreview.mockResolvedValue({
+      payload,
       gaps: ['business_name'],
       rendererVersion: 1,
     } as DocumentPreview);

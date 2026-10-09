@@ -160,6 +160,19 @@ function htmlFor(record: {
   return renderDocument(record.rendererVersion, payload, record.paymentProjection);
 }
 
+const REPORT_PREVIEW_HEIGHT = `
+(function () {
+  const page = document.querySelector('.page') || document.body;
+  const report = () => window.ReactNativeWebView.postMessage(JSON.stringify({
+    type: 'preview-height', height: Math.ceil(page.getBoundingClientRect().height)
+  }));
+  new ResizeObserver(report).observe(page);
+  if (document.fonts) document.fonts.ready.then(report);
+  report();
+})();
+true;
+`;
+
 export type InvoicingJobControlsHandle = { openPreview: () => void };
 
 export const InvoicingJobControls = forwardRef<
@@ -192,6 +205,7 @@ export const InvoicingJobControls = forwardRef<
   );
   const [saved, setSaved] = useState<FinancialDocumentRecord | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewHeight, setPreviewHeight] = useState(600);
   const [previewFonts, setPreviewFonts] = useState<PreviewFontData | null>(null);
   const [previewFontsReady, setPreviewFontsReady] = useState(false);
   const [businessOpen, setBusinessOpen] = useState(false);
@@ -611,110 +625,132 @@ export const InvoicingJobControls = forwardRef<
           style={[
             styles.preview,
             {
-              paddingTop: insets.top + space('Spacing/12'),
+              paddingTop: insets.top,
             },
           ]}
         >
-          <View style={[columnStyle, styles.previewBar]}>
-            <PlatformHeaderAction
-              accessibilityLabel="Back"
-              onPress={() => setPreviewOpen(false)}
-            >
-              <TopHeaderBackIcon size={28} color={fg.primary} />
-            </PlatformHeaderAction>
-            {!saved ? (
-              <SegmentedControl
-                accessibilityLabel="Document type"
-                value={previewType}
-                options={[
-                  { value: 'estimate', label: 'Estimate' },
-                  { value: 'invoice', label: 'Invoice' },
-                ]}
-                onValueChange={(type) => void switchType(type)}
-                labelStyle={typography.statusPillLabel}
-                disabled={!!busy}
-                fill={false}
-                style={styles.previewSelector}
-              />
-            ) : (
-              <Text style={typography.body}>
-                {documentNumberLabel(saved.documentType, saved.documentNumber)}
-              </Text>
-            )}
-          </View>
-          {busy ? (
-            <Text
-              accessibilityLiveRegion="polite"
-              style={[typography.bodySmall, styles.loadingLabel]}
-            >
-              {busy}
-            </Text>
-          ) : null}
-          {preview && !saved && preview.gaps.length > 0 ? (
-            <View style={[columnStyle, styles.gapWrap]}>
-              <View style={styles.gapCard}>
-                <Text style={typography.bodyBold}>
-                  Complete these details before sharing:
-                </Text>
-                {gapLabels(preview.gaps).map((label) => (
-                  <Text key={label} style={typography.body}>
-                    {label}
-                  </Text>
-                ))}
-                {preview.gaps.includes('business_name') ? (
-                  <Pressable
-                    accessibilityRole="button"
-                    style={styles.textAction}
-                    onPress={() => setBusinessOpen(true)}
-                  >
-                    <Text style={[typography.bodyBold, styles.accent]}>
-                      Edit business info
-                    </Text>
-                  </Pressable>
-                ) : null}
-                {preview.gaps.some((gap) => gap !== 'business_name') ? (
-                  <Pressable
-                    accessibilityRole="button"
-                    style={styles.textAction}
-                    onPress={() => {
-                      setPreviewOpen(false);
-                      onEditDetails();
-                    }}
-                  >
-                    <Text style={[typography.bodyBold, styles.accent]}>
-                      Edit Job details
-                    </Text>
-                  </Pressable>
-                ) : null}
-              </View>
-            </View>
-          ) : null}
-          <View style={styles.paperWrap}>
-            <View style={styles.paper}>
-              {previewFontsReady ? (
-                <WebView
-                  originWhitelist={['*']}
-                  source={{
-                    html: saved
-                      ? htmlFor(saved, 'preview', previewFonts ?? undefined)
-                      : preview
-                        ? htmlFor(
-                            {
-                              ...preview,
-                              paymentProjection: preview.paymentProjection,
-                            },
-                            'preview',
-                            previewFonts ?? undefined,
-                          )
-                        : '<html><body></body></html>',
-                  }}
-                  style={styles.web}
+          <ScrollView
+            testID="document-preview-scroll"
+            style={styles.previewScroll}
+            contentContainerStyle={styles.previewContent}
+          >
+            <View style={[columnStyle, styles.previewBar]}>
+              <PlatformHeaderAction
+                accessibilityLabel="Back"
+                onPress={() => setPreviewOpen(false)}
+              >
+                <TopHeaderBackIcon size={28} color={fg.primary} />
+              </PlatformHeaderAction>
+              {!saved ? (
+                <SegmentedControl
+                  accessibilityLabel="Document type"
+                  value={previewType}
+                  options={[
+                    { value: 'estimate', label: 'Estimate' },
+                    { value: 'invoice', label: 'Invoice' },
+                  ]}
+                  onValueChange={(type) => void switchType(type)}
+                  labelStyle={typography.statusPillLabel}
+                  disabled={!!busy}
+                  fill={false}
+                  style={styles.previewSelector}
                 />
               ) : (
-                <ActivityIndicator size="small" color={fg.primary} />
+                <Text style={typography.body}>
+                  {documentNumberLabel(saved.documentType, saved.documentNumber)}
+                </Text>
               )}
             </View>
-          </View>
+            {busy ? (
+              <Text
+                accessibilityLiveRegion="polite"
+                style={[typography.bodySmall, styles.loadingLabel]}
+              >
+                {busy}
+              </Text>
+            ) : null}
+            {preview && !saved && preview.gaps.length > 0 ? (
+              <View style={[columnStyle, styles.gapWrap]}>
+                <View style={styles.gapCard}>
+                  <Text style={typography.bodyBold}>
+                    Complete these details before sharing:
+                  </Text>
+                  {gapLabels(preview.gaps).map((label) => (
+                    <Text key={label} style={typography.body}>
+                      {label}
+                    </Text>
+                  ))}
+                  {preview.gaps.includes('business_name') ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      style={styles.textAction}
+                      onPress={() => setBusinessOpen(true)}
+                    >
+                      <Text style={[typography.bodyBold, styles.accent]}>
+                        Edit business info
+                      </Text>
+                    </Pressable>
+                  ) : null}
+                  {preview.gaps.some((gap) => gap !== 'business_name') ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      style={styles.textAction}
+                      onPress={() => {
+                        setPreviewOpen(false);
+                        onEditDetails();
+                      }}
+                    >
+                      <Text style={[typography.bodyBold, styles.accent]}>
+                        Edit Job details
+                      </Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+              </View>
+            ) : null}
+            <View style={styles.paperWrap}>
+              <View style={styles.paper}>
+                {previewFontsReady ? (
+                  <WebView
+                    testID="document-preview-html"
+                    originWhitelist={['*']}
+                    source={{
+                      html: saved
+                        ? htmlFor(saved, 'preview', previewFonts ?? undefined)
+                        : preview
+                          ? htmlFor(
+                              {
+                                ...preview,
+                                paymentProjection: preview.paymentProjection,
+                              },
+                              'preview',
+                              previewFonts ?? undefined,
+                            )
+                          : '<html><body></body></html>',
+                    }}
+                    scrollEnabled={false}
+                    containerStyle={{ flex: 0, height: previewHeight }}
+                    injectedJavaScript={REPORT_PREVIEW_HEIGHT}
+                    onMessage={(event) => {
+                      try {
+                        const message = JSON.parse(event.nativeEvent.data);
+                        if (message.type === 'preview-height' &&
+                            Number.isFinite(message.height) && message.height > 0) {
+                          setPreviewHeight((height) =>
+                            Math.abs(height - message.height) > 1 ? message.height : height);
+                        }
+                      } catch {
+                        // Ignore messages unrelated to document sizing.
+                      }
+                    }}
+                    style={[styles.web, { height: previewHeight }]}
+                  />
+                ) : (
+                  <ActivityIndicator size="small" color={fg.primary} />
+                )}
+              </View>
+            </View>
+          </ScrollView>
           {!saved && preview && preview.gaps.length === 0 ? (
             <View pointerEvents="box-none" style={styles.fabOverlay}>
               <FullWidthFab
@@ -917,16 +953,15 @@ const styles = StyleSheet.create({
   preview: {
     flex: 1,
     backgroundColor: bg.canvasWarm,
-    gap: space('Spacing/12'),
   },
+  previewScroll: { flex: 1, width: '100%' },
+  previewContent: { paddingTop: space('Spacing/12'), gap: space('Spacing/12') },
   previewBar: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: 'column',
+    alignItems: 'flex-start',
     gap: space('Spacing/8'),
   },
-  previewSelector: { width: 320, maxWidth: '100%', flexShrink: 1 },
+  previewSelector: { width: 320, maxWidth: '100%', alignSelf: 'center' },
   loadingLabel: { color: fg.secondary, textAlign: 'center' },
   gapWrap: { flexShrink: 1 },
   gapCard: {
@@ -938,9 +973,8 @@ const styles = StyleSheet.create({
     gap: space('Spacing/4'),
   },
   textAction: { minHeight: 44, justifyContent: 'center' },
-  paperWrap: { flex: 1, width: '100%' },
+  paperWrap: { width: '100%' },
   paper: {
-    flex: 1,
     overflow: 'hidden',
     backgroundColor: 'transparent',
   },
@@ -952,7 +986,7 @@ const styles = StyleSheet.create({
     zIndex: 2,
     elevation: 2,
   },
-  web: { flex: 1, backgroundColor: bg.surfaceWhite },
+  web: { width: '100%', backgroundColor: bg.surfaceWhite },
   sheet: { padding: space('Spacing/20'), gap: space('Spacing/12') },
   destinations: { gap: space('Spacing/8') },
   destination: {
