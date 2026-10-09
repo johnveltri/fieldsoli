@@ -166,7 +166,9 @@ describe('InvoicingJobControls', () => {
     });
     fireEvent.press(await screen.findByText('Edit Job details'));
     expect(onEditDetails).toHaveBeenCalledTimes(1);
-    expect(screen.queryByRole('button', { name: 'Estimate' })).toBeNull();
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Estimate' })).toBeNull(),
+    );
   });
 
   it('scrolls the document selector with the height-sized invoice', async () => {
@@ -176,6 +178,8 @@ describe('InvoicingJobControls', () => {
     await act(async () => { ref.current?.openPreview(); });
     const scroll = screen.getByTestId('document-preview-scroll');
     expect(within(scroll).getByRole('button', { name: 'Estimate' })).toBeTruthy();
+    expect(within(scroll).queryByLabelText('Close preview')).toBeNull();
+    expect(screen.getByLabelText('Close preview')).toBeTruthy();
     const html = await screen.findByTestId('document-preview-html');
     expect(html.props.scrollEnabled).toBe(false);
     fireEvent(html, 'message', { nativeEvent: { data: JSON.stringify({

@@ -8,6 +8,9 @@ import {
 } from 'react';
 import {
   ActivityIndicator,
+  Animated,
+  Easing,
+  Platform,
   Alert,
   Linking,
   Modal,
@@ -76,6 +79,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PlatformHeaderAction } from '../platform/PlatformHeaderAction';
 import { TopHeaderBackIcon } from '../figma-icons/TopHeaderIcons';
+import { JobDetailIconTopClose } from '../figma-icons/JobDetailScreenIcons';
+import { usePlatformGlass } from '../platform/usePlatformGlass';
 import { ProfileChevronRightIcon } from '../figma-icons/ProfileScreenIcons';
 import {
   BusinessSettingsScreen,
@@ -204,7 +209,35 @@ export const InvoicingJobControls = forwardRef<
     defaultDocumentType(workStatus),
   );
   const [saved, setSaved] = useState<FinancialDocumentRecord | null>(null);
-  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewOpen, setPreviewOpenState] = useState(false);
+  const previewOpacity = useRef(new Animated.Value(0)).current;
+  useEffect(() => () => previewOpacity.stopAnimation(), [previewOpacity]);
+  const { reduceMotion } = usePlatformGlass();
+  const previewFadeDuration = reduceMotion || Platform.OS === 'android' ? 0 : 500;
+  const animatePreviewIn = useCallback(() => {
+    Animated.timing(previewOpacity, {
+      toValue: 1,
+      duration: previewFadeDuration,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  }, [previewOpacity, previewFadeDuration]);
+  const setPreviewOpen = useCallback((open: boolean) => {
+    previewOpacity.stopAnimation();
+    if (open) {
+      previewOpacity.setValue(0);
+      setPreviewOpenState(true);
+      return;
+    }
+    Animated.timing(previewOpacity, {
+      toValue: 0,
+      duration: previewFadeDuration,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start(({ finished }) => {
+      if (finished) setPreviewOpenState(false);
+    });
+  }, [previewOpacity, previewFadeDuration]);
   const [previewHeight, setPreviewHeight] = useState(600);
   const [previewFonts, setPreviewFonts] = useState<PreviewFontData | null>(null);
   const [previewFontsReady, setPreviewFontsReady] = useState(false);
@@ -278,7 +311,7 @@ export const InvoicingJobControls = forwardRef<
     } finally {
       setBusy(null);
     }
-  }, [beforeOpen, client, jobId, workStatus]);
+  }, [beforeOpen, client, jobId, workStatus, setPreviewOpen]);
 
   const switchType = useCallback(
     async (type: 'estimate' | 'invoice') => {
@@ -618,29 +651,34 @@ export const InvoicingJobControls = forwardRef<
 
       <Modal
         visible={previewOpen}
-        animationType="slide"
+        transparent
+        animationType="none"
+        onShow={animatePreviewIn}
         onRequestClose={() => setPreviewOpen(false)}
       >
-        <View
+        <Animated.View
           style={[
             styles.preview,
             {
               paddingTop: insets.top,
+              opacity: previewOpacity,
             },
           ]}
         >
+          <View style={[columnStyle, styles.previewCloseHeader]}>
+            <PlatformHeaderAction
+              accessibilityLabel="Close preview"
+              onPress={() => setPreviewOpen(false)}
+            >
+              <JobDetailIconTopClose color={fg.primary} />
+            </PlatformHeaderAction>
+          </View>
           <ScrollView
             testID="document-preview-scroll"
             style={styles.previewScroll}
             contentContainerStyle={styles.previewContent}
           >
             <View style={[columnStyle, styles.previewBar]}>
-              <PlatformHeaderAction
-                accessibilityLabel="Back"
-                onPress={() => setPreviewOpen(false)}
-              >
-                <TopHeaderBackIcon size={28} color={fg.primary} />
-              </PlatformHeaderAction>
               {!saved ? (
                 <SegmentedControl
                   accessibilityLabel="Document type"
@@ -898,7 +936,7 @@ export const InvoicingJobControls = forwardRef<
               </BottomSheetShell>
             </GestureHandlerRootView>
           </Modal>
-        </View>
+        </Animated.View>
       </Modal>
     </View>
   );
@@ -954,7 +992,8 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: bg.canvasWarm,
   },
-  previewScroll: { flex: 1, width: '100%' },
+  previewCloseHeader: { paddingVertical: space('Spacing/12'), alignItems: 'flex-start' },
+  previewScroll: { flex: 1, width: '100%', backgroundColor: bg.surfaceWhite },
   previewContent: { paddingTop: space('Spacing/12'), gap: space('Spacing/12') },
   previewBar: {
     flexDirection: 'column',
