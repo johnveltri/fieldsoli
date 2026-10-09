@@ -302,9 +302,11 @@ h2 { font-family: var(--font-body); font-size: 14px; font-weight: normal; line-h
 .recipient .name { font-family: var(--font-body); font-size: 16px; line-height: 1.4; margin-bottom: 4px; }
 .document-summary { background: #f3f3f3; }
 .document-title { background: var(--table-header-background); color: #fff; padding: 10px 12px; }
+.document-title-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.document-title-row h2 { min-width: 0; }
 .document-title h2 { font-family: var(--font-bold); font-size: 18px; font-weight: normal; line-height: 1.4; margin: 0; overflow-wrap: anywhere; }
 .document-title p { font-size: 14px; line-height: 1.4; margin-top: 3px; }
-.document-title .payment-status { font-family: var(--font-label); font-size: 12px; line-height: 1.25; letter-spacing: .05em; text-transform: uppercase; }
+.document-title .payment-status { flex: 0 0 auto; font-family: var(--font-label); font-size: 12px; line-height: 1.25; letter-spacing: .05em; text-transform: uppercase; margin-top: 0; }
 .summary-row { display: flex; justify-content: space-between; gap: 16px; padding: 7px 12px; }
 .summary-row span:last-child { text-align: right; overflow-wrap: anywhere; min-width: 0; }
 .document-summary .summary-row { font-size: 14px; line-height: 1.4; }
@@ -342,7 +344,7 @@ ${detail(payload.businessAddress)}${detail(payload.businessPhone)}${detail(paylo
 <section class="recipient"><h2>Recipient</h2>${payload.customerName.trim() ? `<p class="name">${escapeHtml(payload.customerName.trim())}</p>` : ""}
 ${detail(payload.serviceAddress)}${detail(payload.customerPhone)}${detail(payload.customerEmail)}</section>
 </div><section class="document-summary" aria-label="Document summary">
-<div class="document-title"><h2>${escapeHtml(title)}</h2>${payload.documentNumber == null ? "<p>Number assigned on creation</p>" : ""}${!estimate ? `<p class="payment-status">${paid ? "Paid" : "Unpaid"}</p>` : ""}</div>
+<div class="document-title"><div class="document-title-row"><h2>${escapeHtml(title)}</h2>${!estimate ? `<p class="payment-status">${paid ? "Paid" : "Unpaid"}</p>` : ""}</div>${payload.documentNumber == null ? "<p>Number assigned on creation</p>" : ""}</div>
 ${row("Issued", formatDate(payload.issueDate))}
 ${estimate ? (payload.validUntil ? row("Valid until", formatDate(payload.validUntil)) : "") : payload.dueDate ? row("Due", formatDate(payload.dueDate)) : ""}
 ${!estimate && payload.paymentTerms ? row("Terms", PAYMENT_TERMS_LABEL[payload.paymentTerms]) : ""}
