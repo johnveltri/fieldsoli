@@ -248,7 +248,6 @@ export const InvoicingJobControls = forwardRef<
   const [pendingControls, setPendingControls] = useState<Record<string, { archived: boolean; linkEnabled: boolean }>>({});
   const [revenueDocumentDraft, setRevenueDocumentDraft] = useState<string | null>(null);
   const [finalization, setFinalization] = useState<FinalizationReview | null>(null);
-  const [finalizationVisible, setFinalizationVisible] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState<DocumentPreview | null>(null);
@@ -705,14 +704,19 @@ export const InvoicingJobControls = forwardRef<
       });
       setRevenueDocumentDraft(selected?.id ?? null);
       setFinalization({ status, selected, preview: nextPreview });
-      setFinalizationVisible(true);
+      previewRequestRef.current += 1;
+      setSaved(selected);
+      setPreview(nextPreview);
+      setPreviewType('invoice');
+      setShareOpen(false);
+      setPreviewOpen(true);
     } catch {
       Alert.alert('Could not review this invoice. Try again.');
       onFinalizationClosed?.();
     } finally {
       setBusy(null);
     }
-  }, [client, jobId, onFinalizationClosed]);
+  }, [client, jobId, onFinalizationClosed, setPreviewOpen]);
 
   const openBusinessSettings = useCallback((returnTo: NonNullable<typeof businessReturnRef.current>) => {
     businessReturnRef.current = returnTo;
@@ -748,7 +752,7 @@ export const InvoicingJobControls = forwardRef<
         confirmedPaidTotalCents: finalization.status === 'paid' ? totalCents : null,
       });
       setRequestKey(null);
-      setFinalizationVisible(false);
+      setPreviewOpen(false);
       setFinalization(null);
       await reload();
       onFinalized?.(finalization.status);
@@ -767,7 +771,16 @@ export const InvoicingJobControls = forwardRef<
     } finally {
       setBusy(null);
     }
-  }, [client, finalization, jobId, onFinalized, openFinalization, reload, requestKey]);
+  }, [client, finalization, jobId, onFinalized, openFinalization, reload, requestKey, setPreviewOpen]);
+
+  const closeInvoicePreview = () => {
+    if (busy) return;
+    setPreviewOpen(false);
+    if (finalization) {
+      setFinalization(null);
+      onFinalizationClosed?.();
+    }
+  };
 
   const getPendingPreferences = useCallback(() => {
     const initialRevenueId = documents.find((doc) => doc.isRevenueSource)?.id ?? null;
@@ -994,7 +1007,7 @@ export const InvoicingJobControls = forwardRef<
         onDismiss={() => {
           if (Platform.OS === 'ios') void performQueuedHandoff();
         }}
-        onRequestClose={() => setPreviewOpen(false)}
+        onRequestClose={closeInvoicePreview}
       >
         <Animated.View
           style={[
@@ -1008,7 +1021,7 @@ export const InvoicingJobControls = forwardRef<
           <View style={[columnStyle, styles.previewCloseHeader]}>
             <PlatformHeaderAction
               accessibilityLabel="Close preview"
-              onPress={() => setPreviewOpen(false)}
+              onPress={closeInvoicePreview}
               useFloatingChrome={false}
               style={styles.previewCloseButton}
             >
@@ -1020,7 +1033,7 @@ export const InvoicingJobControls = forwardRef<
             style={styles.previewScroll}
             contentContainerStyle={styles.previewContent}
           >
-            {!saved ? (
+            {!saved && !finalization ? (
               <View style={[columnStyle, styles.previewBar]}>
                 <SegmentedControl
                   accessibilityLabel="Document type"
@@ -1049,7 +1062,7 @@ export const InvoicingJobControls = forwardRef<
               <View style={[columnStyle, styles.gapWrap]}>
                 <View style={styles.gapCard}>
                   <Text style={typography.bodyBold}>
-                    Complete these details before sharing:
+                    {finalization ? 'Complete these details before finishing:' : 'Complete these details before sharing:'}
                   </Text>
                   {gapLabels(preview.gaps).map((label) => (
                     <Text key={label} style={typography.body}>
@@ -1060,7 +1073,9 @@ export const InvoicingJobControls = forwardRef<
                     <Pressable
                       accessibilityRole="button"
                       style={styles.textAction}
-                      onPress={() => openBusinessSettings({ kind: 'preview' })}
+                      onPress={() => openBusinessSettings(finalization
+                        ? { kind: 'finalization', status: finalization.status }
+                        : { kind: 'preview' })}
                     >
                       <Text style={[typography.bodyBold, styles.accent]}>
                         Edit business info
@@ -1072,7 +1087,7 @@ export const InvoicingJobControls = forwardRef<
                       accessibilityRole="button"
                       style={styles.textAction}
                       onPress={() => {
-                        setPreviewOpen(false);
+                        closeInvoicePreview();
                         onEditDetails();
                       }}
                     >
@@ -1127,7 +1142,7 @@ export const InvoicingJobControls = forwardRef<
               </View>
             </View>
           </ScrollView>
-          {!saved && preview && preview.gaps.length === 0 ? (
+          {!finalization && !saved && preview && preview.gaps.length === 0 ? (
             <View pointerEvents="box-none" style={styles.fabOverlay}>
               <FullWidthFab
                 typography={typography}
@@ -1144,7 +1159,7 @@ export const InvoicingJobControls = forwardRef<
               />
             </View>
           ) : null}
-          {saved ? (
+          {!finalization && saved ? (
             <View pointerEvents="box-none" style={styles.fabOverlay}>
               <FullWidthFab
                 typography={typography}
@@ -1154,6 +1169,25 @@ export const InvoicingJobControls = forwardRef<
                     : 'SHARE INVOICE'
                 }
                 onPress={openShareSheet}
+                includeSafeArea
+              />
+            </View>
+          ) : null}
+          {finalization && (finalization.selected || finalization.preview?.gaps.length === 0) ? (
+            <View pointerEvents="box-none" style={styles.fabOverlay}>
+              <FullWidthFab
+                typography={typography}
+                label={busy === 'Saving…'
+                  ? 'SAVING…'
+                  : finalization.status === 'paid'
+                    ? finalization.selected
+                      ? `CONFIRM ${formatUsdCombined(finalization.selected.payload.totalCents)} PAID`
+                      : 'CREATE INVOICE & MARK PAID'
+                    : finalization.selected
+                      ? 'COMPLETE JOB'
+                      : 'CREATE INVOICE & COMPLETE JOB'}
+                onPress={() => void confirmFinalization()}
+                disabled={!!busy}
                 includeSafeArea
               />
             </View>
@@ -1272,93 +1306,6 @@ export const InvoicingJobControls = forwardRef<
           </Modal>
         </Animated.View>
       </Modal>
-      <BottomSheetShell
-        visible={finalizationVisible}
-        onClose={() => setFinalizationVisible(false)}
-        onClosed={() => {
-          setFinalization(null);
-          onFinalizationClosed?.();
-        }}
-        accessibilityTitle="Review invoice before finishing job"
-      >
-        {finalization ? (
-          <View style={styles.finalizationSheet}>
-            <Text accessibilityRole="header" style={[typography.titleH3, styles.shareTitle]}>
-              Review Invoice
-            </Text>
-            <Text style={[typography.body, styles.secondary, styles.finalizationDocumentName]}>
-              {finalization.selected
-                ? documentNumberLabel(finalization.selected.documentType, finalization.selected.documentNumber)
-                : 'New Invoice'}
-            </Text>
-            {!finalization.selected && (finalization.preview?.gaps.length ?? 0) > 0 ? (
-              <View style={styles.message}>
-                <Text style={[typography.body, styles.secondary]}>Complete these details before finishing:</Text>
-                {gapLabels(finalization.preview?.gaps ?? []).map((label) => (
-                  <Text key={label} style={[typography.body, styles.secondary]}>{label}</Text>
-                ))}
-                {finalization.preview?.gaps.includes('business_name') ? (
-                  <Pressable accessibilityRole="button" onPress={() => openBusinessSettings({
-                    kind: 'finalization',
-                    status: finalization.status,
-                  })}>
-                    <Text style={[typography.bodyBold, styles.accent]}>Edit business info</Text>
-                  </Pressable>
-                ) : null}
-                {finalization.preview?.gaps.some((gap) => gap !== 'business_name') ? (
-                  <Pressable accessibilityRole="button" onPress={() => {
-                    setFinalizationVisible(false);
-                    onEditDetails();
-                  }}>
-                    <Text style={[typography.bodyBold, styles.accent]}>Edit Job details</Text>
-                  </Pressable>
-                ) : null}
-              </View>
-            ) : (
-              <View style={styles.finalizationTotals}>
-                <View style={styles.finalizationRow}>
-                  <Text style={[typography.body, styles.secondary]}>Subtotal</Text>
-                  <Text style={[typography.body, styles.secondary]}>
-                    {formatUsdCombined(finalization.selected?.payload.subtotalCents ?? finalization.preview?.payload.subtotalCents ?? 0)}
-                  </Text>
-                </View>
-                <View style={styles.finalizationRow}>
-                  <Text style={[typography.body, styles.secondary]}>Tax</Text>
-                  <Text style={[typography.body, styles.secondary]}>
-                    {formatUsdCombined(finalization.selected?.payload.taxCents ?? finalization.preview?.payload.taxCents ?? 0)}
-                  </Text>
-                </View>
-                <View style={[styles.finalizationRow, styles.finalizationTotal]}>
-                  <Text style={[typography.bodyBold, { color: fg.primary }]}>Total</Text>
-                  <Text style={[typography.bodyBold, { color: fg.primary }]}>
-                    {formatUsdCombined(finalization.selected?.payload.totalCents ?? finalization.preview?.payload.totalCents ?? 0)}
-                  </Text>
-                </View>
-                <Text style={[typography.bodySmall, styles.secondary]}>
-                  {finalization.status === 'paid'
-                    ? 'Confirm the invoice total paid to finish this Job.'
-                    : 'Creating the invoice does not share it with your customer.'}
-                </Text>
-              </View>
-            )}
-            {!finalization.selected && (finalization.preview?.gaps.length ?? 0) > 0 ? null : (
-              <FullWidthFab
-                typography={typography}
-                label={busy === 'Saving…'
-                  ? 'SAVING…'
-                  : finalization.status === 'paid'
-                    ? `CONFIRM ${formatUsdCombined(finalization.selected?.payload.totalCents ?? finalization.preview?.payload.totalCents ?? 0)} PAID`
-                    : finalization.selected
-                      ? 'COMPLETE JOB'
-                      : 'CREATE INVOICE & COMPLETE JOB'}
-                onPress={() => void confirmFinalization()}
-                disabled={!!busy}
-                includeSafeArea
-              />
-            )}
-          </View>
-        ) : null}
-      </BottomSheetShell>
       <Modal
         visible={businessOpen}
         animationType="slide"
@@ -1483,16 +1430,6 @@ const styles = StyleSheet.create({
   },
   web: { width: '100%', backgroundColor: bg.surfaceWhite },
   sheet: { paddingVertical: space('Spacing/20'), gap: space('Spacing/12') },
-  finalizationSheet: { width: '100%', gap: space('Spacing/16') },
-  finalizationDocumentName: { textAlign: 'center' },
-  finalizationTotals: {
-    backgroundColor: bg.surfaceWhite,
-    borderRadius: radius('Radius/12'),
-    padding: space('Spacing/16'),
-    gap: space('Spacing/8'),
-  },
-  finalizationRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  finalizationTotal: { borderTopWidth: 1, borderTopColor: border.subtle, paddingTop: space('Spacing/8') },
   shareTitle: { alignSelf: 'stretch', textAlign: 'center' },
   shortcuts: {
     flexDirection: 'row',

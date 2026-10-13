@@ -279,6 +279,10 @@ describe('InvoicingJobControls', () => {
 
     await act(async () => { ref.current?.openFinalization('paid'); });
     expect(mockPreview).not.toHaveBeenCalled();
+    expect(await screen.findByTestId('document-preview-html')).toBeTruthy();
+    expect(screen.queryByText('Review Invoice')).toBeNull();
+    expect(screen.queryByLabelText('Document type')).toBeNull();
+    expect(screen.queryByLabelText('SHARE INVOICE')).toBeNull();
     expect(screen.getAllByText('Invoice #00001').length).toBeGreaterThan(0);
     const confirm = screen.getByRole('button', { name: 'CONFIRM $630.00 PAID' });
     await act(async () => { fireEvent.press(confirm); });
@@ -310,6 +314,9 @@ describe('InvoicingJobControls', () => {
     );
 
     await act(async () => { ref.current?.openFinalization('completed'); });
+    expect(await screen.findByTestId('document-preview-html')).toBeTruthy();
+    expect(screen.queryByText('Review Invoice')).toBeNull();
+    expect(screen.queryByLabelText('Document type')).toBeNull();
     expect(screen.getByRole('button', { name: 'CREATE INVOICE & COMPLETE JOB' })).toBeTruthy();
     await act(async () => {
       fireEvent.press(screen.getByRole('button', { name: 'CREATE INVOICE & COMPLETE JOB' }));
@@ -324,6 +331,28 @@ describe('InvoicingJobControls', () => {
       }),
     );
     expect(onFinalized).toHaveBeenCalledWith('completed');
+  });
+
+  it('cancels Paid review when the existing preview is closed without saving', async () => {
+    mockList.mockResolvedValue([]);
+    mockPreview.mockResolvedValue({
+      payload: { ...payload, documentType: 'invoice', totalCents: 10000 },
+      gaps: [], rendererVersion: 1, fingerprint: 'reviewed-fingerprint',
+    } as DocumentPreview);
+    const onFinalizationClosed = jest.fn();
+    const ref = createRef<InvoicingJobControlsHandle>();
+    const screen = render(
+      <InvoicingJobControls {...props} ref={ref} mode="view" onFinalizationClosed={onFinalizationClosed} />,
+    );
+
+    await act(async () => { ref.current?.openFinalization('paid'); });
+    expect(await screen.findByTestId('document-preview-html')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'CREATE INVOICE & MARK PAID' })).toBeTruthy();
+    fireEvent.press(screen.getByLabelText('Close preview'));
+
+    expect(mockFinalize).not.toHaveBeenCalled();
+    expect(onFinalizationClosed).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(screen.queryByTestId('document-preview-scroll')).toBeNull());
   });
 
   it('does not open an edit preview if saving outstanding edits is cancelled', async () => {
