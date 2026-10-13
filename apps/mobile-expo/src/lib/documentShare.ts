@@ -20,6 +20,20 @@ export function gmailSubject(input: {
   return `${documentNumberLabel(input.type, input.number)} from ${input.businessName}`;
 }
 
+export function mailtoUrl(input: {
+  email: string | null;
+  subject: string;
+  body: string;
+}): string {
+  const recipient = input.email?.trim()
+    ? encodeURIComponent(input.email.trim()).replace(/%40/gi, '@')
+    : '';
+  const params = new URLSearchParams({ subject: input.subject, body: input.body })
+    .toString()
+    .replace(/\+/g, '%20');
+  return `mailto:${recipient}?${params}`;
+}
+
 export function whatsAppUrl(phone: string | null, text: string): string | null {
   const digits = (phone ?? '').replace(/\D/g, '');
   const query = `text=${encodeURIComponent(text)}`;
@@ -39,9 +53,22 @@ export function smsUrl(phone: string | null, body: string): string {
   return `sms:${address}?body=${encodeURIComponent(body)}`;
 }
 
-export function pdfFileName(type: 'estimate' | 'invoice', number: number): string {
+export function pdfFileName(
+  type: 'estimate' | 'invoice',
+  number: number,
+  businessName?: string | null,
+): string {
   const title = type === 'estimate' ? 'Estimate' : 'Invoice';
-  return `${title}-${String(number).padStart(5, '0')}.pdf`;
+  const base = String(number).padStart(5, '0');
+  const safeBusinessName = businessName
+    ?.trim()
+    .replace(/[<>:"/\\|?*\u0000-\u001f]/g, '')
+    .replace(/\s+/g, ' ')
+    .replace(/[. ]+$/g, '')
+    .slice(0, 80);
+  return safeBusinessName
+    ? `${safeBusinessName} - ${title} ${base}.pdf`
+    : `${title}-${base}.pdf`;
 }
 
 export function defaultDocumentType(workStatus: string): 'estimate' | 'invoice' {
