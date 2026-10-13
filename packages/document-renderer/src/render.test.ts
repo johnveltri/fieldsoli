@@ -44,8 +44,10 @@ describe('renderDocument', () => {
     expect(html).not.toContain('<script>');
     expect(html).toContain('Line one\nLine two &amp; café');
     expect(html).toContain('@page { size: letter; margin: 0.5in; }');
-    expect(html).toContain('body { font-size: 11pt; line-height: 1.4; }');
-    expect(html).toContain('h1 { font-size: 20pt; }');
+    expect(html).toContain('body { font-family: var(--font-body); font-size: 14px;');
+    expect(html).toContain('class="document-summary"');
+    expect(html).toContain('Product / Service');
+    expect(html).not.toContain('(pending)');
     expect(html).toContain('max-width: 816px');
   });
 
@@ -55,6 +57,29 @@ describe('renderDocument', () => {
     expect(html).toContain('$627.00');
     expect(html).toContain('Paid');
     expect(html).not.toContain('Amount Due');
+  });
+
+  it('uses the preview layout and all line details for PDF, with desktop print columns', () => {
+    const detailedPayload: DocumentPayload = {
+      ...payload,
+      lines: [
+        { kind: 'materials', label: 'Screen door assembly', amountCents: 29250,
+          details: { quantity: 1, unit: 'ea', unitPriceCents: 29250 } },
+        { kind: 'other', label: 'Disposal', amountCents: 5000, description: 'Haul-away' },
+      ],
+    };
+    const fonts = { body: 'regular', bodyBold: 'medium', label: 'bold', display: 'serif' };
+    const pdf = renderDocument(1, detailedPayload, 'unpaid', fonts, 'pdf');
+    const preview = renderDocumentPreview(1, detailedPayload, 'unpaid', fonts);
+    const body = (html: string) => html.slice(html.indexOf('<article'));
+    expect(body(pdf)).toBe(body(preview).replace('<span class="pending-label"> (pending)</span>', ''));
+    expect(pdf).toContain('Screen door assembly');
+    expect(pdf).toContain('1 ea @ $292.50');
+    expect(pdf).toContain('Haul-away');
+    expect(pdf).toContain('data:font/ttf;base64,regular');
+    expect(pdf).toContain('@media screen, print');
+    expect(pdf).toContain('.page { max-width: none; padding: 0; }');
+    expect(pdf).not.toContain('(pending)');
   });
 
   it('pads document numbers to five digits and escapes independently', () => {

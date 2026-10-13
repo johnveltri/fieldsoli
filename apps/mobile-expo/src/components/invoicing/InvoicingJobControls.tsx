@@ -151,21 +151,18 @@ function htmlFor(record: {
   rendererVersion: number;
   payload: DocumentPreview['payload'];
   paymentProjection: DocumentPreview['paymentProjection'];
-}, presentation: 'document' | 'preview' = 'document', fonts?: PreviewFontData) {
+}, presentation: 'document' | 'preview' | 'pdf' = 'document', fonts?: PreviewFontData) {
   if (record.rendererVersion !== RENDERER_VERSION)
     return unsupportedRendererHtml();
-  const payload =
-    presentation === 'preview'
-      ? {
-          ...record.payload,
-          businessPhone:
-            formatCustomerPhoneDisplay(record.payload.businessPhone) ??
-            record.payload.businessPhone,
-          customerPhone:
-            formatCustomerPhoneDisplay(record.payload.customerPhone) ??
-            record.payload.customerPhone,
-        }
-      : record.payload;
+  const payload = {
+    ...record.payload,
+    businessPhone:
+      formatCustomerPhoneDisplay(record.payload.businessPhone) ??
+      record.payload.businessPhone,
+    customerPhone:
+      formatCustomerPhoneDisplay(record.payload.customerPhone) ??
+      record.payload.customerPhone,
+  };
   if (presentation === 'preview') {
     return renderDocumentPreview(
       record.rendererVersion,
@@ -174,7 +171,13 @@ function htmlFor(record: {
       fonts,
     );
   }
-  return renderDocument(record.rendererVersion, payload, record.paymentProjection);
+  return renderDocument(
+    record.rendererVersion,
+    payload,
+    record.paymentProjection,
+    fonts,
+    presentation,
+  );
 }
 
 const REPORT_PREVIEW_HEIGHT = `
@@ -558,7 +561,7 @@ export const InvoicingJobControls = forwardRef<
           return;
         }
         const generated = await Print.printToFileAsync({
-          html: htmlFor(active),
+          html: htmlFor(active, 'pdf', await loadPreviewFontData()),
           margins: { top: 36, right: 36, bottom: 36, left: 36 },
         });
         const filename = pdfFileName(
