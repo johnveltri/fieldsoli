@@ -117,145 +117,33 @@ function lineRow(line: DocumentLine): string {
   return `<tr><td>${escapeHtml(line.label)}${details}</td><td class="${amountClass}">${escapeHtml(formatUsd(line.amountCents))}</td></tr>`;
 }
 
-function textBlock(label: string, value: string | null | undefined): string {
-  const trimmed = value?.trim() ?? '';
-  if (!trimmed) return '';
-  return `<p class="meta"><span>${escapeHtml(label)}</span> ${escapeHtml(trimmed)}</p>`;
-}
-
-const CSS = `
-:root { color-scheme: light; }
-* { box-sizing: border-box; }
-html, body { margin: 0; padding: 0; background: #fff; color: #000; }
-body { font-family: Georgia, "Times New Roman", serif; font-size: 16px; line-height: 1.45; }
-.page { max-width: 816px; margin: 0 auto; padding: 24px 20px 48px; }
-h1, h2, p { margin: 0; }
-h1 { font-size: 28px; line-height: 1.2; font-weight: 700; }
-h2 { font-size: 20px; line-height: 1.3; margin-top: 28px; }
-.kicker { letter-spacing: 0.04em; text-transform: uppercase; font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
-.identity, .customer, .summary { margin-top: 20px; }
-.meta { margin-top: 4px; }
-.meta span { font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
-.summary p { white-space: pre-wrap; margin-top: 8px; }
-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-th, td { text-align: left; vertical-align: top; padding: 8px 0; border-bottom: 1px solid #000; }
-th { font-family: ui-monospace, Menlo, monospace; font-size: 12px; font-weight: 600; }
-.line-details { color: #6F6A65; font-size: 12px; line-height: 1.35; margin-top: 2px; }
-td.amount, th.amount { text-align: right; white-space: nowrap; }
-td.amount.with-details { vertical-align: middle; }
-.totals { margin-top: 12px; }
-.totals div { display: flex; justify-content: space-between; gap: 16px; padding: 6px 0; }
-.totals .final { border-top: 2px solid #000; font-weight: 700; margin-top: 4px; padding-top: 10px; }
-.badge { display: inline-block; border: 1px solid #000; padding: 2px 8px; font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
-@media print {
-  .page { max-width: none; padding: 0; }
-  thead { display: table-header-group; }
-  tr, .totals .final { break-inside: avoid; }
-  @page { size: letter; margin: 0.5in; }
-}
-`.trim();
-
+/** Saved web documents and PDF exports use the same layout as the preview. */
 export function renderDocument(
   version: number,
   payload: DocumentPayload,
   paymentProjection: PaymentProjection,
+  fonts?: PreviewFontData,
+  presentation: 'document' | 'pdf' = 'document',
 ): string {
-  if (version !== RENDERER_VERSION) {
-    throw new Error('unsupported_renderer_version');
-  }
-  const typeLabel = payload.documentType === 'estimate' ? 'Estimate' : 'Invoice';
-  const numberLabel = `${typeLabel} #${formatDocumentNumber(payload.documentNumber)}`;
-  const paid = payload.documentType === 'invoice' && paymentProjection === 'paid';
-  const finalLabel =
-    payload.documentType === 'estimate' ? 'Total' : paid ? 'Total' : 'Amount Due';
-  const status =
-    payload.documentType === 'invoice'
-      ? `<p class="badge">${paid ? 'Paid' : 'Unpaid'}</p>`
-      : '';
-  const lines = payload.lines
-    .map(lineRow)
-    .join('');
-  const identity = [
-    textBlock('Address', payload.businessAddress),
-    textBlock('Phone', payload.businessPhone),
-    textBlock('Email', payload.businessEmail),
-    textBlock('Website', payload.businessWebsite),
-    textBlock('License', payload.businessLicense),
-  ].join('');
-  const customer = [
-    payload.customerName.trim()
-      ? `<p>${escapeHtml(payload.customerName.trim())}</p>`
-      : '',
-    textBlock('Phone', payload.customerPhone),
-    textBlock('Email', payload.customerEmail),
-    textBlock('Service address', payload.serviceAddress),
-  ].join('');
-  const longDescription = payload.longDescription?.trim()
-    ? `<p>${escapeHtml(payload.longDescription)}</p>`
-    : '';
-  const dateRow =
-    payload.documentType === 'estimate'
-      ? `<div><span>Estimate date</span><span>${escapeHtml(formatDate(payload.issueDate))}</span></div>${
-          payload.validUntil
-            ? `<div><span>Valid until</span><span>${escapeHtml(formatDate(payload.validUntil))}</span></div>`
-            : ''
-        }`
-      : `<div><span>Invoice date</span><span>${escapeHtml(formatDate(payload.issueDate))}</span></div>${
-          payload.dueDate
-            ? `<div><span>Due date</span><span>${escapeHtml(formatDate(payload.dueDate))}</span></div>`
-            : ''
-        }${
-          payload.paymentTerms
-            ? `<div><span>Payment terms</span><span>${escapeHtml(PAYMENT_TERMS_LABEL[payload.paymentTerms])}</span></div>`
-            : ''
-        }`;
-
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>${escapeHtml(numberLabel)}</title>
-<style>${CSS}</style>
-</head>
-<body>
-<article class="page">
-<p class="kicker">${escapeHtml(typeLabel)}</p>
-<h1>${escapeHtml(payload.documentNumber == null ? typeLabel : numberLabel)}</h1>
-${status}
-<section class="identity">
-<h2>${escapeHtml(payload.businessName.trim() || 'Business')}</h2>
-${identity}
-</section>
-<section class="customer">
-<h2>Customer</h2>
-${customer}
-</section>
-<section class="summary">
-<h2>${escapeHtml(payload.shortDescription)}</h2>
-${longDescription}
-</section>
-<table>
-<thead><tr><th>Description</th><th class="amount">Amount</th></tr></thead>
-<tbody>${lines}</tbody>
-</table>
-<section class="totals">
-${dateRow}
-<div><span>Subtotal</span><span>${escapeHtml(formatUsd(payload.subtotalCents))}</span></div>
-<div><span>Tax</span><span>${escapeHtml(formatUsd(payload.taxCents))}</span></div>
-<div class="final"><span>${escapeHtml(finalLabel)}</span><span>${escapeHtml(formatUsd(payload.totalCents))}</span></div>
-</section>
-</article>
-</body>
-</html>`;
+  return renderDocumentLayout(version, payload, paymentProjection, fonts, presentation);
 }
 
-/** Presentation used only by the in-app WebView; saved document rendering stays versioned. */
+/** The in-app preview may display a document number reserved for creation. */
 export function renderDocumentPreview(
   version: number,
   payload: DocumentPayload,
   paymentProjection: PaymentProjection,
   fonts?: PreviewFontData,
+): string {
+  return renderDocumentLayout(version, payload, paymentProjection, fonts, 'preview');
+}
+
+function renderDocumentLayout(
+  version: number,
+  payload: DocumentPayload,
+  paymentProjection: PaymentProjection,
+  fonts: PreviewFontData | undefined,
+  presentation: 'preview' | 'document' | 'pdf',
 ): string {
   if (version !== RENDERER_VERSION)
     throw new Error("unsupported_renderer_version");
@@ -328,6 +216,7 @@ td.amount.with-details { vertical-align: middle; }
 .notes p { white-space: pre-wrap; }
 .totals { width: 100%; }
 .totals .summary-row { padding: 8px 10px; border-bottom: 1px solid #e5e5e5; }
+.totals .summary-row:nth-last-child(2) { border-bottom: 0; }
 .totals .final { font-family: var(--font-bold); font-size: 18px; line-height: 1.4; border-top: 2px solid #333; border-bottom: 0; margin-top: 3px; padding-top: 12px; }
 @media (max-width: 540px) {
   .page { padding: 22px 18px 150px; }
@@ -337,6 +226,18 @@ td.amount.with-details { vertical-align: middle; }
   .footer { flex-direction: column; gap: 24px; }
   .notes, .totals { width: 100%; }
 }
+@page { size: letter; margin: 0.5in; }
+@media ${presentation === 'pdf' ? 'screen, print' : 'print'} {
+  html, body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .page { max-width: none; padding: 0; }
+  .header { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; }
+  .recipient { margin-top: 24px; }
+  .footer { flex-direction: row; gap: 24px; }
+  .notes, .totals { flex: 1; width: auto; }
+  thead { display: table-header-group; }
+  tr, .document-summary, .totals, .business, .recipient { break-inside: avoid; }
+  .services h2, .notes h2 { break-after: avoid; }
+}
 </style></head><body><article class="page">
 <header class="header"><div>
 <section class="business"><h1>${escapeHtml(payload.businessName.trim() || "Business")}</h1>
@@ -345,7 +246,7 @@ ${detail(payload.businessAddress)}${detail(payload.businessPhone)}${detail(paylo
 <section class="recipient"><h2>Recipient</h2>${payload.customerName.trim() ? `<p class="name">${escapeHtml(payload.customerName.trim())}</p>` : ""}
 ${detail(payload.serviceAddress)}${detail(payload.customerPhone)}${detail(payload.customerEmail)}</section>
 </div><section class="document-summary" aria-label="Document summary">
-<div class="document-title"><div class="document-title-row"><h2>${escapeHtml(title)}${payload.documentNumber == null ? "" : '<span class="pending-label"> (pending)</span>'}</h2></div>${!estimate ? `<p class="payment-status">${paid ? "Paid" : "Unpaid"}</p>` : ""}</div>
+<div class="document-title"><div class="document-title-row"><h2>${escapeHtml(title)}${presentation !== "preview" || payload.documentNumber == null ? "" : '<span class="pending-label"> (pending)</span>'}</h2></div>${!estimate ? `<p class="payment-status">${paid ? "Paid" : "Unpaid"}</p>` : ""}</div>
 ${row("Issued", formatDate(payload.issueDate))}
 ${estimate ? (payload.validUntil ? row("Valid until", formatDate(payload.validUntil)) : "") : payload.dueDate ? row("Due", formatDate(payload.dueDate)) : ""}
 ${!estimate && payload.paymentTerms ? row("Terms", PAYMENT_TERMS_LABEL[payload.paymentTerms]) : ""}

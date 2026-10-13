@@ -5,6 +5,7 @@ import {
   documentLinkText,
   gapLabels,
   gmailSubject,
+  mailtoUrl,
   pdfFileName,
   whatsAppUrl,
 } from './documentShare';
@@ -23,6 +24,19 @@ describe('documentShare', () => {
       'Invoice #00012 from North',
     );
     expect(pdfFileName('invoice', 1)).toBe('Invoice-00001.pdf');
+    expect(pdfFileName('invoice', 1, 'Best Business / LLC')).toBe(
+      'Best Business LLC - Invoice 00001.pdf',
+    );
+    expect(mailtoUrl({
+      email: 'blake@example.com',
+      subject: 'Invoice #00001',
+      body: 'Here is your invoice',
+    })).toBe('mailto:blake@example.com?subject=Invoice%20%2300001&body=Here%20is%20your%20invoice');
+    expect(mailtoUrl({
+      email: null,
+      subject: 'Estimate #00002',
+      body: 'Review this estimate',
+    })).toBe('mailto:?subject=Estimate%20%2300002&body=Review%20this%20estimate');
   });
 
   it('defaults completed work to Invoice and leaves a WhatsApp link without a short phone', () => {

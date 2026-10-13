@@ -81,16 +81,19 @@ const props = {
   typography,
   onEditDetails: jest.fn(),
 };
-const timing = Animated.timing;
-
 describe('InvoicingJobControls', () => {
   afterEach(() => jest.restoreAllMocks());
   beforeEach(() => {
     jest.clearAllMocks();
-    // Jest has no native animation host to send the completion callback.
-    jest.spyOn(Animated, 'timing').mockImplementation((value, config) =>
-      timing(value, { ...config, useNativeDriver: false }),
-    );
+    // Complete animations synchronously; Jest has no native animation host.
+    jest.spyOn(Animated, 'timing').mockImplementation((value, config) => ({
+      start: (callback) => {
+        if (typeof config.toValue === 'number') value.setValue(config.toValue);
+        callback?.({ finished: true });
+      },
+      stop: jest.fn(),
+      reset: jest.fn(),
+    }) as unknown as Animated.CompositeAnimation);
     mockList.mockResolvedValue([doc]);
     mockPreview.mockResolvedValue({
       payload,
@@ -251,5 +254,38 @@ describe('InvoicingJobControls', () => {
     });
     expect(mockPreview).not.toHaveBeenCalled();
     expect(screen.queryByRole('button', { name: 'Estimate' })).toBeNull();
+  });
+
+  it('uses compact Text, Email, and Share shortcuts with formatted customer details', async () => {
+    const shareableDoc = {
+      ...doc,
+      payload: {
+        ...payload,
+        customerPhone: '3125550198',
+        customerEmail: 'customer@example.com',
+      },
+    } as FinancialDocumentRecord;
+    mockList.mockResolvedValue([shareableDoc]);
+    const screen = render(<InvoicingJobControls {...props} mode="edit" />);
+
+    fireEvent.press(await screen.findByLabelText('Preview Estimate #00001'));
+    fireEvent.press(await screen.findByLabelText('SHARE ESTIMATE'));
+
+    expect(await screen.findByRole('button', { name: 'Text Customer' })).toBeTruthy();
+    const shareTitle = screen.getByRole('header', { name: 'Share Estimate' });
+    expect(StyleSheet.flatten(shareTitle.props.style)).toMatchObject({
+      ...typography.titleH3,
+      textAlign: 'center',
+    });
+    expect(screen.queryByLabelText('Back to preview')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Email Customer' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Share document' })).toBeTruthy();
+    expect(screen.getByText('Customer · (312) 555-0198 · customer@example.com')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Copy link' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Open in browser' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Download PDF' })).toBeTruthy();
+    fireEvent.press(screen.getByRole('button', { name: 'Copy link' }));
+    expect(await screen.findByRole('button', { name: 'Copied' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Share document' })).toBeTruthy();
   });
 });
