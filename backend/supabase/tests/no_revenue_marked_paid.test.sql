@@ -19,7 +19,8 @@ begin
     no_revenue_confirmed_at,
     materials_reviewed_at,
     other_costs_reviewed_at,
-    job_work_status
+    job_work_status,
+    revenue_invoice_required
   )
   values (
     owner_id,
@@ -28,7 +29,8 @@ begin
     now(),
     now(),
     now(),
-    'completed'
+    'completed',
+    false
   )
   returning id into job_id;
 

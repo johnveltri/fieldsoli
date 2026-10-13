@@ -17,6 +17,8 @@ const mockList =
 const mockPreview = jest.fn<(...args: unknown[]) => Promise<DocumentPreview>>();
 const mockSetControls =
   jest.fn<(...args: unknown[]) => Promise<FinancialDocumentRecord>>();
+const mockFinalize =
+  jest.fn<(...args: unknown[]) => Promise<FinancialDocumentRecord>>();
 
 jest.mock('@fieldsolo/api-client', () => ({
   ...jest.requireActual<object>('@fieldsolo/api-client'),
@@ -24,6 +26,7 @@ jest.mock('@fieldsolo/api-client', () => ({
   previewFinancialDocument: (...args: unknown[]) => mockPreview(...args),
   setFinancialDocumentControls: (...args: unknown[]) =>
     mockSetControls(...args),
+  finalizeJobWithInvoice: (...args: unknown[]) => mockFinalize(...args),
 }));
 jest.mock('react-native-webview', () => ({
   WebView: require('react-native').View,
@@ -95,6 +98,7 @@ describe('InvoicingJobControls', () => {
       reset: jest.fn(),
     }) as unknown as Animated.CompositeAnimation);
     mockList.mockResolvedValue([doc]);
+    mockFinalize.mockResolvedValue(doc);
     mockPreview.mockResolvedValue({
       payload,
       gaps: ['labor'],
@@ -102,7 +106,7 @@ describe('InvoicingJobControls', () => {
     } as DocumentPreview);
   });
 
-  it('opens Docs editing from View and omits archived documents', async () => {
+  it('opens the saved preview from View and omits archived documents', async () => {
     mockList.mockResolvedValue([
       doc,
       { ...doc, id: 'doc-2', documentNumber: 2, archived: true },
@@ -115,47 +119,65 @@ describe('InvoicingJobControls', () => {
         onManageDocs={onManageDocs}
       />,
     );
-    fireEvent.press(await screen.findByLabelText('Edit Estimate #00001'));
-    expect(onManageDocs).toHaveBeenCalledTimes(1);
+    fireEvent.press(await screen.findByLabelText(/^Preview Estimate #00001,/));
+    expect(onManageDocs).not.toHaveBeenCalled();
+    expect(await screen.findByLabelText('SHARE ESTIMATE')).toBeTruthy();
     expect(screen.queryByText('Estimate #00002')).toBeNull();
     expect(mockPreview).not.toHaveBeenCalled();
   });
 
-  it('keeps document controls disabled while a revision update is pending', async () => {
-    let resolveUpdate!: (value: FinancialDocumentRecord) => void;
-    mockSetControls.mockImplementationOnce(
-      () =>
-        new Promise((resolve) => {
-          resolveUpdate = resolve;
-        }),
+  it('stages archive and link changes until the Job Edit Done action saves them', async () => {
+    const ref = createRef<InvoicingJobControlsHandle>();
+    mockSetControls.mockResolvedValue({ ...doc, archived: true, linkEnabled: false });
+    const screen = render(
+      <InvoicingJobControls {...props} ref={ref} mode="edit" />,
     );
-    const screen = render(<InvoicingJobControls {...props} mode="edit" />);
-    const sharedLink = await screen.findByRole('switch', {
-      name: 'Shared link',
+    const archive = await screen.findByRole('checkbox', {
+      name: 'Archive & Disable Link',
     });
-    fireEvent(sharedLink, 'valueChange', false);
-    await waitFor(() =>
-      expect(
-        screen.getByRole('switch', { name: 'Archived' }).props.disabled,
-      ).toBe(true),
-    );
-    expect(mockSetControls).toHaveBeenCalledWith(
-      {},
-      {
+    const preview = screen.getByRole('button', { name: 'Preview and Share' });
+    expect(preview.props.disabled).not.toBe(true);
+    fireEvent.press(archive);
+
+    expect(screen.getByRole('checkbox', { name: 'Archive & Disable Link' }).props.accessibilityState)
+      .toMatchObject({ checked: true });
+    expect(
+      screen.getByRole('button', { name: 'Un-Archive to Preview' }).props.accessibilityState,
+    ).toMatchObject({ disabled: true });
+    expect(screen.queryByText('Saving document settings…')).toBeNull();
+    expect(mockSetControls).not.toHaveBeenCalled();
+
+    let pending: ReturnType<InvoicingJobControlsHandle['getPendingPreferences']> = null;
+    await act(async () => {
+      pending = ref.current?.getPendingPreferences() ?? null;
+    });
+    expect(pending).toEqual({
+      revenueDocumentId: null,
+      expectedRevenueDocumentId: null,
+      controls: [{
         documentId: 'doc-1',
-        archived: false,
+        archived: true,
         linkEnabled: false,
         expectedRevision: 3,
-      },
-    );
-    await act(async () => {
-      resolveUpdate({ ...doc, linkEnabled: false });
+      }],
+      currentTotalCents: null,
     });
-    await waitFor(() =>
-      expect(
-        screen.getByRole('switch', { name: 'Archived' }).props.disabled,
-      ).toBe(false),
+    expect(mockSetControls).not.toHaveBeenCalled();
+  });
+
+  it('opens the saved preview when the document name and date row is tapped in Job Edit', async () => {
+    const screen = render(
+      <InvoicingJobControls {...props} mode="edit" />,
     );
+
+    fireEvent.press(
+      await screen.findByRole('button', {
+        name: 'Preview Estimate #00001, 2026-10-06',
+      }),
+    );
+
+    expect(await screen.findByLabelText('SHARE ESTIMATE')).toBeTruthy();
+    expect(mockPreview).not.toHaveBeenCalled();
   });
 
   it('opens a preview through the FAB handle and dismisses it before Job editing', async () => {
@@ -169,7 +191,7 @@ describe('InvoicingJobControls', () => {
         onEditDetails={onEditDetails}
       />,
     );
-    await screen.findByLabelText('Edit Estimate #00001');
+    await screen.findByLabelText(/^Preview Estimate #00001,/);
     await act(async () => {
       ref.current?.openPreview();
     });
@@ -183,7 +205,7 @@ describe('InvoicingJobControls', () => {
   it('scrolls the document selector with the height-sized invoice', async () => {
     const ref = createRef<InvoicingJobControlsHandle>();
     const screen = render(<InvoicingJobControls {...props} ref={ref} mode="view" />);
-    await screen.findByLabelText('Edit Estimate #00001');
+    await screen.findByLabelText(/^Preview Estimate #00001,/);
     await act(async () => { ref.current?.openPreview(); });
     const scroll = screen.getByTestId('document-preview-scroll');
     expect(within(scroll).getByRole('button', { name: 'Estimate' })).toBeTruthy();
@@ -202,7 +224,7 @@ describe('InvoicingJobControls', () => {
     const screen = render(
       <InvoicingJobControls {...props} ref={ref} mode="view" />,
     );
-    await screen.findByLabelText('Edit Estimate #00001');
+    await screen.findByLabelText(/^Preview Estimate #00001,/);
     await act(async () => {
       ref.current?.openPreview();
     });
@@ -230,7 +252,7 @@ describe('InvoicingJobControls', () => {
     const screen = render(
       <InvoicingJobControls {...props} ref={ref} mode="view" />,
     );
-    await screen.findByLabelText('Edit Estimate #00001');
+    await screen.findByLabelText(/^Preview Estimate #00001,/);
     await act(async () => {
       ref.current?.openPreview();
     });
@@ -238,6 +260,70 @@ describe('InvoicingJobControls', () => {
     fireEvent.press(await screen.findByText('Business info form'));
     await waitFor(() => expect(mockPreview).toHaveBeenCalledTimes(2));
     expect(props.onEditDetails).not.toHaveBeenCalled();
+  });
+
+  it('reviews the selected invoice without building a new preview and confirms its saved total', async () => {
+    const invoice = {
+      ...doc,
+      documentType: 'invoice',
+      isRevenueSource: true,
+      payload: { ...payload, documentType: 'invoice', subtotalCents: 60000, taxCents: 3000, totalCents: 63000 },
+    } as FinancialDocumentRecord;
+    mockList.mockResolvedValue([invoice]);
+    mockPreview.mockRejectedValue(new Error('should not preview an existing source'));
+    const onFinalized = jest.fn();
+    const ref = createRef<InvoicingJobControlsHandle>();
+    const screen = render(
+      <InvoicingJobControls {...props} ref={ref} mode="view" onFinalized={onFinalized} />,
+    );
+
+    await act(async () => { ref.current?.openFinalization('paid'); });
+    expect(mockPreview).not.toHaveBeenCalled();
+    expect(screen.getAllByText('Invoice #00001').length).toBeGreaterThan(0);
+    const confirm = screen.getByRole('button', { name: 'CONFIRM $630.00 PAID' });
+    await act(async () => { fireEvent.press(confirm); });
+
+    expect(mockFinalize).toHaveBeenCalledWith(
+      {},
+      expect.objectContaining({
+        jobId: 'job-1',
+        status: 'paid',
+        documentId: 'doc-1',
+        confirmedPaidTotalCents: 63000,
+      }),
+    );
+    expect(onFinalized).toHaveBeenCalledWith('paid');
+  });
+
+  it('creates an invoice and completes the Job from the final review without sharing', async () => {
+    mockList.mockResolvedValue([]);
+    mockPreview.mockResolvedValue({
+      payload: { ...payload, documentType: 'invoice', subtotalCents: 10000, taxCents: 0, totalCents: 10000 },
+      gaps: [],
+      rendererVersion: 1,
+      fingerprint: 'reviewed-fingerprint',
+    } as DocumentPreview);
+    const onFinalized = jest.fn();
+    const ref = createRef<InvoicingJobControlsHandle>();
+    const screen = render(
+      <InvoicingJobControls {...props} ref={ref} mode="view" onFinalized={onFinalized} />,
+    );
+
+    await act(async () => { ref.current?.openFinalization('completed'); });
+    expect(screen.getByRole('button', { name: 'CREATE INVOICE & COMPLETE JOB' })).toBeTruthy();
+    await act(async () => {
+      fireEvent.press(screen.getByRole('button', { name: 'CREATE INVOICE & COMPLETE JOB' }));
+    });
+    expect(mockFinalize).toHaveBeenCalledWith(
+      {},
+      expect.objectContaining({
+        jobId: 'job-1',
+        status: 'completed',
+        documentId: null,
+        fingerprint: 'reviewed-fingerprint',
+      }),
+    );
+    expect(onFinalized).toHaveBeenCalledWith('completed');
   });
 
   it('does not open an edit preview if saving outstanding edits is cancelled', async () => {
@@ -248,9 +334,9 @@ describe('InvoicingJobControls', () => {
         beforeOpen={async () => false}
       />,
     );
-    await screen.findByLabelText('Preview Estimate #00001');
+    await screen.findByLabelText('Create Estimate');
     await act(async () => {
-      fireEvent.press(screen.getByLabelText('Generate new document'));
+      fireEvent.press(screen.getByLabelText('Create Estimate'));
     });
     expect(mockPreview).not.toHaveBeenCalled();
     expect(screen.queryByRole('button', { name: 'Estimate' })).toBeNull();
@@ -268,7 +354,7 @@ describe('InvoicingJobControls', () => {
     mockList.mockResolvedValue([shareableDoc]);
     const screen = render(<InvoicingJobControls {...props} mode="edit" />);
 
-    fireEvent.press(await screen.findByLabelText('Preview Estimate #00001'));
+    fireEvent.press(await screen.findByLabelText('Preview and Share'));
     fireEvent.press(await screen.findByLabelText('SHARE ESTIMATE'));
 
     expect(await screen.findByRole('button', { name: 'Text Customer' })).toBeTruthy();
@@ -280,7 +366,7 @@ describe('InvoicingJobControls', () => {
     expect(screen.queryByLabelText('Back to preview')).toBeNull();
     expect(screen.getByRole('button', { name: 'Email Customer' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Share document' })).toBeTruthy();
-    expect(screen.getByText('Customer · (312) 555-0198 · customer@example.com')).toBeTruthy();
+    expect(screen.queryByText('Customer · (312) 555-0198 · customer@example.com')).toBeNull();
     expect(screen.getByRole('button', { name: 'Copy link' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Open in browser' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Download PDF' })).toBeTruthy();

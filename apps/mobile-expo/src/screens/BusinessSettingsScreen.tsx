@@ -360,7 +360,7 @@ export const BusinessSettingsScreen = forwardRef<
                       true,
                     )}
                     <Text style={[typography.bodySmall, styles.hint]}>
-                      Applies to new materials added.
+                      Applies to materials without an explicit markup. Changing it updates job revenue and future documents.
                     </Text>
                     {field(
                       'Tax rate',

@@ -47,6 +47,8 @@ import {
 } from '@expo-google-fonts/ubuntu';
 import {
   createFinancialDocument,
+  createAndSelectFinancialDocument,
+  finalizeJobWithInvoice,
   deviceIanaTimeZone,
   FinancialDocumentError,
   formatCustomerPhoneDisplay,
@@ -65,6 +67,8 @@ import {
   type PreviewFontData,
 } from '@fieldsolo/document-renderer';
 import type { FieldSoloSupabaseClient } from '@fieldsolo/api-client';
+import { EditAddRow, EditConfirmNoneRow, EditIconRow } from '../ds/edit-mode/EditFormRows';
+import { EditSwipeableRow } from '../ds/edit-mode/EditSwipeableRow';
 
 import {
   defaultDocumentType,
@@ -76,6 +80,7 @@ import {
   pdfFileName,
 } from '../../lib/documentShare';
 import { announceAccessibilityMessage } from '../../lib/accessibility';
+import { formatUsdCombined } from '../../lib/formatUsd';
 import {
   bg,
   border,
@@ -89,7 +94,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PlatformHeaderAction } from '../platform/PlatformHeaderAction';
 import { JobDetailIconTopClose } from '../figma-icons/JobDetailScreenIcons';
 import { usePlatformGlass } from '../platform/usePlatformGlass';
-import { ProfileChevronRightIcon } from '../figma-icons/ProfileScreenIcons';
 import {
   BusinessSettingsScreen,
   type BusinessSettingsScreenHandle,
@@ -107,10 +111,13 @@ type Props = {
   workStatus: string;
   typography: TextStyles;
   mode: 'view' | 'edit';
+  active?: boolean;
   onEditDetails: () => void;
   onManageDocs?: () => void;
   /** Saves uncommitted Job edits before opening a preview. Return false to cancel. */
   beforeOpen?: () => Promise<boolean>;
+  onFinalized?: (status: 'completed' | 'paid') => void;
+  onFinalizationClosed?: () => void;
 };
 
 type QueuedHandoff =
@@ -193,7 +200,25 @@ const REPORT_PREVIEW_HEIGHT = `
 true;
 `;
 
-export type InvoicingJobControlsHandle = { openPreview: () => void };
+export type InvoicingJobControlsHandle = {
+  openPreview: () => void;
+  openDocument: (documentId: string) => void;
+  openFinalization: (status: 'completed' | 'paid') => void;
+  getPendingPreferences: () => {
+    revenueDocumentId: string | null;
+    expectedRevenueDocumentId: string | null;
+    confirmedPaidTotalCents?: number | null;
+    controls: Array<{ documentId: string; archived: boolean; linkEnabled: boolean; expectedRevision: number }>;
+    currentTotalCents: number | null;
+  } | null;
+  discardPendingControls: () => void;
+};
+
+type FinalizationReview = {
+  status: 'completed' | 'paid';
+  selected: FinancialDocumentRecord | null;
+  preview: DocumentPreview | null;
+};
 
 export const InvoicingJobControls = forwardRef<
   InvoicingJobControlsHandle,
@@ -205,19 +230,25 @@ export const InvoicingJobControls = forwardRef<
     workStatus,
     typography,
     mode,
+    active: isActive = true,
     onEditDetails,
     onManageDocs = onEditDetails,
     beforeOpen,
+    onFinalized,
+    onFinalizationClosed,
   }: Props,
   ref,
 ) {
   const insets = useSafeAreaInsets();
   const { columnStyle } = useContentColumn();
   const businessScreenRef = useRef<BusinessSettingsScreenHandle>(null);
-  const updatingDocumentRef = useRef<string | null>(null);
   const previewRequestRef = useRef(0);
-  const [updatingDocument, setUpdatingDocument] = useState<string | null>(null);
+  const archivingRef = useRef(false);
   const [documents, setDocuments] = useState<FinancialDocumentRecord[]>([]);
+  const [pendingControls, setPendingControls] = useState<Record<string, { archived: boolean; linkEnabled: boolean }>>({});
+  const [revenueDocumentDraft, setRevenueDocumentDraft] = useState<string | null>(null);
+  const [finalization, setFinalization] = useState<FinalizationReview | null>(null);
+  const [finalizationVisible, setFinalizationVisible] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState<DocumentPreview | null>(null);
@@ -261,6 +292,11 @@ export const InvoicingJobControls = forwardRef<
   const [previewFonts, setPreviewFonts] = useState<PreviewFontData | null>(null);
   const [previewFontsReady, setPreviewFontsReady] = useState(false);
   const [businessOpen, setBusinessOpen] = useState(false);
+  const businessReturnRef = useRef<
+    | { kind: 'preview' }
+    | { kind: 'finalization'; status: 'completed' | 'paid' }
+    | null
+  >(null);
   const [shareOpen, setShareOpen] = useState(false);
   const [shareModalMounted, setShareModalMounted] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
@@ -314,7 +350,9 @@ export const InvoicingJobControls = forwardRef<
     setLoading(true);
     setError(null);
     try {
-      setDocuments(await listFinancialDocuments(client, jobId));
+      const nextDocuments = await listFinancialDocuments(client, jobId);
+      setDocuments(nextDocuments);
+      setRevenueDocumentDraft(nextDocuments.find((doc) => doc.isRevenueSource)?.id ?? null);
       setOffline(false);
     } catch {
       setError('Could not load this document.');
@@ -324,8 +362,8 @@ export const InvoicingJobControls = forwardRef<
   }, [client, jobId]);
 
   useEffect(() => {
-    void reload();
-  }, [reload]);
+    if (isActive) void reload();
+  }, [isActive, reload]);
 
   const openUnsaved = useCallback(async () => {
     if (beforeOpen) {
@@ -391,13 +429,31 @@ export const InvoicingJobControls = forwardRef<
     setRequestKey(key);
     setBusy('Creating…');
     try {
-      const created = await createFinancialDocument(client, {
-        jobId,
-        type: previewType,
-        fingerprint: preview.fingerprint,
-        timezone: deviceIanaTimeZone(),
-        requestKey: key,
-      });
+      let confirmedPaidTotalCents: number | null = null;
+      if (previewType === 'invoice' && workStatus === 'paid') {
+        confirmedPaidTotalCents = await new Promise<number | null>((resolve) => {
+          Alert.alert('Confirm payment', `Confirm ${formatUsdCombined(preview.payload.totalCents)} paid?`, [
+            { text: 'Cancel', style: 'cancel', onPress: () => resolve(null) },
+            { text: 'Confirm', onPress: () => resolve(preview.payload.totalCents) },
+          ]);
+        });
+        if (confirmedPaidTotalCents == null) return;
+      }
+      const created = previewType === 'invoice'
+        ? await createAndSelectFinancialDocument(client, {
+            jobId,
+            fingerprint: preview.fingerprint,
+            timezone: deviceIanaTimeZone(),
+            requestKey: key,
+            confirmedPaidTotalCents,
+          })
+        : await createFinancialDocument(client, {
+            jobId,
+            type: previewType,
+            fingerprint: preview.fingerprint,
+            timezone: deviceIanaTimeZone(),
+            requestKey: key,
+          });
       setSaved(created);
       setRequestKey(null);
       openShareSheet();
@@ -425,7 +481,7 @@ export const InvoicingJobControls = forwardRef<
     } finally {
       setBusy(null);
     }
-  }, [client, jobId, openShareSheet, preview, previewType, reload, requestKey]);
+  }, [client, jobId, openShareSheet, preview, previewType, reload, requestKey, workStatus]);
 
   const active = saved;
   const link = active ? shareDocumentUrl(active.token) : '';
@@ -547,7 +603,7 @@ export const InvoicingJobControls = forwardRef<
   ) => {
     if (!active || handoffRunningRef.current || queuedHandoffRef.current) return;
     if (!active.linkEnabled && kind !== 'pdf') {
-      Alert.alert('Enable the shared link in Docs to share this document.');
+      Alert.alert('Enable the shared link in Documents to share this document.');
       return;
     }
     handoffRunningRef.current = true;
@@ -590,7 +646,7 @@ export const InvoicingJobControls = forwardRef<
   const copyLink = useCallback(async () => {
     if (!active) return;
     if (!active.linkEnabled) {
-      Alert.alert('Enable the shared link in Docs to share this document.');
+      Alert.alert('Enable the shared link in Documents to share this document.');
       return;
     }
     try {
@@ -604,28 +660,132 @@ export const InvoicingJobControls = forwardRef<
     }
   }, [active, link]);
 
-  const updateControls = async (
-    doc: FinancialDocumentRecord,
-    patch: { archived?: boolean; linkEnabled?: boolean },
-  ) => {
-    if (updatingDocumentRef.current) return;
-    updatingDocumentRef.current = doc.id;
-    setUpdatingDocument(doc.id);
+  const archiveDocument = async (doc: FinancialDocumentRecord) => {
+    if (archivingRef.current) return;
+    archivingRef.current = true;
     try {
-      await setFinancialDocumentControls(client, {
+      const updated = await setFinancialDocumentControls(client, {
         documentId: doc.id,
-        archived: patch.archived ?? doc.archived,
-        linkEnabled: patch.linkEnabled ?? doc.linkEnabled,
+        archived: true,
+        linkEnabled: false,
         expectedRevision: doc.controlRevision,
       });
-      await reload();
+      setDocuments((current) => current.map((item) => item.id === doc.id ? updated : item));
     } catch {
-      Alert.alert('Could not update document settings. Try again.');
+      Alert.alert('Could not archive this document. Try again.');
+      void reload();
     } finally {
-      updatingDocumentRef.current = null;
-      setUpdatingDocument(null);
+      archivingRef.current = false;
     }
   };
+
+  const openDocument = useCallback((documentId: string) => {
+    const doc = documents.find((item) => item.id === documentId);
+    if (!doc) {
+      void reload();
+      Alert.alert('Could not load this invoice. Try again.');
+      return;
+    }
+    previewRequestRef.current += 1;
+    setSaved(doc);
+    setPreview(null);
+    setPreviewOpen(true);
+  }, [documents, reload, setPreviewOpen]);
+
+  const openFinalization = useCallback(async (status: 'completed' | 'paid') => {
+    setBusy('Reviewing…');
+    try {
+      const nextDocuments = await listFinancialDocuments(client, jobId);
+      setDocuments(nextDocuments);
+      const selected = nextDocuments.find((doc) => doc.isRevenueSource) ?? null;
+      const nextPreview = selected ? null : await previewFinancialDocument(client, {
+        jobId,
+        type: 'invoice',
+        timezone: deviceIanaTimeZone(),
+      });
+      setRevenueDocumentDraft(selected?.id ?? null);
+      setFinalization({ status, selected, preview: nextPreview });
+      setFinalizationVisible(true);
+    } catch {
+      Alert.alert('Could not review this invoice. Try again.');
+      onFinalizationClosed?.();
+    } finally {
+      setBusy(null);
+    }
+  }, [client, jobId, onFinalizationClosed]);
+
+  const openBusinessSettings = useCallback((returnTo: NonNullable<typeof businessReturnRef.current>) => {
+    businessReturnRef.current = returnTo;
+    setBusinessOpen(true);
+  }, []);
+
+  const closeBusinessSettings = useCallback(() => {
+    setBusinessOpen(false);
+    const returnTo = businessReturnRef.current;
+    businessReturnRef.current = null;
+    if (returnTo?.kind === 'finalization') {
+      void openFinalization(returnTo.status);
+    } else if (returnTo?.kind === 'preview') {
+      void switchType(previewType);
+    }
+  }, [openFinalization, previewType, switchType]);
+
+  const confirmFinalization = useCallback(async () => {
+    if (!finalization) return;
+    const totalCents = finalization.selected?.payload.totalCents ?? finalization.preview?.payload.totalCents;
+    if (totalCents == null || (!finalization.selected && (finalization.preview?.gaps.length ?? 0) > 0)) return;
+    const key = requestKey ?? newRequestKey();
+    setRequestKey(key);
+    setBusy('Saving…');
+    try {
+      await finalizeJobWithInvoice(client, {
+        jobId,
+        status: finalization.status,
+        documentId: finalization.selected?.id ?? null,
+        fingerprint: finalization.selected ? null : finalization.preview?.fingerprint,
+        timezone: deviceIanaTimeZone(),
+        requestKey: key,
+        confirmedPaidTotalCents: finalization.status === 'paid' ? totalCents : null,
+      });
+      setRequestKey(null);
+      setFinalizationVisible(false);
+      setFinalization(null);
+      await reload();
+      onFinalized?.(finalization.status);
+    } catch (error) {
+      if (error instanceof FinancialDocumentError && error.code === 'stale') {
+        Alert.alert('This Job changed. Review the updated invoice before continuing.');
+        void openFinalization(finalization.status);
+      } else if (error instanceof FinancialDocumentError && error.code === 'incomplete') {
+        Alert.alert('Complete the invoice details before finishing this Job.');
+      } else if (error instanceof FinancialDocumentError && error.code === 'confirmation_required') {
+        Alert.alert('The invoice total changed. Review it and confirm the current amount.');
+        void openFinalization(finalization.status);
+      } else {
+        Alert.alert('Could not finish this Job. Try again.');
+      }
+    } finally {
+      setBusy(null);
+    }
+  }, [client, finalization, jobId, onFinalized, openFinalization, reload, requestKey]);
+
+  const getPendingPreferences = useCallback(() => {
+    const initialRevenueId = documents.find((doc) => doc.isRevenueSource)?.id ?? null;
+    const controls = Object.entries(pendingControls).flatMap(([documentId, next]) => {
+      const original = documents.find((doc) => doc.id === documentId);
+      return original ? [{ documentId, ...next, expectedRevision: original.controlRevision }] : [];
+    });
+    if (initialRevenueId === revenueDocumentDraft && controls.length === 0) return null;
+    const selected = documents.find((doc) => doc.id === revenueDocumentDraft) ?? null;
+    const current = documents.find((doc) => doc.id === initialRevenueId) ?? null;
+    return {
+      revenueDocumentId: revenueDocumentDraft,
+      expectedRevenueDocumentId: initialRevenueId,
+      controls,
+      currentTotalCents: current?.payload.totalCents ?? null,
+      ...(selected ? { confirmedPaidTotalCents: selected.payload.totalCents } : {}),
+    };
+  }, [documents, pendingControls, revenueDocumentDraft]);
 
   useImperativeHandle(
     ref,
@@ -633,22 +793,35 @@ export const InvoicingJobControls = forwardRef<
       openPreview: () => {
         void openUnsaved();
       },
+      openDocument,
+      openFinalization: (status) => { void openFinalization(status); },
+      getPendingPreferences,
+      discardPendingControls: () => {
+        setPendingControls({});
+        setRevenueDocumentDraft(documents.find((doc) => doc.isRevenueSource)?.id ?? null);
+      },
     }),
-    [openUnsaved],
+    [documents, getPendingPreferences, openDocument, openFinalization, openUnsaved],
   );
 
+  const editedDocuments = documents.map((doc) => ({ ...doc, ...pendingControls[doc.id] }));
   const visibleDocs =
-    mode === 'view' ? documents.filter((doc) => !doc.archived) : documents;
+    mode === 'view' ? editedDocuments.filter((doc) => !doc.archived) : editedDocuments;
+  const createDocumentLabel = defaultDocumentType(workStatus) === 'invoice'
+    ? 'Create Invoice'
+    : 'Create Estimate';
 
   return (
     <View style={styles.block}>
-      <Text
-        accessibilityRole="header"
-        style={[typography.titleH3, styles.sectionTitle]}
-      >
-        Docs
-      </Text>
-      <View style={styles.card}>
+      {mode === 'view' ? (
+        <Text
+          accessibilityRole="header"
+          style={[typography.titleH3, styles.sectionTitle]}
+        >
+          Documents
+        </Text>
+      ) : null}
+      <View style={[styles.card, mode === 'edit' && styles.editCard]}>
         {loading ? (
           <ActivityIndicator
             style={styles.message}
@@ -667,7 +840,7 @@ export const InvoicingJobControls = forwardRef<
             <Text style={[typography.bodyBold, styles.accent]}>Retry</Text>
           </Pressable>
         ) : null}
-        {!loading && !error && visibleDocs.length === 0 ? (
+        {!loading && !error && visibleDocs.length === 0 && mode === 'view' ? (
           <Pressable
             accessibilityRole={mode === 'view' ? 'button' : undefined}
             accessibilityLabel={mode === 'view' ? 'Edit documents' : undefined}
@@ -682,86 +855,129 @@ export const InvoicingJobControls = forwardRef<
         ) : null}
         {visibleDocs.map((doc, index) => (
           <View key={doc.id} style={[index > 0 && styles.separator]}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`${mode === 'view' ? 'Edit' : 'Preview'} ${documentNumberLabel(doc.documentType, doc.documentNumber)}`}
-              onPress={() => {
-                if (mode === 'view') {
-                  onManageDocs();
-                  return;
-                }
-                previewRequestRef.current += 1;
-                setSaved(doc);
-                setPreviewOpen(true);
-                setShareOpen(false);
-              }}
-              style={({ pressed }) => [styles.row, pressed && styles.pressed]}
-            >
-              <View style={styles.rowLabel}>
-                <Text style={typography.bodyBold}>
-                  {documentNumberLabel(doc.documentType, doc.documentNumber)}
-                </Text>
-                <Text style={[typography.bodySmall, styles.secondary]}>
-                  {doc.issueDate}
-                  {doc.archived ? ' · Archived' : ''}
-                </Text>
-              </View>
-              <ProfileChevronRightIcon color={fg.secondary} />
-            </Pressable>
-            {updatingDocument === doc.id ? (
-              <Text
-                accessibilityLiveRegion="polite"
-                style={[typography.bodySmall, styles.loadingLabel]}
-              >
-                Saving document settings…
-              </Text>
-            ) : null}
-            {mode === 'edit' ? (
-              <ProfileRowsCard
+            {mode === 'view' ? (
+              <EditSwipeableRow
                 typography={typography}
-                framed={false}
-                rows={[
-                  {
-                    kind: 'toggle',
-                    label: 'Archived',
-                    value: doc.archived,
-                    disabled: updatingDocument != null,
-                    onValueChange: (archived) => {
-                      void updateControls(doc, { archived });
-                    },
-                  },
-                  {
-                    kind: 'toggle',
-                    label: 'Shared link',
-                    sublabel:
-                      'Anyone with an enabled link can view this document.',
-                    value: doc.linkEnabled,
-                    disabled: updatingDocument != null,
-                    onValueChange: (linkEnabled) => {
-                      void updateControls(doc, { linkEnabled });
-                    },
-                  },
+                accessibilityLabel={documentNumberLabel(doc.documentType, doc.documentNumber)}
+                actionLabel="Archive"
+                onDelete={() => void archiveDocument(doc)}
+              >
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Preview ${documentNumberLabel(doc.documentType, doc.documentNumber)}, ${doc.issueDate}, ${formatUsdCombined(doc.payload.totalCents)}`}
+                onPress={() => {
+                  previewRequestRef.current += 1;
+                  setSaved(doc);
+                  setPreviewOpen(true);
+                  setShareOpen(false);
+                }}
+                style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+              >
+                <View style={styles.rowLabel}>
+                  <Text style={[typography.body, styles.secondary]}>
+                    {documentNumberLabel(doc.documentType, doc.documentNumber)}
+                  </Text>
+                  <Text style={[typography.bodySmall, styles.secondary]}>{doc.issueDate}</Text>
+                </View>
+                <Text style={[typography.metric, { textTransform: 'none' }]}>
+                  {formatUsdCombined(doc.payload.totalCents)}
+                </Text>
+              </Pressable>
+              </EditSwipeableRow>
+            ) : (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={doc.archived ? 'Un-Archive to Preview' : 'Preview and Share'}
+                accessibilityState={{ disabled: doc.archived }}
+                disabled={doc.archived}
+                onPress={() => {
+                  previewRequestRef.current += 1;
+                  setSaved(doc);
+                  setPreviewOpen(true);
+                  setShareOpen(false);
+                }}
+                style={({ pressed }) => [
+                  styles.documentPreviewRow,
+                  pressed && !doc.archived && styles.pressed,
                 ]}
-              />
+              >
+                <IconShare3
+                  color={doc.archived ? fg.secondary : color('Brand/Primary')}
+                  size={24}
+                  strokeWidth={2}
+                />
+                <Text
+                  style={[
+                    doc.archived ? typography.labelHeadingSecondary : typography.labelCaps,
+                    !doc.archived && styles.accent,
+                  ]}
+                >
+                  {doc.archived ? 'UNARCHIVE TO PREVIEW' : 'PREVIEW & SHARE'}
+                </Text>
+              </Pressable>
+            )}
+            {mode === 'edit' ? (
+              <>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Preview ${documentNumberLabel(doc.documentType, doc.documentNumber)}, ${doc.issueDate}`}
+                  onPress={() => openDocument(doc.id)}
+                  style={({ pressed }) => [
+                    styles.documentDetailsRow,
+                    pressed && styles.pressed,
+                  ]}
+                >
+                  <Text style={[typography.body, { color: fg.secondary }]}>
+                    {`${documentNumberLabel(doc.documentType, doc.documentNumber)} (${doc.issueDate})`}
+                  </Text>
+                </Pressable>
+                <EditConfirmNoneRow
+                  typography={typography}
+                  confirmed={doc.archived || !doc.linkEnabled}
+                  confirmLabel="Archive & Disable Link"
+                  confirmedLabel="Archive & Disable Link"
+                  showTopBorder={false}
+                  onToggle={() => {
+                    const disabledOrArchived = doc.archived || !doc.linkEnabled;
+                    const controls = {
+                      archived: !disabledOrArchived,
+                      linkEnabled: disabledOrArchived,
+                    };
+                    setPendingControls((current) => {
+                      const original = documents.find((item) => item.id === doc.id);
+                      if (original?.archived === controls.archived && original.linkEnabled === controls.linkEnabled) {
+                        const next = { ...current };
+                        delete next[doc.id];
+                        return next;
+                      }
+                      return { ...current, [doc.id]: controls };
+                    });
+                  }}
+                />
+                {doc.documentType === 'invoice' ? (
+                  <EditConfirmNoneRow
+                    typography={typography}
+                    confirmed={revenueDocumentDraft === doc.id}
+                    confirmLabel="Use for Job Revenue"
+                    confirmedLabel="Use for Job Revenue"
+                    showTopBorder={false}
+                    onToggle={() => {
+                      if (revenueDocumentDraft !== doc.id) setRevenueDocumentDraft(doc.id);
+                    }}
+                  />
+                ) : null}
+              </>
             ) : null}
           </View>
         ))}
-        {mode === 'edit' ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Generate new document"
+        {mode === 'edit' && !loading && !error ? (
+          <EditAddRow
+            typography={typography}
+            icon={<IconShare3 color={fg.secondary} size={24} strokeWidth={2} />}
+            label={createDocumentLabel}
             onPress={() => void openUnsaved()}
-            style={({ pressed }) => [
-              styles.row,
-              styles.separator,
-              pressed && styles.pressed,
-            ]}
-          >
-            <Text style={[typography.bodyBold, styles.rowLabel, styles.accent]}>
-              Generate new
-            </Text>
-            <ProfileChevronRightIcon color={fg.secondary} />
-          </Pressable>
+            showTopBorder={visibleDocs.length > 0}
+          />
         ) : null}
       </View>
       {offline ? (
@@ -844,7 +1060,7 @@ export const InvoicingJobControls = forwardRef<
                     <Pressable
                       accessibilityRole="button"
                       style={styles.textAction}
-                      onPress={() => setBusinessOpen(true)}
+                      onPress={() => openBusinessSettings({ kind: 'preview' })}
                     >
                       <Text style={[typography.bodyBold, styles.accent]}>
                         Edit business info
@@ -943,22 +1159,6 @@ export const InvoicingJobControls = forwardRef<
             </View>
           ) : null}
           <Modal
-            visible={businessOpen}
-            animationType="slide"
-            onRequestClose={() => businessScreenRef.current?.requestBack()}
-          >
-            <BusinessSettingsScreen
-              ref={businessScreenRef}
-              typography={typography}
-              mode="business"
-              onBack={() => {
-                setBusinessOpen(false);
-                void switchType(previewType);
-              }}
-            />
-          </Modal>
-
-          <Modal
             visible={shareModalMounted}
             transparent
             animationType="none"
@@ -985,25 +1185,6 @@ export const InvoicingJobControls = forwardRef<
                       ? 'Share Estimate'
                       : 'Share Invoice'}
                   </Text>
-                  {active ? (
-                    <View style={styles.shareDetails}>
-                      <Text style={[typography.bodySmall, styles.secondary]}>
-                        {documentNumberLabel(
-                          active.documentType,
-                          active.documentNumber,
-                        )}
-                      </Text>
-                      <Text style={[typography.bodySmall, styles.secondary]}>
-                        {active.payload.customerName}
-                        {active.payload.customerPhone
-                          ? ` · ${formatCustomerPhoneDisplay(active.payload.customerPhone) ?? active.payload.customerPhone}`
-                          : ''}
-                        {active.payload.customerEmail
-                          ? ` · ${active.payload.customerEmail}`
-                          : ''}
-                      </Text>
-                    </View>
-                  ) : null}
                   <View style={styles.shortcuts}>
                     {([
                       { kind: 'text', label: 'Text', Icon: IconMessageCircle },
@@ -1091,6 +1272,105 @@ export const InvoicingJobControls = forwardRef<
           </Modal>
         </Animated.View>
       </Modal>
+      <BottomSheetShell
+        visible={finalizationVisible}
+        onClose={() => setFinalizationVisible(false)}
+        onClosed={() => {
+          setFinalization(null);
+          onFinalizationClosed?.();
+        }}
+        accessibilityTitle="Review invoice before finishing job"
+      >
+        {finalization ? (
+          <View style={styles.finalizationSheet}>
+            <Text accessibilityRole="header" style={[typography.titleH3, styles.shareTitle]}>
+              Review Invoice
+            </Text>
+            <Text style={[typography.body, styles.secondary, styles.finalizationDocumentName]}>
+              {finalization.selected
+                ? documentNumberLabel(finalization.selected.documentType, finalization.selected.documentNumber)
+                : 'New Invoice'}
+            </Text>
+            {!finalization.selected && (finalization.preview?.gaps.length ?? 0) > 0 ? (
+              <View style={styles.message}>
+                <Text style={[typography.body, styles.secondary]}>Complete these details before finishing:</Text>
+                {gapLabels(finalization.preview?.gaps ?? []).map((label) => (
+                  <Text key={label} style={[typography.body, styles.secondary]}>{label}</Text>
+                ))}
+                {finalization.preview?.gaps.includes('business_name') ? (
+                  <Pressable accessibilityRole="button" onPress={() => openBusinessSettings({
+                    kind: 'finalization',
+                    status: finalization.status,
+                  })}>
+                    <Text style={[typography.bodyBold, styles.accent]}>Edit business info</Text>
+                  </Pressable>
+                ) : null}
+                {finalization.preview?.gaps.some((gap) => gap !== 'business_name') ? (
+                  <Pressable accessibilityRole="button" onPress={() => {
+                    setFinalizationVisible(false);
+                    onEditDetails();
+                  }}>
+                    <Text style={[typography.bodyBold, styles.accent]}>Edit Job details</Text>
+                  </Pressable>
+                ) : null}
+              </View>
+            ) : (
+              <View style={styles.finalizationTotals}>
+                <View style={styles.finalizationRow}>
+                  <Text style={[typography.body, styles.secondary]}>Subtotal</Text>
+                  <Text style={[typography.body, styles.secondary]}>
+                    {formatUsdCombined(finalization.selected?.payload.subtotalCents ?? finalization.preview?.payload.subtotalCents ?? 0)}
+                  </Text>
+                </View>
+                <View style={styles.finalizationRow}>
+                  <Text style={[typography.body, styles.secondary]}>Tax</Text>
+                  <Text style={[typography.body, styles.secondary]}>
+                    {formatUsdCombined(finalization.selected?.payload.taxCents ?? finalization.preview?.payload.taxCents ?? 0)}
+                  </Text>
+                </View>
+                <View style={[styles.finalizationRow, styles.finalizationTotal]}>
+                  <Text style={[typography.bodyBold, { color: fg.primary }]}>Total</Text>
+                  <Text style={[typography.bodyBold, { color: fg.primary }]}>
+                    {formatUsdCombined(finalization.selected?.payload.totalCents ?? finalization.preview?.payload.totalCents ?? 0)}
+                  </Text>
+                </View>
+                <Text style={[typography.bodySmall, styles.secondary]}>
+                  {finalization.status === 'paid'
+                    ? 'Confirm the invoice total paid to finish this Job.'
+                    : 'Creating the invoice does not share it with your customer.'}
+                </Text>
+              </View>
+            )}
+            {!finalization.selected && (finalization.preview?.gaps.length ?? 0) > 0 ? null : (
+              <FullWidthFab
+                typography={typography}
+                label={busy === 'Saving…'
+                  ? 'SAVING…'
+                  : finalization.status === 'paid'
+                    ? `CONFIRM ${formatUsdCombined(finalization.selected?.payload.totalCents ?? finalization.preview?.payload.totalCents ?? 0)} PAID`
+                    : finalization.selected
+                      ? 'COMPLETE JOB'
+                      : 'CREATE INVOICE & COMPLETE JOB'}
+                onPress={() => void confirmFinalization()}
+                disabled={!!busy}
+                includeSafeArea
+              />
+            )}
+          </View>
+        ) : null}
+      </BottomSheetShell>
+      <Modal
+        visible={businessOpen}
+        animationType="slide"
+        onRequestClose={() => businessScreenRef.current?.requestBack()}
+      >
+        <BusinessSettingsScreen
+          ref={businessScreenRef}
+          typography={typography}
+          mode="business"
+          onBack={closeBusinessSettings}
+        />
+      </Modal>
     </View>
   );
 });
@@ -1127,6 +1407,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     ...cardShadowRn,
   },
+  editCard: { borderWidth: 0, shadowOpacity: 0, elevation: 0 },
   message: { padding: space('Spacing/20'), gap: space('Spacing/8') },
   emptyLabel: { color: fg.secondary, textAlign: 'center' },
   row: {
@@ -1137,6 +1418,22 @@ const styles = StyleSheet.create({
     gap: space('Spacing/12'),
   },
   rowLabel: { flex: 1, minWidth: 0, gap: space('Spacing/4') },
+  documentPreviewRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space('Spacing/12'),
+    minHeight: 48,
+    paddingVertical: space('Spacing/12'),
+    paddingLeft: space('Spacing/16'),
+    paddingRight: space('Spacing/16'),
+  },
+  documentDetailsRow: {
+    minHeight: 48,
+    justifyContent: 'center',
+    paddingVertical: space('Spacing/12'),
+    paddingLeft: space('Spacing/16') + 28 + space('Spacing/12'),
+    paddingRight: space('Spacing/16'),
+  },
   separator: { borderTopWidth: 1, borderTopColor: border.subtle },
   secondary: { color: fg.secondary },
   accent: { color: color('Brand/Primary') },
@@ -1186,8 +1483,17 @@ const styles = StyleSheet.create({
   },
   web: { width: '100%', backgroundColor: bg.surfaceWhite },
   sheet: { paddingVertical: space('Spacing/20'), gap: space('Spacing/12') },
+  finalizationSheet: { width: '100%', gap: space('Spacing/16') },
+  finalizationDocumentName: { textAlign: 'center' },
+  finalizationTotals: {
+    backgroundColor: bg.surfaceWhite,
+    borderRadius: radius('Radius/12'),
+    padding: space('Spacing/16'),
+    gap: space('Spacing/8'),
+  },
+  finalizationRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  finalizationTotal: { borderTopWidth: 1, borderTopColor: border.subtle, paddingTop: space('Spacing/8') },
   shareTitle: { alignSelf: 'stretch', textAlign: 'center' },
-  shareDetails: { gap: space('Spacing/4') },
   shortcuts: {
     flexDirection: 'row',
     alignItems: 'flex-start',

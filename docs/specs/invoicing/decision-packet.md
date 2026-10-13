@@ -1,7 +1,7 @@
 # Estimates, Invoices, and Sharing — Decision Packet
 
-Date: 2026-10-06
-Readiness: Ready for Implementation — product choices resolved; see spec.md and readiness.md for the final contracts. The original question table below is historical.
+Date: 2026-10-13
+Readiness: Implementation in progress — product choices resolved; see spec.md and the contracts for current behavior. The original question table below is historical and superseded where noted.
 Source revision: b85ebe5. Working branch: codex/invoicing-shaping.
 
 ## Proposed direction
@@ -13,7 +13,7 @@ This is a coupled foundation: pricing changes affect Jobs, Materials, Other Cost
 ## Source interpretation
 
 - The pasted plan is the primary product direction. The referenced ChatGPT conversation, “Branch · Competitive invoicing research,” was read for context; assistant recommendations are not approvals.
-- Preserve the pasted Docs navigation: Job View row opens Job Edit's Docs section; explicit Preview opens the saved document. Do not replace this with the prior assistant's direct-preview alternative.
+- Current navigation: tapping a Job View document row opens its Preview directly. Job Edit provides staged document controls and explicit Preview & Share.
 - Preserve the specified rich-preview card: business name, document type/number, short description, and total. It excludes customer contact details but still intentionally publishes description and amount to preview crawlers.
 - The truncated line “Document numbers have separate in” is interpreted as separate Estimate and Invoice sequences; starting values remain proposed below.
 - Invoice due date derives from terms. Due upon receipt is the approved default; this supersedes “Due date — today.”
@@ -28,22 +28,35 @@ This is a coupled foundation: pricing changes affect Jobs, Materials, Other Cost
 5. One HTML/CSS document renderer powers native preview, hosted web, and PDF. Black and white, mobile-first, bounded desktop/print width. A document is a saved content snapshot rendered as a page; PDF generation occurs only when Download PDF is selected, never on creation, sharing a link, preview, or crawler access.
 6. Share FAB opens live unsaved preview. Saving freezes customer-facing data, assigns a number, creates a hosted URL, then opens the share sheet. Existing documents use “Share Estimate” / “Share Invoice.”
 7. Share sheet offers Messages, WhatsApp, Gmail, More, Copy link, Open in browser, and Download PDF. PDF opens native sharing. Recipient details come from the saved document's copied Job customer snapshot; later Job reassignment cannot silently change a historical document's recipient.
-8. Job View's Docs section omits archived rows. Job Edit includes them; type, number, and snapshot date are read-only. Archive and link enablement are independent controls; “Generate new” creates another snapshot.
+8. Job View's Documents section omits archived rows. Job Edit includes them; type, number, and snapshot date are read-only. The single Archive & Disable Link control couples archive and link access; “Create Invoice/Estimate” creates another snapshot.
 9. Free hosted route is /share/<random-token>. Branded routes/colors are deferred Pro work. Anyone possessing the URL can access an enabled document; exclude from sitemap/discovery and request no indexing/following while allowing link-preview retrieval.
-10. Invoices display Paid/Unpaid and Total/Amount Due accordingly. Every saved Invoice reflects its Job's current Paid/Unpaid status, even if an older Invoice has a different total. The badge and Total/Amount Due label are live; amounts/content remain immutable. No payment records, payment method, receipt, or amount-paid/balance accounting in V1.
+10. Invoices display Paid/Unpaid and Total/Amount Due accordingly. Only the selected Job Revenue Invoice follows the Job's current Paid/Unpaid status; other Invoices retain their last status. Content/amounts remain immutable. No payment processing, receipts, or partial-balance accounting in V1.
 
 ## PM decisions received on 2026-10-06
 
 - D-01B approved, with dependent clarification: every Invoice follows the Job's current status. Estimate content has no payment badge. PDF captures the status at explicit generation time; an already exported file cannot update.
 - D-02A approved: preserve Revenue with initial 0% material markup and nonbillable Other Costs. PM requested a production check before adopting the negative-residual exception; see production-evidence.md.
 - D-03 replaced by the approved business-level category multi-select and All control. User-configured rate applies to selected customer-charge categories, including material markup inside the Materials price. This does not provide jurisdiction advice.
-- D-04 approved: capture the business markup on new materials; changes affect future additions. Settings helper copy: “Applies to new materials added.” New Other Costs default Invoice customer unchecked.
+- D-04 approved: use the current business markup for materials without an explicit override; changes reprice existing Jobs and future documents, preserving issued snapshots. Settings helper copy: “Applies to materials without an explicit markup. Changing it updates job revenue and future documents.” New Other Costs default Invoice customer unchecked.
 - D-05 approved: separate Estimate and Invoice sequences starting 00001; expiration Off/7/14/30 days, default 30; required business/customer names, summary, complete customer-facing amounts. Default payment terms: Due upon receipt; Net 7/15/30 remain options.
 - D-06 approved: Job deletion disables public access while retaining recoverable snapshots; account deletion removes documents and disables links.
 - On-demand PDF added as an explicit cost constraint. Selected implementation: device-side PDF generation with no permanent server PDF storage or rendering provider.
 - Dependent restoration decision: exclude deleted Jobs from the initial migration and require pricing review on restoration.
 - Public summary: include both short and long Job descriptions; keep Notes and other internal fields private.
 - Hosting: the PM confirms existing Vercel Pro and authorizes reuse; no new plan or provider purchase.
+
+## PM decisions received on 2026-10-13 — Invoice-backed Job Revenue
+
+These decisions extend and supersede the 2026-10-06 rules for historical migration, invoice payment status, Job completion, and material markup lifecycle:
+
+- One selected Invoice is the Job Revenue source. Revenue remains the pretax saved subtotal, shown with its invoice reference in the Job profit summary. Actual costs and tracked time remain editable and continue to drive Net earnings/Net/hour.
+- Extend the financial-completeness flow for both Complete and Paid. Final review creates an Invoice when none is selected; sharing is optional. With an existing source, final review uses that Invoice's saved total. A separate Replace Invoice action handles intentional replacement; cost corrections alone do not replace.
+- A Job can have one selected revenue Invoice. Job Edit adds “Use for Job Revenue”; selection and Archive & Disable Link changes are staged until Done and save atomically with the Job draft. Estimates cannot be selected, and an established source cannot be cleared without selecting another Invoice.
+- Replacing the source archives/disables the previous Invoice link. Keep the selected Invoice's existing archive/link controls. An archived Invoice can still be a Revenue source. Only the selected Invoice follows later Job Paid/Unpaid changes; prior Invoices keep their last status.
+- On a Paid Job, switching to a different total requires confirmation of the then-current new total. Do not show old and new totals together. Cancellation retains the previous source and Paid status; an unchanged total requires no extra confirmation.
+- On successful Invoice creation, material rows without explicit markup receive the current business default as an explicit override. Explicit values, including 0%, remain. Estimate creation does not solidify markup. Clearing an override returns to the current business default for future calculations and never alters the selected Invoice's saved Revenue.
+- Preserve historical Jobs, amounts, documents and links in migration; do not select/generate historical Invoices or change Revenue/payment/link state. Require adoption during the next finalization, replacement or source-selection action. Retain legacy reads; block old-client bypasses after a Job adopts invoice-backed Revenue.
+- Deploy additive backend changes before enabling the client flow. No production rollout is authorized by this implementation request.
 
 The question table below preserves the original decision history; resolved alternatives are not current blockers.
 
@@ -70,7 +83,7 @@ No current-product.html claims were used: freshness was not established. Product
 | D-01 | Paid status after an invoice is issued | A: entire invoice stays frozen; create a new Paid invoice. B: freeze content/prices but update saved invoice payment status. | A preserves literal immutability but leaves old links Unpaid. B requires a separate mutable status model and an explicit rule for which invoices change, especially when amounts differ. |
 | D-02 | Existing Job migration | A: preserve Revenue using Labor & Services = old Revenue − 0%-markup Materials, Other Costs initially nonbillable; review negative residuals. B: keep legacy pricing until explicit conversion. | Never silently add existing material costs to historic Revenue. A needs an exception flow; B adds a visible dual-pricing model and conversion guard. |
 | D-03 | Tax on billable Other Costs | A: exclude Other Costs in V1. B: add a per-cost taxable checkbox. | Labor/Materials/Both alone does not define Other Costs taxation. This is configured arithmetic, not jurisdiction advice or automatic compliance. |
-| D-04 | Defaults over time | Proposal: capture markup when a material is added; future default changes affect only future rows. New Other Costs default “Invoice customer” unchecked. | Changing business defaults cannot unexpectedly reprice already recorded work. Inbox/Session materials must capture consistently. |
+| D-04 | Defaults over time | Approved revision: unset overrides inherit the current business markup; default changes reprice existing Job materials and future document snapshots. New Other Costs default “Invoice customer” unchecked. | Explicit overrides, including 0%, remain fixed. Issued documents retain their amounts. Job, Inbox, and Session materials resolve the same current default. |
 | D-05 | Document defaults and creation guard | Proposal: independent sequences start 00001; estimate expiration Off/7/14/30 days, default 30; derive invoice due date from terms; require business name, customer name, summary, and complete customer-facing charges to create. | Jobs remain permissive. This adds only a document-creation guard. No requirement for time tracking or cost-completeness confirmations solely to issue a document. |
 | D-06 | Deleting a Job | Proposal: public documents become unavailable, snapshots stay recoverable with the Job. Account deletion removes snapshots and disables links. | Defines public exposure and retention; restoring a Job must not silently reactivate links without an agreed rule. |
 

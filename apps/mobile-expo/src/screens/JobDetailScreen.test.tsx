@@ -15,6 +15,8 @@ const mockRefreshLiveSession = jest.fn<(...args: unknown[]) => Promise<unknown>>
 const mockUpdateLiveSessionJobShortDescription = jest.fn();
 let mockFullscreenEditFlagState = { enabled: true, ready: true };
 const mockOpenDocumentPreview = jest.fn();
+const mockOpenDocument = jest.fn();
+const mockOpenFinalization = jest.fn();
 let mockInvoicingFlagState = { enabled: false, ready: true };
 let mockLiveSession: { id: string; jobId: string } | null = null;
 
@@ -582,7 +584,13 @@ jest.mock('../components/invoicing/InvoicingJobControls', () => {
   const { Text, View } = require('react-native');
   return {
     InvoicingJobControls: React.forwardRef(({ mode, onManageDocs }: { mode: string; onManageDocs?: () => void }, ref: unknown) => {
-      React.useImperativeHandle(ref, () => ({ openPreview: mockOpenDocumentPreview }));
+      React.useImperativeHandle(ref, () => ({
+        openPreview: mockOpenDocumentPreview,
+        openDocument: mockOpenDocument,
+        openFinalization: mockOpenFinalization,
+        getPendingPreferences: () => null,
+        discardPendingControls: jest.fn(),
+      }));
       return React.createElement(View, null,
         React.createElement(Text, null, 'Docs'),
         React.createElement(Text, { accessibilityLabel: mode === 'view' ? 'Manage documents' : 'Generate new', onPress: onManageDocs }, mode === 'view' ? 'Saved document' : 'Generate new'));
@@ -599,6 +607,7 @@ jest.mock('./jobDetailEdit/JobDetailEditMode', () => ({
     hideHeader,
     focusTarget,
     editApi,
+    footer,
   }: {
     onBack: () => void;
     onDone: () => void;
@@ -606,6 +615,7 @@ jest.mock('./jobDetailEdit/JobDetailEditMode', () => ({
     saving: boolean;
     hideHeader?: boolean;
     focusTarget?: unknown;
+    footer?: React.ReactNode;
     editApi?: {
       draft: {
         noMaterialsConfirmed?: boolean;
@@ -680,6 +690,7 @@ jest.mock('./jobDetailEdit/JobDetailEditMode', () => ({
         <Pressable accessibilityRole="button" accessibilityLabel="Delete job" disabled={saving} onPress={onDeleteJob}>
           <Text>Delete job</Text>
         </Pressable>
+        {footer}
       </View>
     );
   },
@@ -859,7 +870,7 @@ describe('JobDetailScreen manual session and note flows', () => {
     apiClient.fetchJobDetail.mockResolvedValue(baseJob);
   });
 
-  it('offers feedback after the first completed job', async () => {
+  it('gates completion behind invoice finalization', async () => {
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     mockClaimFeedbackPromptMilestone.mockResolvedValueOnce(1);
     let jobState: JobDetailViewModel = {
@@ -883,15 +894,11 @@ describe('JobDetailScreen manual session and note flows', () => {
     await waitFor(() => expect(screen.getByText('Primary status action')).toBeTruthy());
     fireEvent.press(screen.getByText('Primary status action'));
 
-    await waitFor(() => {
-      expect(apiClient.countCompletedJobsForCurrentUser).toHaveBeenCalledWith({});
-      expect(mockClaimFeedbackPromptMilestone).toHaveBeenCalledWith('user-1', 1);
-      expect(alertSpy).toHaveBeenCalledWith(
-        "How's FieldSoli working for you?",
-        'You just completed your first job. What felt confusing or missing?',
-        expect.any(Array),
-      );
-    });
+    await waitFor(() => expect(mockOpenFinalization).toHaveBeenCalledWith('completed'));
+    expect(apiClient.updateJobStatusById).not.toHaveBeenCalledWith({}, 'job-1', 'completed');
+    expect(apiClient.countCompletedJobsForCurrentUser).not.toHaveBeenCalled();
+    expect(mockClaimFeedbackPromptMilestone).not.toHaveBeenCalled();
+    expect(alertSpy).not.toHaveBeenCalled();
     alertSpy.mockRestore();
   });
 
@@ -1697,9 +1704,8 @@ describe('JobDetailScreen simplified view (flag on)', () => {
     await waitFor(() => expect(screen.getByText('Open status sheet')).toBeTruthy());
     fireEvent.press(screen.getByText('Open status sheet'));
     fireEvent.press(screen.getByText('Pick unit paid'));
-    await waitFor(() =>
-      expect(apiClient.updateJobStatusById).toHaveBeenCalledWith({}, 'job-1', 'paid'),
-    );
+    await waitFor(() => expect(mockOpenFinalization).toHaveBeenCalledWith('paid'));
+    expect(apiClient.updateJobStatusById).not.toHaveBeenCalled();
   });
 
   it('TEST-V05 opens edit from title, customer and earnings taps', async () => {
@@ -1998,9 +2004,7 @@ describe('JobDetailScreen simplified view (flag on)', () => {
         }),
       ),
     );
-    await waitFor(() =>
-      expect(apiClient.updateJobStatusById).toHaveBeenCalledWith({}, 'job-1', 'paid'),
-    );
+    await waitFor(() => expect(mockOpenFinalization).toHaveBeenCalledWith('paid'));
     expect(screen.queryByTestId('edit-focus-target')).toBeNull();
   });
 
@@ -2066,9 +2070,7 @@ describe('JobDetailScreen simplified view (flag on)', () => {
     const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
     await waitFor(() => expect(screen.getByText('Primary status action')).toBeTruthy());
     fireEvent.press(screen.getByText('Primary status action'));
-    await waitFor(() =>
-      expect(apiClient.updateJobStatusById).toHaveBeenCalledWith({}, 'job-1', 'paid'),
-    );
+    await waitFor(() => expect(mockOpenFinalization).toHaveBeenCalledWith('paid'));
   });
 
   it('TEST-V08 materials confirm-none checkbox in Edit advances completeness gap', async () => {
@@ -2149,11 +2151,12 @@ describe('JobDetailScreen simplified view (flag on)', () => {
     expect(apiClient.updateJobStatusById).not.toHaveBeenCalledWith({}, 'job-1', 'completed');
   });
 
-  it('keeps Revenue entry and omits Share when invoicing is off', async () => {
+  it('shows invoicing actions even when the optional flag is off', async () => {
     mockInvoicingFlagState = { enabled: false, ready: true };
     const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
-    await waitFor(() => expect(screen.getByText('Primary status action')).toBeTruthy());
-    expect(screen.queryByLabelText('Share job document')).toBeNull();
+    await waitFor(() => expect(screen.getByLabelText('Share job document')).toBeTruthy());
+    fireEvent.press(screen.getByLabelText('Share job document'));
+    expect(mockOpenDocumentPreview).toHaveBeenCalledTimes(1);
   });
 
   it('shows Share when invoicing is ready and enabled', async () => {
@@ -2166,11 +2169,10 @@ describe('JobDetailScreen simplified view (flag on)', () => {
     await waitFor(() => expect(screen.getByTestId('edit-focus-target').props.children).toBe('\"docs\"'));
   });
 
-  it('does not show Share while the invoicing flag is still loading', async () => {
+  it('shows invoicing actions while the optional flag is loading', async () => {
     mockInvoicingFlagState = { enabled: true, ready: false };
     const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
-    await waitFor(() => expect(screen.getByText('Primary status action')).toBeTruthy());
-    expect(screen.queryByLabelText('Share job document')).toBeNull();
+    await waitFor(() => expect(screen.getByLabelText('Share job document')).toBeTruthy());
   });
 
   it('TEST-V09 flag off keeps ADD pills and confirm cards', async () => {

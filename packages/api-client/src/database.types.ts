@@ -385,6 +385,8 @@ export type Database = {
           other_costs_reviewed_at: string | null
           paid_at: string | null
           revenue_cents: number | null
+          revenue_document_id: string | null
+          revenue_invoice_required: boolean
           service_address: string | null
           short_description: string
           updated_at: string
@@ -419,6 +421,8 @@ export type Database = {
           pricing_needs_review?: boolean
           pricing_revision?: number
           revenue_cents?: number | null
+          revenue_document_id?: string | null
+          revenue_invoice_required?: boolean
           service_address?: string | null
           short_description: string
           updated_at?: string
@@ -453,6 +457,8 @@ export type Database = {
           pricing_needs_review?: boolean
           pricing_revision?: number
           revenue_cents?: number | null
+          revenue_document_id?: string | null
+          revenue_invoice_required?: boolean
           service_address?: string | null
           short_description?: string
           updated_at?: string
@@ -784,6 +790,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      apply_job_detail_edit_with_invoice_preferences: {
+        Args: { p_job_id: string; p_payload: Json }
+        Returns: Json
+      }
       accept_job_export_request: {
         Args: { p_time_zone: string; p_year: number }
         Returns: Json
@@ -808,6 +818,33 @@ export type Database = {
           p_timezone: string
           p_type: string
         }
+        Returns: Json
+      }
+      create_and_select_financial_document: {
+        Args: {
+          p_confirmed_paid_total?: number | null
+          p_fingerprint: string
+          p_job_id: string
+          p_request_key: string
+          p_timezone: string
+          p_type: string
+        }
+        Returns: Json
+      }
+      finalize_job_with_invoice: {
+        Args: {
+          p_confirmed_paid_total?: number | null
+          p_document_id: string | null
+          p_fingerprint: string | null
+          p_job_id: string
+          p_request_key: string
+          p_status: string
+          p_timezone: string
+        }
+        Returns: Json
+      }
+      get_job_revenue_document: {
+        Args: { p_job_id: string }
         Returns: Json
       }
       list_financial_documents: {
@@ -836,6 +873,15 @@ export type Database = {
           p_document_id: string
           p_expected_revision: number
           p_link_enabled: boolean
+        }
+        Returns: Json
+      }
+      select_job_revenue_invoice: {
+        Args: {
+          p_confirmed_paid_total?: number | null
+          p_document_id: string
+          p_expected_document_id: string | null
+          p_job_id: string
         }
         Returns: Json
       }
@@ -1042,4 +1088,3 @@ export const Constants = {
     },
   },
 } as const
-

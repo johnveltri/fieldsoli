@@ -3,7 +3,7 @@ import {
   fieldsoloExpoFontAssets,
   fieldsoloLoadedFonts,
 } from '@fieldsolo/design-system/expo/loadFieldSoloFonts';
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, type ReactNode } from 'react';
 import {
   Animated,
   Easing,
@@ -162,6 +162,8 @@ type PlatformPrimaryActionProps = {
   /** Diameter of the circular FAB. */
   size: number;
   accessibilityLabel?: string;
+  /** Optional icon for a contextual FAB; the Home FAB keeps its default plus. */
+  icon?: (color: string, size: number) => ReactNode;
 };
 
 export function PlatformPrimaryAction({
@@ -172,6 +174,7 @@ export function PlatformPrimaryAction({
   onSelectMenuItem,
   size,
   accessibilityLabel = 'Primary action',
+  icon,
 }: PlatformPrimaryActionProps) {
   const iconSize = Math.max(22, Math.round(size * 0.4));
   const lastPressAt = useRef(0);
@@ -220,7 +223,11 @@ export function PlatformPrimaryAction({
             {open ? (
               <PrimaryActionCloseIcon color={fabIconColor} size={iconSize} />
             ) : (
-              <JobsFabPlusIcon color={fabIconColor} size={iconSize} />
+              icon ? (
+                icon(fabIconColor, iconSize)
+              ) : (
+                <JobsFabPlusIcon color={fabIconColor} size={iconSize} />
+              )
             )}
           </View>
         </PlatformFloatingSurface>

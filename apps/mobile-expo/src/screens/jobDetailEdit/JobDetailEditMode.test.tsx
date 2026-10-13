@@ -43,7 +43,7 @@ const job = {
   noOtherCostsConfirmed: false,
 } as unknown as JobDetailViewModel;
 
-function Harness({ onDirtyBack, docsOnly = false }: { onDirtyBack: (dirty: boolean) => void; docsOnly?: boolean }) {
+function Harness({ onDirtyBack, docsOnly = false, invoicingEnabled = false }: { onDirtyBack: (dirty: boolean) => void; docsOnly?: boolean; invoicingEnabled?: boolean }) {
   const editApi = useJobEditDraft(job);
 
   useEffect(() => {
@@ -58,6 +58,7 @@ function Harness({ onDirtyBack, docsOnly = false }: { onDirtyBack: (dirty: boole
       bottomInset={0}
       columnStyle={{}}
       saving={false}
+      invoicingEnabled={invoicingEnabled}
       focusTarget={docsOnly ? 'docs' : 'materials'}
       footer={<Text>Docs management</Text>}
       onBack={() => {
@@ -72,6 +73,14 @@ function Harness({ onDirtyBack, docsOnly = false }: { onDirtyBack: (dirty: boole
 }
 
 describe('JobDetailEditMode buffered numeric fields', () => {
+  it('closes untouched Documents editing without marking hidden pricing dirty', async () => {
+    const onDirtyBack = jest.fn();
+    const screen = render(<Harness docsOnly invoicingEnabled onDirtyBack={onDirtyBack} />);
+    await screen.findByText('Docs management');
+    fireEvent.press(screen.getByLabelText('Close'));
+    await waitFor(() => expect(onDirtyBack).toHaveBeenCalledWith(false));
+  });
+
   it('opens Docs management without unrelated edit fields for a Docs entry', async () => {
     const screen = render(<Harness docsOnly onDirtyBack={() => {}} />);
     await screen.findByText('Docs management');

@@ -15,11 +15,15 @@ export function JobDetailSummaryCard({
   typography,
   onPress,
   noRevenueConfirmed,
+  revenueInvoiceLabel,
+  onOpenRevenueInvoice,
 }: {
   earnings: JobDetailViewModel['earnings'];
   typography: TextStyles;
   onPress?: () => void;
   noRevenueConfirmed?: boolean;
+  revenueInvoiceLabel?: string | null;
+  onOpenRevenueInvoice?: () => void;
 }) {
   const netTone =
     earnings.netEarningsCents >= 0
@@ -44,6 +48,22 @@ export function JobDetailSummaryCard({
               ? formatUsdCombined(earnings.revenueCents)
               : '—'}
         </Text>
+      </View>
+      <View style={styles.invoiceReference}>
+        {revenueInvoiceLabel && onOpenRevenueInvoice ? (
+          <Pressable
+            accessibilityRole="link"
+            accessibilityLabel={`Preview ${revenueInvoiceLabel}`}
+            onPress={(event) => {
+              event.stopPropagation();
+              onOpenRevenueInvoice();
+            }}
+          >
+            <Text style={[typography.bodySmall, { color: fg.secondary }]}>{revenueInvoiceLabel}</Text>
+          </Pressable>
+        ) : (
+          <Text style={[typography.bodySmall, { color: fg.secondary }]}>Not invoiced</Text>
+        )}
       </View>
       <View style={styles.summaryRow}>
         <Text style={[typography.body, { color: fg.secondary, flex: 1 }]}>Materials</Text>
@@ -110,6 +130,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     minHeight: 24,
   },
+  invoiceReference: { marginTop: -space('Spacing/4'), marginBottom: space('Spacing/4') },
   summaryMoney: {
     color: fg.primary,
     textAlign: 'right',

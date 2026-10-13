@@ -28,9 +28,15 @@ describe('applyJobDetailEdit', () => {
         notes: { create: [], update: [], deleteIds: [] },
         materials: { create: [], update: [], deleteIds: [] },
         otherCosts: { create: [], update: [], deleteIds: [] },
+        invoicePreferences: {
+          revenueDocumentId: 'invoice-2',
+          expectedRevenueDocumentId: 'invoice-1',
+          confirmedPaidTotalCents: 12500,
+          controls: [],
+        },
       }),
     ).resolves.toBeUndefined();
-    expect(rpc).toHaveBeenCalledWith('apply_job_detail_edit_atomic', {
+    expect(rpc).toHaveBeenCalledWith('apply_job_detail_edit_with_invoice_preferences', {
       p_job_id: 'job-1',
       p_payload: expect.objectContaining({
         job: expect.objectContaining({
@@ -38,6 +44,12 @@ describe('applyJobDetailEdit', () => {
           noMaterialsConfirmed: true,
           noOtherCostsConfirmed: false,
         }),
+        invoicePreferences: {
+          revenueDocumentId: 'invoice-2',
+          expectedRevenueDocumentId: 'invoice-1',
+          confirmedPaidTotalCents: 12500,
+          controls: [],
+        },
       }),
     });
   });

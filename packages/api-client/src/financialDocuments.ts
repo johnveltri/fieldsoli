@@ -19,6 +19,7 @@ export type FinancialDocumentRecord = {
   controlRevision: number;
   token: string;
   paymentProjection: PaymentProjection;
+  isRevenueSource?: boolean;
 };
 
 export type DocumentPreview = {
@@ -30,7 +31,7 @@ export type DocumentPreview = {
 };
 
 export class FinancialDocumentError extends Error {
-  readonly code: 'unauthorized' | 'not_found' | 'invalid' | 'conflict' | 'stale' | 'incomplete';
+  readonly code: 'unauthorized' | 'not_found' | 'invalid' | 'conflict' | 'stale' | 'incomplete' | 'confirmation_required' | 'invoice_required';
 
   constructor(code: FinancialDocumentError['code']) {
     super(`financial_document:${code}`);
@@ -39,7 +40,7 @@ export class FinancialDocumentError extends Error {
   }
 }
 
-const ERROR_RE = /financial_document:(unauthorized|not_found|invalid|conflict|stale)/;
+const ERROR_RE = /financial_document:(unauthorized|not_found|invalid|conflict|stale|incomplete|confirmation_required|invoice_required)/;
 
 function parseError(error: unknown): FinancialDocumentError | null {
   if (!error || typeof error !== 'object' || !('message' in error)) return null;
@@ -101,6 +102,83 @@ export async function createFinancialDocument(
     throw new FinancialDocumentError('incomplete');
   }
   return asRecord(data as Json);
+}
+
+export async function createAndSelectFinancialDocument(
+  client: FieldSoloSupabaseClient,
+  input: {
+    jobId: string;
+    fingerprint: string;
+    timezone: string;
+    requestKey: string;
+    confirmedPaidTotalCents?: number | null;
+  },
+): Promise<FinancialDocumentRecord> {
+  const { data, error } = await client.rpc('create_and_select_financial_document', {
+    p_job_id: input.jobId,
+    p_type: 'invoice',
+    p_fingerprint: input.fingerprint,
+    p_timezone: input.timezone,
+    p_request_key: input.requestKey,
+    p_confirmed_paid_total: input.confirmedPaidTotalCents ?? null,
+  });
+  if (error) throw parseError(error) ?? error;
+  const body = data as unknown as { status?: string; gaps?: string[] } & FinancialDocumentRecord;
+  if (body.status === 'incomplete') throw new FinancialDocumentError('incomplete');
+  return asRecord(data as Json);
+}
+
+export async function selectJobRevenueInvoice(
+  client: FieldSoloSupabaseClient,
+  input: {
+    jobId: string;
+    documentId: string;
+    expectedDocumentId: string | null;
+    confirmedPaidTotalCents?: number | null;
+  },
+): Promise<FinancialDocumentRecord> {
+  const { data, error } = await client.rpc('select_job_revenue_invoice', {
+    p_job_id: input.jobId,
+    p_document_id: input.documentId,
+    p_expected_document_id: input.expectedDocumentId,
+    p_confirmed_paid_total: input.confirmedPaidTotalCents ?? null,
+  });
+  if (error) throw parseError(error) ?? error;
+  return asRecord(data as Json);
+}
+
+export async function finalizeJobWithInvoice(
+  client: FieldSoloSupabaseClient,
+  input: {
+    jobId: string;
+    status: 'completed' | 'paid';
+    documentId?: string | null;
+    fingerprint?: string | null;
+    timezone: string;
+    requestKey: string;
+    confirmedPaidTotalCents?: number | null;
+  },
+): Promise<FinancialDocumentRecord> {
+  const { data, error } = await client.rpc('finalize_job_with_invoice', {
+    p_job_id: input.jobId,
+    p_status: input.status,
+    p_document_id: input.documentId ?? null,
+    p_fingerprint: input.fingerprint ?? null,
+    p_timezone: input.timezone,
+    p_request_key: input.requestKey,
+    p_confirmed_paid_total: input.confirmedPaidTotalCents ?? null,
+  });
+  if (error) throw parseError(error) ?? error;
+  return asRecord(data as Json);
+}
+
+export async function getJobRevenueDocument(
+  client: FieldSoloSupabaseClient,
+  jobId: string,
+): Promise<FinancialDocumentRecord | null> {
+  const { data, error } = await client.rpc('get_job_revenue_document', { p_job_id: jobId });
+  if (error) throw parseError(error) ?? error;
+  return data == null ? null : asRecord(data as Json);
 }
 
 export async function listFinancialDocuments(

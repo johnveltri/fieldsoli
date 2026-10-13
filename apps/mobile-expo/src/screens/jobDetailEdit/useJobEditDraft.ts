@@ -635,12 +635,15 @@ export function useJobEditDraft(
 
   const resetFromJob = useCallback((j: JobDetailViewModel) => {
     const next = createJobEditDraft(j);
+    if (invoicingEnabled && !next.pricingNeedsReview) {
+      next.pricingIntent = 'labor';
+    }
     snapshotRef.current = next;
     draftRef.current = next;
     setSnapshot(next);
     setDraft(next);
     setResetVersion((version) => version + 1);
-  }, []);
+  }, [invoicingEnabled]);
 
   const dirty = useMemo(
     () => (snapshot && draft ? isJobEditDraftDirty(snapshot, draft) : false),

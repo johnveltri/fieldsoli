@@ -170,6 +170,11 @@ export type JobDetailViewModel = {
   /** Linked reusable customer identity when present. */
   customerId: string | null;
   serviceAddress: string;
+  revenueInvoice?: {
+    id: string;
+    documentNumber: number;
+    documentType: 'invoice';
+  } | null;
   jobType: string;
   lastWorkedLabel: string;
   workStatus: JobDetailWorkStatus;

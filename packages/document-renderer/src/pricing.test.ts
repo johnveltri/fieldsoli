@@ -34,6 +34,7 @@ describe('computeJobPricing', () => {
   it('matches the approved $400 labor example and keeps tax out of revenue', () => {
     const priced = computeJobPricing({
       laborServicesCents: 40000,
+      materialMarkupBps: 2000,
       costs,
       taxRateBps: 1000,
       taxableCategories: ['labor', 'materials', 'billable_other_costs'],
@@ -48,6 +49,7 @@ describe('computeJobPricing', () => {
   it('taxes only the selected categories', () => {
     const priced = computeJobPricing({
       laborServicesCents: 40000,
+      materialMarkupBps: 2000,
       costs,
       taxRateBps: 1000,
       taxableCategories: ['labor'],
@@ -59,12 +61,29 @@ describe('computeJobPricing', () => {
   it('treats null labor as unknown revenue', () => {
     const priced = computeJobPricing({
       laborServicesCents: null,
+      materialMarkupBps: 0,
       costs: [],
       taxRateBps: 0,
       taxableCategories: [],
     });
     expect(priced.revenueCents).toBeNull();
     expect(priced.netEarningsCents).toBeNull();
+  });
+
+  it('uses the current default, preserves explicit zero, and restores the default after clearing', () => {
+    const price = (materialMarkupBps: number, markupOverrideBps: number | null) => computeJobPricing({
+      laborServicesCents: 50000,
+      materialMarkupBps,
+      costs: [{ costType: 'material', totalCostCents: 10000, capturedMarkupBps: 0, markupOverrideBps }],
+      taxRateBps: 1000,
+      taxableCategories: ['materials'],
+    });
+    expect(price(1000, null)).toMatchObject({ revenueCents: 61000, taxCents: 1100, documentTotalCents: 62100 });
+    expect(price(2000, null).revenueCents).toBe(62000);
+    expect(price(2000, 0).revenueCents).toBe(60000);
+    expect(price(3000, 0).revenueCents).toBe(60000);
+    expect(price(3000, null).revenueCents).toBe(63000);
+    expect(price(3000, 500).revenueCents).toBe(60500);
   });
 
   it('rejects a negative residual when solving labor', () => {

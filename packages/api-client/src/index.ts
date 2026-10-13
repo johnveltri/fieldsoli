@@ -5,6 +5,7 @@ export {
   applyJobDetailEdit,
   ApplyJobDetailEditError,
   type ApplyJobDetailEditPayload,
+  type ApplyJobInvoicePreferences,
   type ApplyJobDetailEditErrorCode,
 } from './applyJobDetailEdit';
 export {
@@ -158,10 +159,14 @@ export {
 } from './businessSettings';
 export {
   createFinancialDocument,
+  createAndSelectFinancialDocument,
+  finalizeJobWithInvoice,
   FinancialDocumentError,
+  getJobRevenueDocument,
   listFinancialDocuments,
   previewFinancialDocument,
   setFinancialDocumentControls,
+  selectJobRevenueInvoice,
   shareDocumentUrl,
   SHARE_DOCUMENT_ORIGIN,
   type DocumentPreview,

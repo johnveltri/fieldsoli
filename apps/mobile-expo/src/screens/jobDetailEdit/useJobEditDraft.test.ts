@@ -409,6 +409,21 @@ describe('validateJobEditDraft capture-now', () => {
 });
 
 describe('useJobEditDraft confirm-none and refs', () => {
+  it('preserves billable other costs in the save payload after resetting an invoicing draft', () => {
+    const job = minimalJob();
+    const { result } = renderHook(() => useJobEditDraft(job, { invoicingEnabled: true }));
+    act(() => result.current.resetFromJob(job));
+    act(() => result.current.addOtherCost());
+    const id = result.current.draft!.otherCosts[0].id;
+    act(() => result.current.updateOtherCost(id, {
+      costType: 'other', costCents: 1200, description: 'Travel', invoiceCustomer: true,
+    }));
+    expect(result.current.buildPayload().job.pricingIntent).toBe('labor');
+    expect(result.current.buildPayload().otherCosts.create[0].invoiceCustomer).toBe(true);
+    act(() => result.current.updateOtherCost(id, { invoiceCustomer: false }));
+    expect(result.current.buildPayload().otherCosts.create[0].invoiceCustomer).toBe(false);
+  });
+
   function setupHook(job: JobDetailViewModel) {
     const { result } = renderHook(() => useJobEditDraft(job));
     act(() => {

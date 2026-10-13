@@ -5,15 +5,15 @@ import {
   Keyboard,
   Pressable,
   StyleSheet,
-  Switch,
   Text,
   View,
   type ScrollView,
 } from 'react-native';
 import { color, radius, space } from '@fieldsolo/design-system/lib/tokens';
 import type { JobDetailViewModel } from '@fieldsolo/shared-types';
-import { computeJobPricing, roundHalfUpBps } from '@fieldsolo/document-renderer';
 import {
+  DEFAULT_BUSINESS_SETTINGS,
+  fetchBusinessSettings,
   formatLocalDateLabel,
   formatSessionDurationLabel,
   formatSessionTimeLabel,
@@ -149,41 +149,6 @@ function JobDetailEditFocusScroller({
   return null;
 }
 
-function previewRevenueCents(draft: {
-  laborServicesCents: number | null;
-  materials: {
-    removed: boolean;
-    totalCostCents: number;
-    capturedMarkupBps: number | null;
-    markupOverrideBps: number | null;
-  }[];
-  otherCosts: { removed: boolean; costCents: number; costType: string; invoiceCustomer: boolean }[];
-}): number {
-  const priced = computeJobPricing({
-    laborServicesCents: draft.laborServicesCents,
-    taxRateBps: 0,
-    taxableCategories: [],
-    costs: [
-      ...draft.materials
-        .filter((row) => !row.removed)
-        .map((row) => ({
-          costType: 'material' as const,
-          totalCostCents: Math.max(0, row.totalCostCents),
-          capturedMarkupBps: row.capturedMarkupBps,
-          markupOverrideBps: row.markupOverrideBps,
-        })),
-      ...draft.otherCosts
-        .filter((row) => !row.removed && row.costType)
-        .map((row) => ({
-          costType: row.costType as 'other',
-          totalCostCents: Math.max(0, row.costCents),
-          invoiceCustomer: row.invoiceCustomer,
-        })),
-    ],
-  });
-  return priced.revenueCents ?? 0;
-}
-
 function parseRevenueInput(text: string): number | null {
   const trimmed = text.trim().replace(/[@$,\s]/g, '');
   if (trimmed.length === 0) return null;
@@ -209,6 +174,17 @@ function formatMoneyFieldOnBlur(text: string, setText: (value: string) => void) 
 function formatUnitPriceFieldOnBlur(text: string, setText: (value: string) => void) {
   const cents = parseRevenueInput(text);
   setText(cents != null ? `@ ${formatUsdCombined(cents)}` : '');
+}
+
+function parseMarkupInput(text: string): number | null {
+  const trimmed = text.trim().replace(/%\s*(?:\((?:default markup|default material markup|default)\)|markup)?$/i, '').trim();
+  if (trimmed === '' || !/^\d+(\.\d{0,2})?$/.test(trimmed)) return null;
+  return Math.round(Number(trimmed) * 100);
+}
+
+function markupToInput(markupBps: number | null, defaultMarkupBps: number): string {
+  const value = markupBps ?? defaultMarkupBps;
+  return `${value / 100}%${markupBps == null ? ' (default markup)' : ' markup'}`;
 }
 
 function parseQuantityInput(text: string): number | null {
@@ -313,6 +289,26 @@ export function JobDetailEditMode({
     },
     [],
   );
+  const [businessMarkupBps, setBusinessMarkupBps] = useState(
+    DEFAULT_BUSINESS_SETTINGS.materialMarkupBps,
+  );
+  useEffect(() => {
+    if (!active || !invoicingEnabled) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { data, error } = await supabase.auth.getUser();
+        if (error || !data.user) return;
+        const settings = await fetchBusinessSettings(supabase, data.user.id);
+        if (!cancelled) setBusinessMarkupBps(settings.materialMarkupBps);
+      } catch {
+        // Keep the standard zero markup default if settings cannot be loaded.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [active, invoicingEnabled, supabase]);
   const pricingCents = invoicingEnabled
     ? draft?.laborServicesCents ?? null
     : draft?.revenueCents ?? null;
@@ -343,9 +339,12 @@ export function JobDetailEditMode({
   ]);
 
   useEffect(() => {
-    setRevenueText(revenueCentsToInput(getDraftSnapshot().draft?.revenueCents ?? null));
+    const current = getDraftSnapshot().draft;
+    setRevenueText(revenueCentsToInput(
+      invoicingEnabled ? current?.laborServicesCents ?? null : current?.revenueCents ?? null,
+    ));
     setIsRevenueFocused(false);
-  }, [getDraftSnapshot, resetVersion]);
+  }, [getDraftSnapshot, invoicingEnabled, resetVersion]);
 
   const openPicker = useCallback((target: EditPickerTarget) => {
     Keyboard.dismiss();
@@ -377,6 +376,10 @@ export function JobDetailEditMode({
     (text: string) => {
       const parsed = parseRevenueInput(text);
       formatMoneyFieldOnBlur(text, setRevenueText);
+      const current = getDraftSnapshot().draft;
+      if (!current) return;
+      const currentCents = invoicingEnabled ? current.laborServicesCents : current.revenueCents;
+      if (parsed === currentCents) return;
       if (invoicingEnabled) {
         updateDraft({
           laborServicesCents: parsed,
@@ -400,10 +403,11 @@ export function JobDetailEditMode({
   );
 
   useEffect(() => {
+    if (focusTarget === 'docs') return;
     return registerFieldFlusher(() => {
       commitRevenueFromText(revenueTextRef.current);
     });
-  }, [commitRevenueFromText, registerFieldFlusher]);
+  }, [commitRevenueFromText, focusTarget, registerFieldFlusher]);
 
   const flushFields = useCallback(() => {
     for (const flush of fieldFlushersRef.current) {
@@ -612,17 +616,11 @@ export function JobDetailEditMode({
                 }}
               />
             </EditIconRow>
-            {invoicingEnabled ? (
-              <View style={invoicingStyles.totalRow}>
-                <Text style={[typography.bodySmall, { color: fg.secondary }]}>Revenue</Text>
-                <Text style={typography.bodyBold}>{formatUsdCombined(previewRevenueCents(draft))}</Text>
-              </View>
-            ) : null}
             {(invoicingEnabled ? (draft.laborServicesCents ?? 0) : (draft.revenueCents ?? 0)) <= 0 ? (
               <EditConfirmNoneRow
                 typography={typography}
                 confirmed={draft.noRevenueConfirmed}
-                confirmLabel="Confirm no revenue"
+                confirmLabel="Confirm no labor"
                 confirmedLabel="No revenue confirmed"
                 disabled={saving}
                 onToggle={() => {
@@ -699,6 +697,7 @@ export function JobDetailEditMode({
                   onOpenPicker={openPicker}
                   registerFieldFlusher={registerFieldFlusher}
                   invoicingEnabled={invoicingEnabled}
+                  defaultMarkupBps={businessMarkupBps}
                 />
                 </View>
               ))}
@@ -927,6 +926,7 @@ function MaterialEditBlock({
   onOpenPicker,
   registerFieldFlusher,
   invoicingEnabled = false,
+  defaultMarkupBps,
 }: {
   row: DraftMaterialRow;
   typography: TextStyles;
@@ -937,6 +937,7 @@ function MaterialEditBlock({
   onOpenPicker: (target: EditPickerTarget) => void;
   registerFieldFlusher: (flush: () => void) => () => void;
   invoicingEnabled?: boolean;
+  defaultMarkupBps: number;
 }) {
   const [totalCostText, setTotalCostText] = useState(() =>
     revenueCentsToInput(row.totalCostCents),
@@ -947,16 +948,23 @@ function MaterialEditBlock({
   const [quantityText, setQuantityText] = useState(() =>
     quantityToInput(row.quantity, row.quantityExplicit),
   );
+  const [markupText, setMarkupText] = useState(() =>
+    markupToInput(row.markupOverrideBps, defaultMarkupBps),
+  );
   const [isTotalCostFocused, setIsTotalCostFocused] = useState(false);
   const [isUnitPriceFocused, setIsUnitPriceFocused] = useState(false);
   const [isQuantityFocused, setIsQuantityFocused] = useState(false);
+  const [isMarkupFocused, setIsMarkupFocused] = useState(false);
+  const isDefaultMarkup = row.markupOverrideBps == null;
   const totalCostTextRef = useRef(totalCostText);
   const unitPriceTextRef = useRef(unitPriceText);
   const quantityTextRef = useRef(quantityText);
+  const markupTextRef = useRef(markupText);
   const rowRef = useRef(row);
   totalCostTextRef.current = totalCostText;
   unitPriceTextRef.current = unitPriceText;
   quantityTextRef.current = quantityText;
+  markupTextRef.current = markupText;
   rowRef.current = row;
 
   const hasCompleteBreakdown = row.quantityExplicit && row.unitCostExplicit;
@@ -1001,6 +1009,11 @@ function MaterialEditBlock({
     setQuantityText(quantityToInput(row.quantity, row.quantityExplicit));
   }, [isQuantityFocused, row.quantity, row.quantityExplicit]);
 
+  useEffect(() => {
+    if (isMarkupFocused) return;
+    setMarkupText(markupToInput(row.markupOverrideBps, defaultMarkupBps));
+  }, [defaultMarkupBps, isMarkupFocused, row.markupOverrideBps]);
+
   const commitTotalCost = useCallback(() => {
     const current = rowRef.current;
     if (current.quantityExplicit && current.unitCostExplicit) return;
@@ -1028,16 +1041,26 @@ function MaterialEditBlock({
     });
   }, [onChange]);
 
+  const commitMarkup = useCallback(() => {
+    const markupOverrideBps = markupTextRef.current.trim() === '' || /\(default (?:material )?markup\)$/i.test(markupTextRef.current.trim())
+      ? null
+      : parseMarkupInput(markupTextRef.current) ?? defaultMarkupBps;
+    setMarkupText(markupToInput(markupOverrideBps, defaultMarkupBps));
+    onChange({ markupOverrideBps });
+  }, [defaultMarkupBps, onChange]);
+
   useEffect(() => {
     const unsubTotal = registerFieldFlusher(commitTotalCost);
     const unsubUnit = registerFieldFlusher(commitUnitPrice);
     const unsubQty = registerFieldFlusher(commitQuantity);
+    const unsubMarkup = invoicingEnabled ? registerFieldFlusher(commitMarkup) : undefined;
     return () => {
       unsubTotal();
       unsubUnit();
       unsubQty();
+      unsubMarkup?.();
     };
-  }, [commitQuantity, commitTotalCost, commitUnitPrice, registerFieldFlusher]);
+  }, [commitMarkup, commitQuantity, commitTotalCost, commitUnitPrice, invoicingEnabled, registerFieldFlusher]);
 
   return (
     <EntityBlock
@@ -1124,6 +1147,41 @@ function MaterialEditBlock({
             />
           }
         />
+        {invoicingEnabled ? (
+          <View style={invoicingStyles.markupRow}>
+            <EditFieldInput
+              typography={typography}
+              placeholder={isMarkupFocused ? String(defaultMarkupBps / 100) : 'Material Markup %'}
+              accessibilityLabel="Material Markup %"
+              style={{ flex: 1, minWidth: 0, width: 'auto' }}
+              keyboardType="decimal-pad"
+              value={markupText}
+              inputMode="decimal"
+              onFocus={() => {
+                const text = isDefaultMarkup
+                  ? ''
+                  : markupTextRef.current.replace(/%\s*(?:\((?:default markup|default material markup|default)\)|markup)?$/i, '').trim();
+                markupTextRef.current = text;
+                setMarkupText(text);
+                setIsMarkupFocused(true);
+              }}
+              onBlur={() => {
+                commitMarkup();
+                setIsMarkupFocused(false);
+              }}
+              onChangeText={(text) => {
+                markupTextRef.current = text;
+                setMarkupText(text);
+                if (text.trim() === '') {
+                  onChange({ markupOverrideBps: null });
+                } else {
+                  const value = parseMarkupInput(text);
+                  if (value != null) onChange({ markupOverrideBps: value });
+                }
+              }}
+            />
+          </View>
+        ) : null}
       </EditIconGroup>
       <EditIconRow icon={<EditIconLink color={iconColor} />}>
         <SessionAttachRow
@@ -1135,32 +1193,6 @@ function MaterialEditBlock({
           }
         />
       </EditIconRow>
-      {invoicingEnabled ? (
-        <EditIconRow icon={<JobDetailIconSectionMaterials color={iconColor} />}>
-          <View style={invoicingStyles.pricingFields}>
-            <Text style={[typography.bodySmall, { color: fg.secondary }]}>Material markup</Text>
-            <View style={invoicingStyles.totalRowInline}>
-              <EditFieldInput typography={typography} placeholder="Markup" accessibilityLabel="Markup percentage"
-                style={{ flex: 1, minWidth: 0, width: 'auto' }}
-                keyboardType="decimal-pad" value={String((row.markupOverrideBps ?? row.capturedMarkupBps ?? 0) / 100)}
-                onChangeText={(text) => {
-                  const trimmed = text.trim();
-                  if (!/^\d+(\.\d{0,2})?$/.test(trimmed)) return;
-                  onChange({ markupOverrideBps: Math.round(Number(trimmed) * 100) });
-                }} />
-              <Text style={typography.body}>%</Text>
-            </View>
-            <Text style={[typography.bodySmall, { color: fg.secondary }]}>
-              {`Customer price ${formatUsdCombined(row.totalCostCents + roundHalfUpBps(row.totalCostCents, row.markupOverrideBps ?? row.capturedMarkupBps ?? 0))}`}
-            </Text>
-            <Text style={[typography.bodySmall, { color: fg.secondary }]}>Customer price includes markup.</Text>
-            <Pressable accessibilityRole="button" accessibilityLabel="Reset to original markup"
-              onPress={() => onChange({ markupOverrideBps: null })} style={invoicingStyles.reset}>
-              <Text style={[typography.bodySmall, invoicingStyles.action]}>Reset to original markup</Text>
-            </Pressable>
-          </View>
-        </EditIconRow>
-      ) : null}
     </EntityBlock>
   );
 }
@@ -1246,6 +1278,16 @@ function OtherCostEditBlock({
           placeholder="Description"
         />
       </EditIconGroup>
+      {invoicingEnabled ? (
+        <EditConfirmNoneRow
+          typography={typography}
+          confirmed={row.invoiceCustomer}
+          confirmLabel="Invoice customer"
+          confirmedLabel="Invoice customer"
+          showTopBorder={false}
+          onToggle={() => onChange({ invoiceCustomer: !row.invoiceCustomer })}
+        />
+      ) : null}
       <EditIconRow icon={<EditIconLink color={iconColor} />}>
         <SessionAttachRow
           typography={typography}
@@ -1256,17 +1298,6 @@ function OtherCostEditBlock({
           }
         />
       </EditIconRow>
-      {invoicingEnabled ? (
-        <View style={invoicingStyles.billableRow}>
-          <View style={invoicingStyles.billableLabel}>
-            <Text style={typography.body}>Invoice customer</Text>
-            <Text style={[typography.bodySmall, { color: fg.secondary }]}>Adds this cost to the customer’s estimate or invoice.</Text>
-          </View>
-          <Switch accessibilityLabel="Invoice customer" value={row.invoiceCustomer}
-            trackColor={{ false: border.subtle, true: color('Brand/Accent') }} thumbColor={bg.surfaceWhite}
-            onValueChange={(value) => onChange({ invoiceCustomer: value })} />
-        </View>
-      ) : null}
     </EntityBlock>
   );
 }
@@ -1362,9 +1393,5 @@ const invoicingStyles = StyleSheet.create({
   notice: { padding: space('Spacing/16'), gap: space('Spacing/8'), backgroundColor: bg.subtle },
   action: { color: color('Brand/Primary') },
   totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: space('Spacing/16'), paddingVertical: space('Spacing/12'), gap: space('Spacing/12') },
-  totalRowInline: { flexDirection: 'row', alignItems: 'center', gap: space('Spacing/8') },
-  pricingFields: { width: '100%', gap: space('Spacing/4') },
-  reset: { minHeight: 44, justifyContent: 'center' },
-  billableRow: { flexDirection: 'row', alignItems: 'center', padding: space('Spacing/16'), gap: space('Spacing/12') },
-  billableLabel: { flex: 1, gap: space('Spacing/4') },
+  markupRow: { flexDirection: 'row', alignItems: 'center', gap: space('Spacing/8') },
 });

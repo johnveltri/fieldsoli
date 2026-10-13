@@ -13,6 +13,7 @@ type EditSwipeableRowProps = {
   accessibilityLabel: string;
   /** When false, disables swipe-to-delete without remounting children that may hold focus. */
   enabled?: boolean;
+  actionLabel?: string;
 };
 
 type SwipeableAccessibilityProps = Pick<
@@ -34,6 +35,7 @@ export function EditSwipeableRow({
   onDelete,
   accessibilityLabel,
   enabled = true,
+  actionLabel = 'Delete',
 }: EditSwipeableRowProps) {
   const swipeRef = useRef<Swipeable>(null);
 
@@ -49,7 +51,7 @@ export function EditSwipeableRow({
     return (
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Delete"
+        accessibilityLabel={actionLabel}
         onPress={() => {
           swipeRef.current?.close();
           onDelete();
@@ -57,7 +59,7 @@ export function EditSwipeableRow({
         style={styles.deleteAction}
       >
         <Animated.Text style={[typography.bodyBold, styles.deleteLabel, { transform: [{ scale }] }]}>
-          Delete
+          {actionLabel}
         </Animated.Text>
       </Pressable>
     );
@@ -70,9 +72,9 @@ export function EditSwipeableRow({
       friction={2}
       overshootRight={false}
       renderRightActions={enabled ? renderRightActions : undefined}
-      accessibilityActions={enabled ? [{ name: 'delete', label: 'Delete' }] : []}
+      accessibilityActions={enabled ? [{ name: actionLabel.toLowerCase(), label: actionLabel }] : []}
       onAccessibilityAction={(e) => {
-        if (enabled && e.nativeEvent.actionName === 'delete') onDelete();
+        if (enabled && e.nativeEvent.actionName === actionLabel.toLowerCase()) onDelete();
       }}
     >
       <View accessibilityLabel={accessibilityLabel} style={styles.row}>

@@ -25,6 +25,7 @@ export const OTHER_COST_LABELS: Record<OtherCostCategory, string> = {
 export type PricingCostInput = {
   costType: 'material' | OtherCostCategory;
   totalCostCents: number;
+  /** Historical metadata; defaults are resolved from JobPricingInput.materialMarkupBps. */
   capturedMarkupBps?: number | null;
   markupOverrideBps?: number | null;
   invoiceCustomer?: boolean;
@@ -33,6 +34,8 @@ export type PricingCostInput = {
 
 export type JobPricingInput = {
   laborServicesCents: number | null;
+  /** Current business default; explicit material overrides (including 0) take priority. */
+  materialMarkupBps: number;
   costs: PricingCostInput[];
   taxRateBps: number;
   taxableCategories: readonly TaxableCategory[];
@@ -51,9 +54,9 @@ export type JobPricingResult = {
   otherCharges: { category: OtherCostCategory; label: string; amountCents: number }[];
 };
 
-function effectiveMarkupBps(cost: PricingCostInput): number {
+function effectiveMarkupBps(cost: PricingCostInput, businessDefaultBps: number): number {
   if (cost.markupOverrideBps != null) return cost.markupOverrideBps;
-  return cost.capturedMarkupBps ?? 0;
+  return businessDefaultBps;
 }
 
 export function computeJobPricing(input: JobPricingInput): JobPricingResult {
@@ -69,7 +72,10 @@ export function computeJobPricing(input: JobPricingInput): JobPricingResult {
     }
     directCostCents += cost.totalCostCents;
     if (cost.costType === 'material') {
-      const markup = roundHalfUpBps(cost.totalCostCents, effectiveMarkupBps(cost));
+      const markup = roundHalfUpBps(
+        cost.totalCostCents,
+        effectiveMarkupBps(cost, input.materialMarkupBps),
+      );
       materialCostCents += cost.totalCostCents;
       materialChargeCents += cost.totalCostCents + markup;
       continue;

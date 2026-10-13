@@ -55,6 +55,7 @@ export function makeBuilder(options: BuilderOptions = {}) {
 type ClientOptions = {
   authUserId?: string | null;
   buildersByTable: Record<string, ReturnType<typeof makeBuilder>[]>;
+  rpcResult?: QueryResult;
 };
 
 export function makeClient(options: ClientOptions) {
@@ -73,6 +74,7 @@ export function makeClient(options: ClientOptions) {
     }
     return next;
   });
+  const rpc = vi.fn(async () => options.rpcResult ?? { data: null, error: null });
 
   return {
     auth: {
@@ -88,5 +90,6 @@ export function makeClient(options: ClientOptions) {
       })),
     },
     from,
+    rpc,
   } as const;
 }

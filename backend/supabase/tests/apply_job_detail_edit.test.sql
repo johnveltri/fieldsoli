@@ -38,8 +38,8 @@ begin
   perform set_config('request.jwt.claim.sub', user_a::text, true);
   perform set_config('request.jwt.claim.role', 'authenticated', true);
 
-  insert into public.jobs (user_id, short_description, revenue_cents, materials_reviewed_at, other_costs_reviewed_at)
-  values (user_a, 'Edit RPC job', 5000, now(), now()) returning id into job_a;
+  insert into public.jobs (user_id, short_description, revenue_cents, materials_reviewed_at, other_costs_reviewed_at, revenue_invoice_required)
+  values (user_a, 'Edit RPC job', 5000, now(), now(), false) returning id into job_a;
 
   insert into public.sessions (job_id, user_id, entry_mode, session_status, started_at, ended_at, clock_times_explicit)
   values (job_a, user_a, 'manual', 'ended', now() - interval '2 hours', now() - interval '1 hour', true)
@@ -283,8 +283,8 @@ begin
   -- Storage timestamps for an undated, zero-duration partial session must not
   -- fabricate last-worked, work status, or record completeness.
   insert into public.jobs (
-    user_id, short_description, revenue_cents, materials_reviewed_at, other_costs_reviewed_at
-  ) values (user_a, 'Partial session job', 5000, now(), now()) returning id into partial_job;
+    user_id, short_description, revenue_cents, materials_reviewed_at, other_costs_reviewed_at, revenue_invoice_required
+  ) values (user_a, 'Partial session job', 5000, now(), now(), false) returning id into partial_job;
   perform public.apply_job_detail_edit(partial_job, jsonb_build_object(
     'job', jsonb_build_object(
       'shortDescription', 'Partial session job',
@@ -406,8 +406,8 @@ begin
 
   begin
     perform set_config('request.jwt.claim.sub', user_b::text, true);
-    insert into public.jobs (user_id, short_description)
-    values (user_b, 'Other tenant job') returning id into job_b;
+    insert into public.jobs (user_id, short_description, revenue_invoice_required)
+    values (user_b, 'Other tenant job', false) returning id into job_b;
     begin
       perform public.apply_job_detail_edit(job_b, jsonb_build_object(
         'job', jsonb_build_object(

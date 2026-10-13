@@ -61,6 +61,18 @@ export type ApplyJobDetailEditOtherCostRow = {
   invoiceCustomer?: boolean;
 };
 
+export type ApplyJobInvoicePreferences = {
+  revenueDocumentId: string | null;
+  expectedRevenueDocumentId: string | null;
+  confirmedPaidTotalCents?: number | null;
+  controls: Array<{
+    documentId: string;
+    archived: boolean;
+    linkEnabled: boolean;
+    expectedRevision: number;
+  }>;
+};
+
 export type ApplyJobDetailEditPayload = {
   job: ApplyJobDetailEditJobPatch;
   sessions: {
@@ -83,6 +95,7 @@ export type ApplyJobDetailEditPayload = {
     update: ApplyJobDetailEditOtherCostRow[];
     deleteIds: string[];
   };
+  invoicePreferences?: ApplyJobInvoicePreferences;
 };
 
 export type ApplyJobDetailEditErrorCode =
@@ -141,6 +154,7 @@ function toRpcPayload(payload: ApplyJobDetailEditPayload): Record<string, unknow
     notes: payload.notes,
     materials: payload.materials,
     otherCosts: payload.otherCosts,
+    ...(payload.invoicePreferences ? { invoicePreferences: payload.invoicePreferences } : {}),
   };
 }
 
@@ -150,7 +164,7 @@ export async function applyJobDetailEdit(
   jobId: JobId,
   payload: ApplyJobDetailEditPayload,
 ): Promise<void> {
-  const { data, error } = await client.rpc('apply_job_detail_edit_atomic', {
+  const { data, error } = await client.rpc('apply_job_detail_edit_with_invoice_preferences', {
     p_job_id: jobId,
     p_payload: toRpcPayload(payload) as import('./database.types').Json,
   });

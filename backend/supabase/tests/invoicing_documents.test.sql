@@ -43,9 +43,9 @@ begin
   end if;
 
   insert into public.jobs (
-    user_id, short_description, customer_name, revenue_cents
+    user_id, short_description, customer_name, revenue_cents, revenue_invoice_required
   ) values (
-    owner, 'Panel upgrade', 'Ada Lovelace', null
+    owner, 'Panel upgrade', 'Ada Lovelace', null, false
   ) returning id into job_id;
   if (select pricing_mode from public.jobs where id = job_id) <> 'legacy' then
     raise exception 'null revenue insert should stay legacy until priced';
@@ -137,13 +137,19 @@ begin
     raise exception 'disabled link was distinguishable';
   end if;
 
-  update public.jobs set collected_cents = revenue_cents where id = job_id;
+  perform public.finalize_job_with_invoice(
+    job_id, 'paid', (created ->> 'id')::uuid, null, 'America/Chicago',
+    gen_random_uuid(), (created -> 'payload' ->> 'totalCents')::bigint
+  );
   if (select job_payment_state from public.jobs where id = job_id) <> 'paid' then
     raise exception 'collected revenue did not project paid';
   end if;
+  if (private.owner_document_json((created ->> 'id')::uuid) ->> 'paymentProjection') <> 'paid' then
+    raise exception 'selected invoice did not retain the paid payment status';
+  end if;
 
-  insert into public.jobs (user_id, short_description, revenue_cents)
-  values (owner, 'Too small', 1000)
+  insert into public.jobs (user_id, short_description, revenue_cents, revenue_invoice_required)
+  values (owner, 'Too small', 1000, false)
   returning id into negative_job;
   insert into public.job_costs (
     user_id, job_id, description, quantity, unit, unit_cost_cents, total_cost_cents, cost_type

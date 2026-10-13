@@ -81,11 +81,11 @@ values (
   now(), date_trunc('year', now()) - interval '3 years'
 );
 
-insert into public.jobs (id, user_id, short_description, job_work_status, revenue_cents, collected_cents)
+insert into public.jobs (id, user_id, short_description, job_work_status, revenue_cents, collected_cents, revenue_invoice_required)
 values (
   current_setting('fieldsoli.export_test_job_id')::uuid,
   current_setting('fieldsoli.export_test_user_id')::uuid,
-  'Export timestamp test', 'completed', 10000, 10000
+  'Export timestamp test', 'completed', 10000, 10000, false
 );
 
 do $$
@@ -159,11 +159,11 @@ declare
   current_year integer := extract(year from now() at time zone 'UTC')::integer;
 begin
   for offset_year in 1..3 loop
-    insert into public.jobs (user_id, short_description, job_work_status)
+    insert into public.jobs (user_id, short_description, job_work_status, revenue_invoice_required)
     values (
       current_setting('fieldsoli.export_test_user_id')::uuid,
       'Historical export test ' || offset_year,
-      'completed'
+      'completed', false
     ) returning id into historical_job_id;
 
     update public.jobs

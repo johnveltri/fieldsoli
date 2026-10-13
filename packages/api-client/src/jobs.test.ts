@@ -1385,6 +1385,10 @@ describe('jobs api client', () => {
         ],
         notes: [notesBuilder],
       },
+      rpcResult: {
+        data: { id: 'invoice-1', documentType: 'invoice', documentNumber: 7 },
+        error: null,
+      },
     });
 
     const [listRows, detail] = await Promise.all([
@@ -1411,6 +1415,11 @@ describe('jobs api client', () => {
     expect(listRow.isFinanciallyComplete).toBe(true);
     expect(listRow.hasMaterials).toBe(true);
     expect(listRow.hasSessions).toBe(true);
+    expect(jobDetail.revenueInvoice).toEqual({
+      id: 'invoice-1',
+      documentNumber: 7,
+      documentType: 'invoice',
+    });
   });
 
   it('fetchJobDetail includes only ended sessions in the sessions list', async () => {
