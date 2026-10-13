@@ -32,13 +32,13 @@ import * as SMS from 'expo-sms';
 import { Asset } from 'expo-asset';
 import { File, Paths } from 'expo-file-system';
 import {
-  Copy,
-  Download,
-  ExternalLink,
-  Forward,
-  Mail,
-  MessageCircle,
-} from 'lucide-react-native';
+  IconCopy,
+  IconDownload,
+  IconExternalLink,
+  IconShare3,
+  IconMail,
+  IconMessageCircle,
+} from '@tabler/icons-react-native';
 import { PTSerif_700Bold } from '@expo-google-fonts/pt-serif';
 import {
   Ubuntu_400Regular,
@@ -1003,9 +1003,9 @@ export const InvoicingJobControls = forwardRef<
                   ) : null}
                   <View style={styles.shortcuts}>
                     {([
-                      { kind: 'text', label: 'Text', Icon: MessageCircle },
-                      { kind: 'email', label: 'Email', Icon: Mail },
-                      { kind: 'share', label: 'Share', Icon: Forward },
+                      { kind: 'text', label: 'Text', Icon: IconMessageCircle },
+                      { kind: 'email', label: 'Email', Icon: IconMail },
+                      { kind: 'share', label: 'Share', Icon: IconShare3 },
                     ] as const).map(({ kind, label, Icon }) => (
                       <Pressable
                         key={kind}
@@ -1044,7 +1044,7 @@ export const InvoicingJobControls = forwardRef<
                         label: copySuccess ? 'Copied' : 'Copy link',
                         onPress: () => void copyLink(),
                         trailingIcon: (
-                          <Copy
+                          <IconCopy
                             size={20}
                             color={fg.secondary}
                             strokeWidth={2}
@@ -1056,7 +1056,7 @@ export const InvoicingJobControls = forwardRef<
                         label: 'Open in browser',
                         onPress: () => void requestHandoff('browser'),
                         trailingIcon: (
-                          <ExternalLink
+                          <IconExternalLink
                             size={20}
                             color={fg.secondary}
                             strokeWidth={2}
@@ -1073,7 +1073,7 @@ export const InvoicingJobControls = forwardRef<
                           ? undefined
                           : () => void requestHandoff('pdf'),
                         trailingIcon: (
-                          <Download
+                          <IconDownload
                             size={20}
                             color={fg.secondary}
                             strokeWidth={2}
