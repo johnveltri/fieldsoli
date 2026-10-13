@@ -149,10 +149,14 @@ td.amount.with-details { vertical-align: middle; }
 .badge { display: inline-block; border: 1px solid #000; padding: 2px 8px; font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
 @media print {
   .page { max-width: none; padding: 0; }
+  body { font-size: 11pt; line-height: 1.4; }
+  h1 { font-size: 20pt; }
+  h2 { font-size: 15pt; }
+  .kicker, .meta span, th, .line-details, .badge { font-size: 9pt; }
   thead { display: table-header-group; }
   tr, .totals .final { break-inside: avoid; }
-  @page { size: letter; margin: 0.5in; }
 }
+@page { size: letter; margin: 0.5in; }
 `.trim();
 
 export function renderDocument(
@@ -328,6 +332,7 @@ td.amount.with-details { vertical-align: middle; }
 .notes p { white-space: pre-wrap; }
 .totals { width: 100%; }
 .totals .summary-row { padding: 8px 10px; border-bottom: 1px solid #e5e5e5; }
+.totals .summary-row:nth-last-child(2) { border-bottom: 0; }
 .totals .final { font-family: var(--font-bold); font-size: 18px; line-height: 1.4; border-top: 2px solid #333; border-bottom: 0; margin-top: 3px; padding-top: 12px; }
 @media (max-width: 540px) {
   .page { padding: 22px 18px 150px; }

@@ -15,6 +15,7 @@ import {
   Linking,
   Modal,
   Pressable,
+  Platform,
   ScrollView,
   Share,
   StyleSheet,
@@ -27,8 +28,10 @@ import * as Clipboard from 'expo-clipboard';
 import * as MailComposer from 'expo-mail-composer';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import * as SMS from 'expo-sms';
 import { Asset } from 'expo-asset';
-import { File } from 'expo-file-system';
+import { File, Paths } from 'expo-file-system';
+import { Mail, MessageCircle, Share2 } from 'lucide-react-native';
 import { PTSerif_700Bold } from '@expo-google-fonts/pt-serif';
 import {
   Ubuntu_400Regular,
@@ -62,11 +65,10 @@ import {
   documentNumberLabel,
   gapLabels,
   gmailSubject,
-  gmailUrl,
+  mailtoUrl,
   pdfFileName,
-  smsUrl,
-  whatsAppUrl,
 } from '../../lib/documentShare';
+import { announceAccessibilityMessage } from '../../lib/accessibility';
 import {
   bg,
   border,
@@ -104,6 +106,10 @@ type Props = {
   /** Saves uncommitted Job edits before opening a preview. Return false to cancel. */
   beforeOpen?: () => Promise<boolean>;
 };
+
+type QueuedHandoff =
+  | { kind: 'text' | 'email' | 'share' | 'browser' }
+  | { kind: 'pdf'; uri: string };
 
 let previewFontDataPromise: Promise<PreviewFontData> | null = null;
 
@@ -223,7 +229,7 @@ export const InvoicingJobControls = forwardRef<
       useNativeDriver: true,
     }).start();
   }, [previewTranslateY, reduceMotion]);
-  const setPreviewOpen = useCallback((open: boolean) => {
+  const setPreviewOpen = useCallback((open: boolean, afterClose?: () => void) => {
     previewTranslateY.stopAnimation();
     if (open) {
       previewTranslateY.setValue(previewWindowHeight);
@@ -236,7 +242,10 @@ export const InvoicingJobControls = forwardRef<
       easing: Easing.in(Easing.cubic),
       useNativeDriver: true,
     }).start(({ finished }) => {
-      if (finished) setPreviewOpenState(false);
+      if (finished) {
+        setPreviewOpenState(false);
+        afterClose?.();
+      }
     });
   }, [previewTranslateY, previewWindowHeight, reduceMotion]);
   const [previewHeight, setPreviewHeight] = useState(600);
@@ -244,9 +253,31 @@ export const InvoicingJobControls = forwardRef<
   const [previewFontsReady, setPreviewFontsReady] = useState(false);
   const [businessOpen, setBusinessOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  const [shareModalMounted, setShareModalMounted] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
+  const [copySuccess, setCopySuccess] = useState(false);
   const [requestKey, setRequestKey] = useState<string | null>(null);
   const [offline, setOffline] = useState(false);
+  const queuedHandoffRef = useRef<QueuedHandoff | null>(null);
+  const handoffRunningRef = useRef(false);
+  const copySuccessTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const openShareSheet = useCallback(() => {
+    setShareModalMounted(true);
+    setShareOpen(true);
+  }, []);
+
+  const closeShareSheet = useCallback(() => {
+    if (busy) return;
+    setShareOpen(false);
+  }, [busy]);
+
+  useEffect(
+    () => () => {
+      if (copySuccessTimeoutRef.current) clearTimeout(copySuccessTimeoutRef.current);
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!previewOpen) return;
@@ -360,7 +391,7 @@ export const InvoicingJobControls = forwardRef<
       });
       setSaved(created);
       setRequestKey(null);
-      setShareOpen(true);
+      openShareSheet();
       await reload();
     } catch (error) {
       if (error instanceof FinancialDocumentError && error.code === 'stale') {
@@ -385,7 +416,7 @@ export const InvoicingJobControls = forwardRef<
     } finally {
       setBusy(null);
     }
-  }, [client, jobId, preview, previewType, reload, requestKey]);
+  }, [client, jobId, openShareSheet, preview, previewType, reload, requestKey]);
 
   const active = saved;
   const link = active ? shareDocumentUrl(active.token) : '';
@@ -395,103 +426,174 @@ export const InvoicingJobControls = forwardRef<
         number: active.documentNumber,
         businessName: active.payload.businessName,
         url: link,
-      })
+    })
     : '';
 
-  const handoff = useCallback(
-    async (
-      kind:
-        'messages' | 'whatsapp' | 'gmail' | 'more' | 'copy' | 'browser' | 'pdf',
-    ) => {
-      if (!active) return;
-      if (!active.linkEnabled && kind !== 'pdf') {
-        Alert.alert('Enable the shared link in Docs to share a link.');
-        return;
-      }
-      try {
-        if (kind === 'copy') {
-          await Clipboard.setStringAsync(link);
-          Alert.alert('Link copied.');
+  const offerNativeShareFallback = useCallback((message: string) => {
+    Alert.alert(message, undefined, [
+      { text: 'Cancel', style: 'cancel', onPress: () => setPreviewOpen(true) },
+      {
+        text: 'Share link…',
+        onPress: () => {
+          void Share.share({ message: linkText, title: active ? documentNumberLabel(active.documentType, active.documentNumber) : undefined })
+            .catch(() => Alert.alert('Could not share this link. Try again.'))
+            .finally(() => setPreviewOpen(true));
+        },
+      },
+    ]);
+  }, [active, linkText, setPreviewOpen]);
+
+  const performQueuedHandoff = useCallback(async () => {
+    const action = queuedHandoffRef.current;
+    if (!active || !action || handoffRunningRef.current) return;
+    queuedHandoffRef.current = null;
+    handoffRunningRef.current = true;
+    let fallbackAlertOpen = false;
+    let handoffFailed = false;
+    try {
+      if (action.kind === 'text') {
+        if (!(await SMS.isAvailableAsync())) {
+          fallbackAlertOpen = true;
+          offerNativeShareFallback('Messages is unavailable on this device.');
           return;
         }
-        if (kind === 'browser') {
-          const opened = await Linking.openURL(link);
-          if (!opened) Alert.alert('Could not open this link. Try again.');
-          return;
-        }
-        if (kind === 'messages') {
-          await Linking.openURL(smsUrl(active.payload.customerPhone, linkText));
-          return;
-        }
-        if (kind === 'whatsapp') {
-          const url = whatsAppUrl(active.payload.customerPhone, linkText);
-          const can = url ? await Linking.canOpenURL(url) : false;
-          if (!can || !url) {
-            Alert.alert(
-              'WhatsApp is unavailable. Use More to share this link.',
-            );
-            return;
-          }
-          await Linking.openURL(url);
-          return;
-        }
-        if (kind === 'gmail') {
-          const available = await MailComposer.isAvailableAsync();
-          if (!available) {
-            Alert.alert('Gmail is unavailable. Use More to share this link.');
-            return;
-          }
-          await Linking.openURL(
-            gmailUrl({
-              email: active.payload.customerEmail,
-              subject: gmailSubject({
-                type: active.documentType,
-                number: active.documentNumber,
-                businessName: active.payload.businessName,
-              }),
-              body: linkText,
-            }),
-          ).catch(async () => {
+        await SMS.sendSMSAsync(active.payload.customerPhone ?? '', linkText);
+      } else if (action.kind === 'email') {
+        const subject = gmailSubject({
+          type: active.documentType,
+          number: active.documentNumber,
+          businessName: active.payload.businessName,
+        });
+        try {
+          await Linking.openURL(mailtoUrl({
+            email: active.payload.customerEmail,
+            subject,
+            body: linkText,
+          }));
+        } catch {
+          if (await MailComposer.isAvailableAsync()) {
             await MailComposer.composeAsync({
-              subject: gmailSubject({
-                type: active.documentType,
-                number: active.documentNumber,
-                businessName: active.payload.businessName,
-              }),
+              subject,
               body: linkText,
               recipients: active.payload.customerEmail
                 ? [active.payload.customerEmail]
                 : [],
             });
-          });
-          return;
+          } else {
+            fallbackAlertOpen = true;
+            offerNativeShareFallback('Email is unavailable on this device.');
+            return;
+          }
         }
-        if (kind === 'more') {
-          await Share.share({ message: linkText });
-          return;
-        }
-        setBusy('Creating PDF…');
-        const file = await Print.printToFileAsync({
-          html: htmlFor(active),
+      } else if (action.kind === 'share') {
+        await Share.share({
+          message: linkText,
+          title: documentNumberLabel(active.documentType, active.documentNumber),
         });
+      } else if (action.kind === 'browser') {
+        await Linking.openURL(link);
+      } else if (action.kind === 'pdf') {
+        await Sharing.shareAsync(action.uri, {
+          mimeType: 'application/pdf',
+          UTI: 'com.adobe.pdf',
+          dialogTitle: action.uri.split('/').at(-1),
+        });
+      }
+    } catch {
+      handoffFailed = true;
+      const message = action.kind === 'browser'
+        ? 'Could not open this document. Try again.'
+        : action.kind === 'pdf'
+          ? 'Could not share the PDF. Try again.'
+          : 'Could not open the share option. Try again.';
+      Alert.alert(message, undefined, [
+        { text: 'Close', style: 'cancel', onPress: () => setPreviewOpen(true) },
+        { text: 'Try again', onPress: openShareSheet },
+      ]);
+    } finally {
+      handoffRunningRef.current = false;
+      setBusy(null);
+      if (!fallbackAlertOpen && !handoffFailed) setPreviewOpen(true);
+    }
+  }, [active, link, linkText, offerNativeShareFallback, openShareSheet, setPreviewOpen]);
+
+  const closePreviewForHandoff = useCallback(() => {
+    if (!queuedHandoffRef.current) return;
+    setPreviewOpen(false, () => {
+      if (Platform.OS !== 'ios') {
+        requestAnimationFrame(() => requestAnimationFrame(() => void performQueuedHandoff()));
+      }
+    });
+  }, [performQueuedHandoff, setPreviewOpen]);
+
+  const onShareSheetClosed = useCallback(() => {
+    setShareModalMounted(false);
+    if (Platform.OS !== 'ios' && queuedHandoffRef.current) {
+      requestAnimationFrame(() => requestAnimationFrame(closePreviewForHandoff));
+    }
+  }, [closePreviewForHandoff]);
+
+  const requestHandoff = useCallback(async (
+    kind: 'text' | 'email' | 'share' | 'browser' | 'pdf',
+  ) => {
+    if (!active || handoffRunningRef.current || queuedHandoffRef.current) return;
+    if (!active.linkEnabled && kind !== 'pdf') {
+      Alert.alert('Enable the shared link in Docs to share this document.');
+      return;
+    }
+    handoffRunningRef.current = true;
+    if (kind === 'pdf') {
+      setBusy('Creating PDF…');
+      try {
         if (!(await Sharing.isAvailableAsync())) {
+          handoffRunningRef.current = false;
+          setBusy(null);
           Alert.alert('PDF sharing is unavailable on this device.');
           return;
         }
-        await Sharing.shareAsync(file.uri, {
-          mimeType: 'application/pdf',
-          UTI: 'com.adobe.pdf',
-          dialogTitle: pdfFileName(active.documentType, active.documentNumber),
+        const generated = await Print.printToFileAsync({
+          html: htmlFor(active),
+          margins: { top: 36, right: 36, bottom: 36, left: 36 },
         });
-      } catch {
-        if (kind === 'pdf') Alert.alert('Could not create the PDF. Try again.');
-        else Alert.alert('Could not open this link. Try again.');
-      } finally {
+        const filename = pdfFileName(
+          active.documentType,
+          active.documentNumber,
+          active.payload.businessName,
+        );
+        const namedFile = new File(Paths.cache, filename);
+        await new File(generated.uri).copy(namedFile, { overwrite: true });
+        queuedHandoffRef.current = { kind: 'pdf', uri: namedFile.uri };
         setBusy(null);
+        handoffRunningRef.current = false;
+        closeShareSheet();
+      } catch {
+        handoffRunningRef.current = false;
+        setBusy(null);
+        Alert.alert('Could not create the PDF. Try again.');
       }
-    },
-    [active, link, linkText],
-  );
+      return;
+    }
+    queuedHandoffRef.current = { kind };
+    handoffRunningRef.current = false;
+    closeShareSheet();
+  }, [active, closeShareSheet]);
+
+  const copyLink = useCallback(async () => {
+    if (!active) return;
+    if (!active.linkEnabled) {
+      Alert.alert('Enable the shared link in Docs to share this document.');
+      return;
+    }
+    try {
+      await Clipboard.setStringAsync(link);
+      setCopySuccess(true);
+      announceAccessibilityMessage('Link copied');
+      if (copySuccessTimeoutRef.current) clearTimeout(copySuccessTimeoutRef.current);
+      copySuccessTimeoutRef.current = setTimeout(() => setCopySuccess(false), 1800);
+    } catch {
+      Alert.alert('Could not copy the link. Try again.');
+    }
+  }, [active, link]);
 
   const updateControls = async (
     doc: FinancialDocumentRecord,
@@ -664,6 +766,9 @@ export const InvoicingJobControls = forwardRef<
         transparent
         animationType="none"
         onShow={animatePreviewIn}
+        onDismiss={() => {
+          if (Platform.OS === 'ios') void performQueuedHandoff();
+        }}
         onRequestClose={() => setPreviewOpen(false)}
       >
         <Animated.View
@@ -823,7 +928,7 @@ export const InvoicingJobControls = forwardRef<
                     ? 'SHARE ESTIMATE'
                     : 'SHARE INVOICE'
                 }
-                onPress={() => setShareOpen(true)}
+                onPress={openShareSheet}
                 includeSafeArea
               />
             </View>
@@ -845,24 +950,28 @@ export const InvoicingJobControls = forwardRef<
           </Modal>
 
           <Modal
-            visible={shareOpen}
+            visible={shareModalMounted}
             transparent
             animationType="none"
             statusBarTranslucent
-            onRequestClose={() => setShareOpen(false)}
+            onDismiss={() => {
+              if (Platform.OS === 'ios') closePreviewForHandoff();
+            }}
+            onRequestClose={closeShareSheet}
           >
             <GestureHandlerRootView style={{ flex: 1 }}>
               <BottomSheetShell
                 autoSizeUpToFraction={0.9}
                 visible={shareOpen}
-                onClose={() => setShareOpen(false)}
+                onClose={closeShareSheet}
+                onClosed={onShareSheetClosed}
                 accessibilityTitle="Share document"
               >
                 <View style={styles.sheet}>
                   <View style={styles.shareHeading}>
                     <PlatformHeaderAction
                       accessibilityLabel="Back to preview"
-                      onPress={() => setShareOpen(false)}
+                      onPress={closeShareSheet}
                     >
                       <TopHeaderBackIcon size={24} color={fg.primary} />
                     </PlatformHeaderAction>
@@ -873,58 +982,71 @@ export const InvoicingJobControls = forwardRef<
                     </Text>
                   </View>
                   {active ? (
-                    <Text style={[typography.bodySmall, styles.secondary]}>
-                      {documentNumberLabel(
-                        active.documentType,
-                        active.documentNumber,
-                      )}
-                    </Text>
+                    <View style={styles.shareDetails}>
+                      <Text style={[typography.bodySmall, styles.secondary]}>
+                        {documentNumberLabel(
+                          active.documentType,
+                          active.documentNumber,
+                        )}
+                      </Text>
+                      <Text style={[typography.bodySmall, styles.secondary]}>
+                        {active.payload.customerName}
+                        {active.payload.customerPhone
+                          ? ` · ${formatCustomerPhoneDisplay(active.payload.customerPhone) ?? active.payload.customerPhone}`
+                          : ''}
+                        {active.payload.customerEmail
+                          ? ` · ${active.payload.customerEmail}`
+                          : ''}
+                      </Text>
+                    </View>
                   ) : null}
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.destinations}
-                  >
-                    {(['messages', 'whatsapp', 'gmail', 'more'] as const).map(
-                      (kind) => (
-                        <Pressable
-                          key={kind}
-                          accessibilityRole="button"
-                          onPress={() => void handoff(kind)}
-                          style={({ pressed }) => [
-                            styles.destination,
-                            pressed && styles.pressed,
-                          ]}
-                        >
-                          <Text style={typography.bodyBold}>
-                            {kind === 'messages'
-                              ? 'Messages'
-                              : kind === 'whatsapp'
-                                ? 'WhatsApp'
-                                : kind === 'gmail'
-                                  ? 'Gmail'
-                                  : 'More'}
-                          </Text>
-                        </Pressable>
-                      ),
-                    )}
-                  </ScrollView>
+                  <View style={styles.shortcuts}>
+                    {([
+                      { kind: 'text', label: 'Text', Icon: MessageCircle },
+                      { kind: 'email', label: 'Email', Icon: Mail },
+                      { kind: 'share', label: 'Share', Icon: Share2 },
+                    ] as const).map(({ kind, label, Icon }) => (
+                      <Pressable
+                        key={kind}
+                        accessibilityRole="button"
+                        accessibilityLabel={
+                          kind === 'text'
+                            ? `Text ${active?.payload.customerName ?? 'customer'}`
+                            : kind === 'email'
+                              ? `Email ${active?.payload.customerName ?? 'customer'}`
+                              : 'Share document'
+                        }
+                        accessibilityHint={
+                          kind === 'share'
+                            ? 'Choose an app and recipient'
+                            : 'Opens a message composer'
+                        }
+                        disabled={busy != null}
+                        onPress={() => void requestHandoff(kind)}
+                        style={({ pressed }) => [
+                          styles.shortcut,
+                          pressed && styles.pressed,
+                        ]}
+                      >
+                        <View style={styles.shortcutIcon}>
+                          <Icon size={24} color={fg.primary} strokeWidth={2} />
+                        </View>
+                        <Text style={typography.bodySmall}>{label}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
                   <ProfileRowsCard
                     typography={typography}
                     rows={[
                       {
                         kind: 'link',
-                        label: 'Copy link',
-                        onPress: () => {
-                          void handoff('copy');
-                        },
+                        label: copySuccess ? 'Copied' : 'Copy link',
+                        onPress: () => void copyLink(),
                       },
                       {
                         kind: 'link',
                         label: 'Open in browser',
-                        onPress: () => {
-                          void handoff('browser');
-                        },
+                        onPress: () => void requestHandoff('browser'),
                       },
                       {
                         kind: 'link',
@@ -934,9 +1056,7 @@ export const InvoicingJobControls = forwardRef<
                             : 'Download PDF',
                         onPress: busy
                           ? undefined
-                          : () => {
-                              void handoff('pdf');
-                            },
+                          : () => void requestHandoff('pdf'),
                       },
                     ]}
                   />
@@ -1041,15 +1161,29 @@ const styles = StyleSheet.create({
   },
   web: { width: '100%', backgroundColor: bg.surfaceWhite },
   sheet: { padding: space('Spacing/20'), gap: space('Spacing/12') },
-  destinations: { gap: space('Spacing/8') },
-  destination: {
-    minHeight: 52,
-    padding: space('Spacing/12'),
+  shareDetails: { gap: space('Spacing/4') },
+  shortcuts: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-around',
+    paddingVertical: space('Spacing/4'),
+  },
+  shortcut: {
+    flex: 1,
+    minWidth: 0,
+    alignItems: 'center',
+    gap: space('Spacing/8'),
+    paddingVertical: space('Spacing/4'),
+  },
+  shortcutIcon: {
+    width: 56,
+    height: 56,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radius('Radius/Full'),
     borderWidth: 1,
     borderColor: border.subtle,
-    borderRadius: radius('Radius/12'),
     backgroundColor: bg.surfaceWhite,
-    justifyContent: 'center',
   },
   shareHeading: {
     flexDirection: 'row',

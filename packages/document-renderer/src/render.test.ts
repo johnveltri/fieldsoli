@@ -44,6 +44,8 @@ describe('renderDocument', () => {
     expect(html).not.toContain('<script>');
     expect(html).toContain('Line one\nLine two &amp; café');
     expect(html).toContain('@page { size: letter; margin: 0.5in; }');
+    expect(html).toContain('body { font-size: 11pt; line-height: 1.4; }');
+    expect(html).toContain('h1 { font-size: 20pt; }');
     expect(html).toContain('max-width: 816px');
   });
 
@@ -86,7 +88,8 @@ describe("renderDocumentPreview", () => {
       },
       null,
     );
-    expect(html).toContain("Number assigned on creation");
+    expect(html).toContain('<h2>Estimate</h2>');
+    expect(html).not.toContain('Number assigned on creation');
     expect(html).toContain("Valid until");
     expect(html).not.toContain("Unpaid");
     expect(html).not.toContain("Amount Due");
