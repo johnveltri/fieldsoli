@@ -31,6 +31,8 @@ type ProfileRowLinkVariant = {
   kind: 'link';
   label: string;
   onPress?: () => void;
+  /** Replaces the default trailing chevron for action rows. */
+  trailingIcon?: ReactNode;
   /** When set, label uses the matching color and chevron tint matches. */
   tone?: 'default' | 'danger';
   /** Hide the trailing chevron — Log out is a terminal action. */
@@ -153,9 +155,9 @@ function Row({
         <Text style={[typography.bodyBold, { color: labelColor, flex: 1, minWidth: 0 }]}>
           {row.label}
         </Text>
-        {!row.hideChevron ? (
+        {row.trailingIcon ?? (!row.hideChevron ? (
           <ProfileChevronRightIcon color={chevronColor} size={12} />
-        ) : null}
+        ) : null)}
       </View>
     );
 

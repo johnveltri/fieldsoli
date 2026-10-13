@@ -31,7 +31,14 @@ import * as Sharing from 'expo-sharing';
 import * as SMS from 'expo-sms';
 import { Asset } from 'expo-asset';
 import { File, Paths } from 'expo-file-system';
-import { Mail, MessageCircle, Share2 } from 'lucide-react-native';
+import {
+  Copy,
+  Download,
+  ExternalLink,
+  Mail,
+  MessageCircle,
+  Share2,
+} from 'lucide-react-native';
 import { PTSerif_700Bold } from '@expo-google-fonts/pt-serif';
 import {
   Ubuntu_400Regular,
@@ -1036,11 +1043,25 @@ export const InvoicingJobControls = forwardRef<
                         kind: 'link',
                         label: copySuccess ? 'Copied' : 'Copy link',
                         onPress: () => void copyLink(),
+                        trailingIcon: (
+                          <Copy
+                            size={20}
+                            color={fg.secondary}
+                            strokeWidth={2}
+                          />
+                        ),
                       },
                       {
                         kind: 'link',
                         label: 'Open in browser',
                         onPress: () => void requestHandoff('browser'),
+                        trailingIcon: (
+                          <ExternalLink
+                            size={20}
+                            color={fg.secondary}
+                            strokeWidth={2}
+                          />
+                        ),
                       },
                       {
                         kind: 'link',
@@ -1051,6 +1072,13 @@ export const InvoicingJobControls = forwardRef<
                         onPress: busy
                           ? undefined
                           : () => void requestHandoff('pdf'),
+                        trailingIcon: (
+                          <Download
+                            size={20}
+                            color={fg.secondary}
+                            strokeWidth={2}
+                          />
+                        ),
                       },
                     ]}
                   />
