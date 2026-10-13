@@ -310,7 +310,7 @@ export function EditMaterialBottomSheet({
           ) : showSessionPill ? (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={assignedSession ? 'Edit session' : 'Attach to session'}
+              accessibilityLabel={assignedSession ? 'Edit visit' : 'Attach to visit'}
               onPress={() => onSessionPillPress?.(currentDraft())}
               disabled={!onSessionPillPress}
               style={({ pressed }) => [styles.sessionButton, pressed && styles.pressed]}
@@ -320,7 +320,7 @@ export function EditMaterialBottomSheet({
               ) : (
                 <JobDetailIconSectionAdd color={onDark} />
               )}
-              <Text style={[typography.pillCompact, { color: onDark }]}>SESSION</Text>
+              <Text style={[typography.pillCompact, { color: onDark }]}>VISIT</Text>
             </Pressable>
           ) : null}
         </View>
@@ -334,7 +334,7 @@ export function EditMaterialBottomSheet({
         <Text style={[typography.bodySmall, styles.subtitle]}>
           {subtitle ??
             (assignedSession
-              ? `Session: ${assignedSession.dateLabel} ${assignedSession.timeRangeLabel}`
+              ? `Visit: ${assignedSession.dateLabel} ${assignedSession.timeRangeLabel}`
               : 'Unassigned job material')}
         </Text>
 

@@ -625,7 +625,7 @@ export function LiveSessionOverlay({
         job_id: liveSession?.jobId ?? null,
         ...errorProperties(e),
       });
-      Alert.alert('End failed', formatErrorMessage(e) || 'Could not end session.');
+      Alert.alert('End failed', formatErrorMessage(e) || 'Could not end visit.');
     }
   }, [endLiveSessionNow, formatErrorMessage, liveSession, onSessionEnded]);
 
@@ -683,7 +683,7 @@ export function LiveSessionOverlay({
           job_id: liveSession?.jobId ?? null,
           ...errorProperties(e),
         });
-        Alert.alert('End failed', formatErrorMessage(e) || 'Could not end session.');
+        Alert.alert('End failed', formatErrorMessage(e) || 'Could not end visit.');
       }
     },
     [
@@ -713,7 +713,7 @@ export function LiveSessionOverlay({
         job_id: liveSession?.jobId ?? null,
         ...errorProperties(e),
       });
-      Alert.alert('Delete failed', formatErrorMessage(e) || 'Could not delete live session.');
+      Alert.alert('Delete failed', formatErrorMessage(e) || 'Could not delete live visit.');
     }
   }, [deleteLiveSessionNow, elapsedSeconds, formatErrorMessage, liveSession, onSessionEnded]);
 

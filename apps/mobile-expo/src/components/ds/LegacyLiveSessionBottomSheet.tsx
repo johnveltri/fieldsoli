@@ -112,7 +112,7 @@ export function LegacyLiveSessionBottomSheet({
         <View style={styles.darkContent}>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Minimize live session"
+            accessibilityLabel="Minimize live visit"
             onPress={onMinimize}
             style={({ pressed }) => [styles.back, pressed && styles.pressed]}
             hitSlop={12}
@@ -125,7 +125,7 @@ export function LegacyLiveSessionBottomSheet({
             <View style={styles.statusIdentity}>
               <LiveSessionActiveDotIcon color={color('Brand/Accent')} size={11.5} />
               <Text style={[typography.labelCaps, styles.statusLabel]}>
-                ACTIVE SESSION
+                ACTIVE VISIT
               </Text>
             </View>
             <View style={styles.statusSpacer} />
@@ -168,11 +168,11 @@ export function LegacyLiveSessionBottomSheet({
 
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="End session"
+          accessibilityLabel="End visit"
           onPress={onEndSessionPress}
           style={({ pressed }) => [styles.endButton, pressed && styles.pressed]}
         >
-          <Text style={styles.endButtonLabel}>END SESSION</Text>
+          <Text style={styles.endButtonLabel}>END VISIT</Text>
         </Pressable>
       </View>
     </BottomSheetShell>

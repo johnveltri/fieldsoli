@@ -224,7 +224,7 @@ describe('LiveSessionBottomSheet phase3Capture', () => {
     fireEvent.press(screen.getByText('Add note'));
     expect(screen.getByPlaceholderText('Note')).toBeTruthy();
     expect(onAddNote).not.toHaveBeenCalled();
-    expect(screen.getByLabelText('End session')).toBeTruthy();
+    expect(screen.getByLabelText('End visit')).toBeTruthy();
   });
 
   it('TEST-16 persists customer changes on blur, not per keystroke', () => {
@@ -334,7 +334,7 @@ describe('LiveSessionBottomSheet phase3Capture', () => {
 
   it.each([
     ['minimize', 'Close'] as const,
-    ['end', 'End session'] as const,
+    ['end', 'End visit'] as const,
   ])('%s stays open on Customer-save failure and offers retry', async (transition, label) => {
     let alertButtons: Parameters<typeof Alert.alert>[2] = [];
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation((_title, _message, buttons) => {
@@ -403,8 +403,8 @@ describe('LiveSessionBottomSheet phase3Capture', () => {
 
   it.each([
     ['minimize', 'Close'] as const,
-    ['end', 'End session'] as const,
-  ])('%s waits for the customer save before closing the Live Session', async (transition, label) => {
+    ['end', 'End visit'] as const,
+  ])('%s waits for the customer save before closing the Live Visit', async (transition, label) => {
     let resolveSave: (() => void) | undefined;
     const onCustomerSnapshotSave = jest.fn(
       () => new Promise<void>((resolve) => { resolveSave = resolve; }),
@@ -446,7 +446,7 @@ describe('LiveSessionBottomSheet phase3Capture', () => {
     screen.unmount();
   });
 
-  it('restores End Session when the address input blurs and keeps the lookup row mounted', () => {
+  it('restores End Visit when the address input blurs and keeps the lookup row mounted', () => {
     const screen = render(
       <LiveSessionBottomSheet
         typography={typography}
@@ -467,14 +467,14 @@ describe('LiveSessionBottomSheet phase3Capture', () => {
 
     const address = screen.getByLabelText('Address');
     fireEvent(address, 'focus', { nativeEvent: { target: 1 } });
-    expect(screen.queryByLabelText('End session')).toBeNull();
+    expect(screen.queryByLabelText('End visit')).toBeNull();
     fireEvent(address, 'blur');
-    expect(screen.getByLabelText('End session')).toBeTruthy();
+    expect(screen.getByLabelText('End visit')).toBeTruthy();
     expect(screen.getByLabelText('Address')).toBeTruthy();
     screen.unmount();
   });
 
-  it('restores End Session after selecting a customer suggestion', () => {
+  it('restores End Visit after selecting a customer suggestion', () => {
     jest.useFakeTimers();
     mockCustomerSuggestionsState.suggestions = [
       {
@@ -511,10 +511,10 @@ describe('LiveSessionBottomSheet phase3Capture', () => {
 
     const customer = screen.getByPlaceholderText('Customer');
     fireEvent(customer, 'focus', { nativeEvent: { target: 1 } });
-    expect(screen.queryByLabelText('End session')).toBeNull();
+    expect(screen.queryByLabelText('End visit')).toBeNull();
 
     fireEvent.press(screen.getByLabelText('Beta Electric'));
-    expect(screen.getByLabelText('End session')).toBeTruthy();
+    expect(screen.getByLabelText('End visit')).toBeTruthy();
 
     mockCustomerSuggestionsState.suggestions = [];
     mockCustomerSuggestionsState.suggestionsQuery = '';
@@ -522,7 +522,7 @@ describe('LiveSessionBottomSheet phase3Capture', () => {
     jest.useRealTimers();
   });
 
-  it('keeps End Session visible while an inline field is focused', () => {
+  it('keeps End Visit visible while an inline field is focused', () => {
     jest.useFakeTimers();
     const screen = render(
       <LiveSessionBottomSheet
@@ -543,17 +543,17 @@ describe('LiveSessionBottomSheet phase3Capture', () => {
     );
 
     const title = screen.getByLabelText('Job title');
-    expect(screen.getByLabelText('End session')).toBeTruthy();
+    expect(screen.getByLabelText('End visit')).toBeTruthy();
 
     act(() => {
       jest.advanceTimersByTime(320);
     });
 
     fireEvent(title, 'focus', { nativeEvent: { target: 1 } });
-    expect(screen.getByLabelText('End session')).toBeTruthy();
+    expect(screen.getByLabelText('End visit')).toBeTruthy();
 
     fireEvent(title, 'blur');
-    expect(screen.getByLabelText('End session')).toBeTruthy();
+    expect(screen.getByLabelText('End visit')).toBeTruthy();
     screen.unmount();
     jest.useRealTimers();
   });

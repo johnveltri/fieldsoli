@@ -19,7 +19,7 @@ jest.mock('react-native-safe-area-context', () => ({
 
 describe('FullWidthFab', () => {
   it('uses the home-indicator inset when the keyboard is down', () => {
-    render(<FullWidthFab typography={typography} label="END SESSION" includeSafeArea />);
+    render(<FullWidthFab typography={typography} label="END VISIT" includeSafeArea />);
     expect(StyleSheet.flatten(screen.getByTestId('full-width-fab').props.style).paddingBottom).toBe(34);
   });
 
@@ -32,7 +32,7 @@ describe('FullWidthFab', () => {
           stickyFooterHeight: 120,
         }}
       >
-        <FullWidthFab typography={typography} label="END SESSION" includeSafeArea />
+        <FullWidthFab typography={typography} label="END VISIT" includeSafeArea />
       </SheetChromeContext.Provider>,
     );
     expect(StyleSheet.flatten(screen.getByTestId('full-width-fab').props.style).paddingBottom).toBe(0);

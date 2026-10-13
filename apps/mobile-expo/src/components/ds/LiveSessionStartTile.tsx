@@ -23,7 +23,7 @@ export function LiveSessionStartTile({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel="Start live session"
+      accessibilityLabel="Start live visit"
       disabled={disabled}
       onPress={onPress}
       style={({ pressed }) => [

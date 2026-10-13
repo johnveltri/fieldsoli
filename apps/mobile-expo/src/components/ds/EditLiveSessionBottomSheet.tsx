@@ -244,7 +244,7 @@ export function EditLiveSessionBottomSheet({
         <View style={styles.header}>
           <SessionEditClockIcon color={color('Semantic/Status/Error/Text')} />
           <Text {...screenHeaderA11y()} style={[typography.titleH3, { color: fg.primary }]}>
-            Edit Live Session
+            Edit Live Visit
           </Text>
         </View>
 
@@ -254,7 +254,7 @@ export function EditLiveSessionBottomSheet({
             value={dateFmt.format(date)}
             active={activePicker === 'date'}
             onPress={() => openPicker('date')}
-            accessibilityLabel="Session date"
+            accessibilityLabel="Visit date"
           />
           <Text style={[typography.bodySmall, styles.fieldLabel]}>Start Time</Text>
           <FieldShell
@@ -269,11 +269,11 @@ export function EditLiveSessionBottomSheet({
             typography={typography}
             // Per spec: end time is optional, placeholder reads
             // "Editing will End Live Session" until the user picks one.
-            value={endTime ? formatTimeLabel(endTime) : 'Editing will End Live Session'}
+            value={endTime ? formatTimeLabel(endTime) : 'Editing will End Live Visit'}
             placeholder={!endTime}
             active={activePicker === 'endTime'}
             onPress={() => openPicker('endTime')}
-            accessibilityLabel="End time (optional — saving with a value ends the session)"
+            accessibilityLabel="End time (optional — saving with a value ends the visit)"
           />
         </View>
 

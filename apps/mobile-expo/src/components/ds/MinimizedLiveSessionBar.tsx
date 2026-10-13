@@ -95,7 +95,7 @@ export function MinimizedLiveSessionBar({
     >
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Open live session"
+        accessibilityLabel="Open live visit"
         onPress={onPress}
         style={({ pressed }) => [styles.bar, pressed && styles.pressed]}
       >
@@ -103,7 +103,7 @@ export function MinimizedLiveSessionBar({
           <View style={styles.copy}>
             <View style={styles.labelRow}>
               <LiveSessionActiveDotIcon color={color('Brand/Accent')} size={13.5} />
-              <Text style={[typography.labelCaps, styles.label]}>ACTIVE SESSION</Text>
+              <Text style={[typography.labelCaps, styles.label]}>ACTIVE VISIT</Text>
             </View>
             <Text
               style={[typography.bodyBold, styles.title]}

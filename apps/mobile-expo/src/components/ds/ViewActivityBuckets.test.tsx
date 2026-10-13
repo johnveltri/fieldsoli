@@ -39,7 +39,7 @@ describe('Job Detail readable row accessibility', () => {
     ).toHaveProp('accessibilityHint', 'Opens customer and address editing');
   });
 
-  it('announces the visible session, material, cost, and note content', () => {
+  it('announces the visible visit, material, cost, and note content', () => {
     const screen = render(
       <>
         <ViewSessionsBuckets
@@ -131,7 +131,7 @@ describe('Job Detail readable row accessibility', () => {
     );
 
     expect(
-      screen.getByLabelText('Session. Sep 9, 2026. 9:00 AM – 10:30 AM. 1.5h'),
+      screen.getByLabelText('Visit. Sep 9, 2026. 9:00 AM – 10:30 AM. 1.5h'),
     ).toBeTruthy();
     expect(
       screen.getByLabelText('Material. Copper pipe. 2 ft @ $5.00. $10.00'),

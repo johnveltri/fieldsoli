@@ -859,8 +859,8 @@ export function LiveSessionBottomSheet({
         phase3Capture && !customerFieldFocused ? (
           <FullWidthFab
             typography={typography}
-            label="END SESSION"
-            accessibilityLabel="End session"
+            label="END VISIT"
+            accessibilityLabel="End visit"
             onPress={handleEndSessionPress}
             includeSafeArea
           />
@@ -894,7 +894,7 @@ export function LiveSessionBottomSheet({
             <View style={styles.statusIdentity}>
               <LiveSessionActiveDotIcon color={color('Brand/Accent')} size={11.5} />
               <Text style={[typography.labelCaps, styles.statusLabel]}>
-                ACTIVE SESSION
+                ACTIVE VISIT
               </Text>
             </View>
             {!phase3Capture && onEditJobPress ? (

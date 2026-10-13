@@ -98,7 +98,7 @@ describe('validateJobEditDraft capture-now', () => {
     ).toBe(true);
   });
 
-  it('includes a referenced date-only session in the payload', () => {
+  it('includes a referenced date-only visit in the payload', () => {
     const job = minimalJob();
     const snapshot = createJobEditDraft(job);
     const draft: JobEditDraft = {
@@ -141,7 +141,7 @@ describe('validateJobEditDraft capture-now', () => {
     expect(payload.materials.create[0]?.sessionId).toBe('sess-new');
   });
 
-  it('persists sessions without a calendar date', () => {
+  it('persists visits without a calendar date', () => {
     const job = minimalJob();
     const snapshot = createJobEditDraft(job);
     const draft: JobEditDraft = {
@@ -167,7 +167,7 @@ describe('validateJobEditDraft capture-now', () => {
     expect(payload.sessions.create[0]?.calendarDateExplicit).toBe(false);
   });
 
-  it('can build and reopen an undated session without synthesizing from an empty date', () => {
+  it('can build and reopen an undated visit without synthesizing from an empty date', () => {
     const job = minimalJob({
       displaySessions: [
         {
@@ -228,7 +228,7 @@ describe('validateJobEditDraft capture-now', () => {
     expect(payload.notes.create).toHaveLength(1);
   });
 
-  it('detaches visible children when a session is removed', () => {
+  it('detaches visible children when a visit is removed', () => {
     const snapshot = createJobEditDraft(minimalJob());
     const draft: JobEditDraft = {
       ...snapshot,

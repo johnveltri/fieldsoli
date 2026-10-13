@@ -217,14 +217,14 @@ function SessionAttachRow({
   onPress: () => void;
 }) {
   const session = value ? sessions.find((s) => s.id === value) : undefined;
-  const displayValue = session ? `${session.dateLabel} Session` : '';
+  const displayValue = session ? `${session.dateLabel} Visit` : '';
 
   return (
     <EditTappableValue
       typography={typography}
       value={displayValue}
       placeholder="Unassigned"
-      accessibilityLabel="Attach to session"
+      accessibilityLabel="Attach to visit"
       onPress={onPress}
     />
   );
@@ -656,7 +656,7 @@ export function JobDetailEditMode({
           <View ref={setFocusAnchor('sessions')} collapsable={false}>
           <EditSheet>
             {visibleSessions.map((row, index) => (
-                <View key={row.id} ref={setFocusAnchor(`session:${row.id}`)} collapsable={false}>
+                <View key={row.id} ref={setFocusAnchor(`visit:${row.id}`)} collapsable={false}>
                 <SessionEditBlock
                   row={row}
                   typography={typography}
@@ -671,7 +671,7 @@ export function JobDetailEditMode({
             <EditAddRow
               typography={typography}
               icon={<JobDetailIconSectionSessions color={iconColor} />}
-              label="Add session"
+              label="Add visit"
               onPress={addSession}
               showTopBorder={visibleSessions.length > 0}
             />
@@ -887,21 +887,21 @@ function SessionEditBlock({
       typography={typography}
       showTopBorder={showTopBorder}
       onDelete={onDelete}
-      accessibilityLabel="Session"
+      accessibilityLabel="Visit"
     >
       <EditIconGroup icon={<JobDetailIconSectionSessions color={iconColor} />}>
         <EditTappableValue
           typography={typography}
           value={row.date ? formatLocalDateLabel(row.date) : ''}
           placeholder="Date"
-          accessibilityLabel="Session date"
+          accessibilityLabel="Visit date"
           onPress={() => onOpenPicker({ kind: 'sessionDate', sessionId: row.id })}
         />
         <EditTappableValue
           typography={typography}
           value={row.durationHours > 0 ? formatSessionDurationLabel(row.durationHours) : ''}
           placeholder="Duration"
-          accessibilityLabel="Session duration"
+          accessibilityLabel="Visit duration"
           onPress={() => onOpenPicker({ kind: 'sessionDuration', sessionId: row.id })}
         />
         <EditSplitTimeRow

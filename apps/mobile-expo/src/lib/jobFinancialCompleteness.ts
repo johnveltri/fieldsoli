@@ -104,7 +104,7 @@ export function incompletePillsForJobDetail(job: JobDetailViewModel): string[] {
   ) {
     pills.push('revenue');
   }
-  if (!hasUsableSession(job)) pills.push('sessions');
+  if (!hasUsableSession(job)) pills.push('visits');
   if (!hasMaterialsComplete(job)) pills.push('materials');
   if (!hasOtherCostsComplete(job)) pills.push('costs');
   return pills;
@@ -122,7 +122,7 @@ export function incompletePillsForListJob(job: {
 }): string[] {
   const pills: string[] = [];
   if (!hasRevenueComplete(job)) pills.push('revenue');
-  if (!job.hasSessions) pills.push('sessions');
+  if (!job.hasSessions) pills.push('visits');
   if (!job.hasMaterials && !job.noMaterialsConfirmed) pills.push('materials');
   if (!job.hasOtherCosts && !job.noOtherCostsConfirmed) pills.push('costs');
   return pills;

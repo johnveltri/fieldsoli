@@ -109,7 +109,7 @@
         <li>The persistent main shell contains <a href="#screen-home">Home</a>, <a href="#screen-jobs">Jobs</a>, and <a href="#screen-earnings">Earnings</a>.</li>
         <li><a href="#screen-job-detail">Job Detail</a> and <a href="#state-inbox-notes">Inbox</a> cover the shell but preserve the selected destination tab.</li>
         <li><a href="#screen-profile">Profile</a> stacks over Home; <a href="#state-help">Help</a> and <a href="#state-privacy">Privacy</a> are secondary Profile screens.</li>
-        <li>An active live session is represented globally by <a href="#state-live-session">Live Session</a> UI.</li>
+        <li>An active live visit is represented globally by <a href="#state-live-session">Live Visit</a> UI.</li>
       </ol>
     </section>
 
@@ -125,7 +125,7 @@
         <article id="screen-home" data-screen-id="home" data-status="shipped">
           <p class="kicker">Main tab</p>
           <h3>Home</h3>
-          <dl><dt>Purpose</dt><dd>Fast capture, current work, and attention queue.</dd><dt>Actions</dt><dd>Open Profile, Earnings, or Job Detail; start a live session; quick-capture a note or material to Inbox or a selected job.</dd><dt>States</dt><dd>Weekly net snapshot with zero-earnings guidance, recent jobs, incomplete jobs, work needing completion review, pending payment, loading, error, and a full-page first-job state.</dd></dl>
+          <dl><dt>Purpose</dt><dd>Fast capture, current work, and attention queue.</dd><dt>Actions</dt><dd>Open Profile, Earnings, or Job Detail; start a live visit; quick-capture a note or material to Inbox or a selected job.</dd><dt>States</dt><dd>Weekly net snapshot with zero-earnings guidance, recent jobs, incomplete jobs, work needing completion review, pending payment, loading, error, and a full-page first-job state.</dd></dl>
           <p><a href="https://github.com/johnveltri/fieldsoli/blob/main/apps/mobile-expo/src/screens/HomeScreen.tsx">Source</a> · <a href="https://www.figma.com/design/TdvsllfeXrnkvBqR4qb3fn/Fieldsolo-App---gig-work-for-skilled-trade?node-id=2025-19">Figma node 2025:19</a></p>
         </article>
         <article id="screen-jobs" data-screen-id="jobs" data-status="shipped">
@@ -143,7 +143,7 @@
         <article id="screen-job-detail" data-screen-id="job-detail" data-status="shipped">
           <p class="kicker">Shell-covering screen</p>
           <h3>Job Detail</h3>
-          <dl><dt>Data</dt><dd>Job identity, customer, address, category, work/payment status, earnings, time, sessions, notes, and materials.</dd><dt>Actions</dt><dd>Edit job; change work status; create/edit/delete sessions, notes, and materials; assign items to sessions; start or manage live work; delete job.</dd><dt>Constraints</dt><dd>Material rows require description and nonzero quantity; units support presets and custom values.</dd></dl>
+          <dl><dt>Data</dt><dd>Job identity, customer, address, category, work/payment status, earnings, time, visits, notes, and materials.</dd><dt>Actions</dt><dd>Edit job; change work status; create/edit/delete visits, notes, and materials; assign items to visits; start or manage live work; delete job.</dd><dt>Constraints</dt><dd>Material rows require description and nonzero quantity; units support presets and custom values.</dd></dl>
           <p><a href="https://github.com/johnveltri/fieldsoli/blob/main/apps/mobile-expo/src/screens/JobDetailScreen.tsx">Source</a> · <a href="https://www.figma.com/design/TdvsllfeXrnkvBqR4qb3fn/Fieldsolo-App---gig-work-for-skilled-trade?node-id=2025-561">Figma node 2025:561</a></p>
         </article>
         <article id="screen-profile" data-screen-id="profile" data-status="shipped">
@@ -166,7 +166,7 @@
         <article id="state-analytics-consent" data-state-id="analytics-consent" data-status="shipped"><h4>Analytics consent</h4><p>Blocks the authenticated shell until the user chooses Allow analytics or No thanks. <a href="https://www.figma.com/design/TdvsllfeXrnkvBqR4qb3fn/Fieldsolo-App---gig-work-for-skilled-trade?node-id=2028-1596">Figma 2028:1596</a></p></article>
         <article id="state-legal-reacceptance" data-state-id="legal-reacceptance" data-status="shipped"><h4>Legal reacceptance</h4><p>Fails closed when current Privacy/Terms acceptance cannot be verified and records acceptance before continuing. <a href="https://www.figma.com/design/TdvsllfeXrnkvBqR4qb3fn/Fieldsolo-App---gig-work-for-skilled-trade?node-id=2028-1606">Figma 2028:1606</a></p></article>
         <article id="state-delete-account" data-state-id="delete-account" data-status="shipped"><h4>Delete account</h4><p class="danger">Requires the exact confirmation phrase, then a system confirmation, before permanent account deletion. <a href="https://www.figma.com/design/TdvsllfeXrnkvBqR4qb3fn/Fieldsolo-App---gig-work-for-skilled-trade?node-id=2028-1614">Figma 2028:1614</a></p></article>
-        <article id="state-live-session" data-state-id="live-session" data-status="shipped"><h4>Active live session</h4><p>Global minimized bar and editing flow for an in-progress session. The feature-flagged expanded overlay persists time and job details inline; ending a session opens that job's detail view in either state. <a href="https://www.figma.com/design/TdvsllfeXrnkvBqR4qb3fn/Fieldsolo-App---gig-work-for-skilled-trade?node-id=2028-1625">Figma 2028:1625</a></p></article>
+        <article id="state-live-session" data-state-id="live-session" data-status="shipped"><h4>Active live visit</h4><p>Global minimized bar and editing flow for an in-progress visit. The feature-flagged expanded overlay persists time and job details inline; ending a visit opens that job's detail view in either state. <a href="https://www.figma.com/design/TdvsllfeXrnkvBqR4qb3fn/Fieldsolo-App---gig-work-for-skilled-trade?node-id=2028-1625">Figma 2028:1625</a></p></article>
       </div>
     </section>
 
@@ -181,13 +181,13 @@
           <tr data-capability-id="analytics.choose" data-status="shipped"><td>Choose analytics</td><td>First authenticated run or Privacy</td><td>Grants or withdraws optional analytics and updates client activation.</td><td>Analytics are off before consent; failed writes revert UI.</td></tr>
           <tr data-capability-id="home.review" data-status="shipped"><td>Review current work</td><td>Home</td><td>Loads weekly net, recent work, incomplete jobs, completion review, and pending payment.</td><td>Paginated attention data; loading/error/empty states.</td></tr>
           <tr data-capability-id="capture.quick" data-status="shipped"><td>Quick capture</td><td>Home quick actions</td><td>Creates a note or material in Inbox; assignment happens later through explicit Add to job.</td><td>Material supports a description and authoritative total without requiring a breakdown.</td></tr>
-          <tr data-capability-id="session.live" data-status="shipped"><td>Live session</td><td>Home / global overlay</td><td>Creates an in-progress session, maintains a timer, and opens the job detail view after ending.</td><td>The feature-flagged expanded overlay supports inline adjustments; failed start cleans up a placeholder job unless refresh confirms success.</td></tr>
+          <tr data-capability-id="session.live" data-status="shipped"><td>Live visit</td><td>Home / global overlay</td><td>Creates an in-progress visit, maintains a timer, and opens the job detail view after ending.</td><td>The feature-flagged expanded overlay supports inline adjustments; failed start cleans up a placeholder job unless refresh confirms success.</td></tr>
           <tr data-capability-id="jobs.browse" data-status="shipped"><td>Browse/search jobs</td><td>Jobs</td><td>Loads paginated All/Open/Paid lists and debounced search.</td><td>Search hides tabs while focused; explicit empty/error/loading states.</td></tr>
-          <tr data-capability-id="jobs.create" data-status="shipped"><td>Create job</td><td>Jobs FAB</td><td>Creates a blank job and opens Job Detail with edit sheet.</td><td>FAB is suppressed when the live-session bar occupies its slot.</td></tr>
+          <tr data-capability-id="jobs.create" data-status="shipped"><td>Create job</td><td>Jobs FAB</td><td>Creates a blank job and opens Job Detail with edit sheet.</td><td>FAB is suppressed when the live-visit bar occupies its slot.</td></tr>
           <tr data-capability-id="jobs.update" data-status="shipped"><td>Edit job and status</td><td>Job Detail</td><td>Updates identity/economic fields, no-materials confirmation, and work status.</td><td>Work and payment status are separate.</td></tr>
           <tr data-capability-id="jobs.delete" data-status="shipped"><td>Delete job</td><td>Job Detail</td><td>Deletes the job after confirmation and returns to the shell.</td><td>Destructive and explicitly confirmed.</td></tr>
-          <tr data-capability-id="sessions.manage" data-status="shipped"><td>Manage sessions</td><td>Job Detail</td><td>Create manual sessions; edit times; delete; attach notes/materials.</td><td>In-progress sessions are excluded from completed cards but available to assignment.</td></tr>
-          <tr data-capability-id="notes.manage" data-status="shipped"><td>Manage notes</td><td>Job Detail / Home / Inbox</td><td>Create, update, soft-delete, and attach notes to jobs/sessions.</td><td>Unassigned notes remain in Inbox.</td></tr>
+          <tr data-capability-id="sessions.manage" data-status="shipped"><td>Manage visits</td><td>Job Detail</td><td>Create manual visits; edit times; delete; attach notes/materials.</td><td>In-progress visits are excluded from completed cards but available to assignment.</td></tr>
+          <tr data-capability-id="notes.manage" data-status="shipped"><td>Manage notes</td><td>Job Detail / Home / Inbox</td><td>Create, update, soft-delete, and attach notes to jobs/visits.</td><td>Unassigned notes remain in Inbox.</td></tr>
           <tr data-capability-id="materials.manage" data-status="shipped"><td>Manage materials</td><td>Job Detail / Home / Inbox</td><td>Create, update, soft-delete, price, quantify, and attach materials.</td><td>Description and total are sufficient; quantity, unit, and unit price remain optional explicit details.</td></tr>
           <tr data-capability-id="inbox.assign" data-status="shipped"><td>Assign Inbox item</td><td>Inbox item</td><td>Updates an unassigned note/material with a selected job and removes it from Inbox.</td><td>Notes and materials have separate tabs.</td></tr>
           <tr data-capability-id="earnings.review" data-status="shipped"><td>Review earnings</td><td>Earnings</td><td>Aggregates job economics for 7/30/365-day windows and lists ranked jobs.</td><td>Only completed, financially complete jobs in the selected work window contribute; Home's weekly snapshot uses the same rule.</td></tr>

@@ -57,15 +57,15 @@ export function QuickActionsBottomSheet({
       visible={visible}
       onClose={onClose}
       onClosed={onClosed}
-      accessibilityTitle="Start session"
+      accessibilityTitle="Start visit"
     >
       <View style={styles.stack}>
         <Text {...screenHeaderA11y()} style={[typography.titleH3, styles.title, { color: fg.primary }]}>
-          {step === 'chooseJob' ? 'Start Session' : ''}
+          {step === 'chooseJob' ? 'Start Visit' : ''}
         </Text>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Start New Session"
+          accessibilityLabel="Start New Visit"
           disabled={busy}
           onPress={onStartNewSession}
           style={({ pressed }) => [
@@ -79,7 +79,7 @@ export function QuickActionsBottomSheet({
             <SessionChooserRowPlayIcon color={fg.muted} />
           </View>
           <View style={styles.textStack}>
-            <Text style={[typography.bodyBold, { color: fg.muted }]}>Start New Session</Text>
+            <Text style={[typography.bodyBold, { color: fg.muted }]}>Start New Visit</Text>
             <Text style={[typography.bodySmall, { color: fg.muted }]} numberOfLines={2}>
               Begin tracking now — add job details later
             </Text>

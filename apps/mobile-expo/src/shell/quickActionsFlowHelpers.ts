@@ -33,5 +33,5 @@ export function formatLiveSessionJobTitle(now: Date): string {
     minute: '2-digit',
     hour12: true,
   }).format(now);
-  return `Live Session ${monthDay} at ${time}`;
+  return `Live Visit ${monthDay} at ${time}`;
 }

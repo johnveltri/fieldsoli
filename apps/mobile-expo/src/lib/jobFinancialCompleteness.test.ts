@@ -148,7 +148,7 @@ describe('usable rows for financial completeness', () => {
     expect(incompletePillsForJobDetail(job)).toEqual([]);
   });
 
-  it('ignores sessions missing date or duration', () => {
+  it('ignores visits missing date or duration', () => {
     const job = baseJob({
       displaySessions: [
         {
@@ -169,7 +169,7 @@ describe('usable rows for financial completeness', () => {
     });
     expect(isJobFinanciallyComplete({ job })).toBe(false);
     expect(financialCompletenessGaps({ job })).toContain('session');
-    expect(incompletePillsForJobDetail(job)).toContain('sessions');
+    expect(incompletePillsForJobDetail(job)).toContain('visits');
   });
 
   it('ignores materials missing description or total', () => {
@@ -283,7 +283,7 @@ describe('usable rows for financial completeness', () => {
     expect(incompletePillsForJobDetail(job)).toEqual([]);
   });
 
-  it('counts a live in-progress session when displaySessions are empty or unusable', () => {
+  it('counts a live in-progress visit when displaySessions are empty or unusable', () => {
     const liveSession = {
       id: 'sess-live',
       startedAt: '2026-04-17T14:00:00.000Z',
@@ -303,7 +303,7 @@ describe('usable rows for financial completeness', () => {
     });
     expect(isJobFinanciallyComplete({ job })).toBe(true);
     expect(financialCompletenessGaps({ job })).not.toContain('session');
-    expect(incompletePillsForJobDetail(job)).not.toContain('sessions');
+    expect(incompletePillsForJobDetail(job)).not.toContain('visits');
 
     const unusableEnded = baseJob({
       displaySessions: [
@@ -322,7 +322,7 @@ describe('usable rows for financial completeness', () => {
     expect(financialCompletenessGaps({ job: unusableEnded })).not.toContain('session');
   });
 
-  it('fails session completeness for unusable ended-only sessions', () => {
+  it('fails visit completeness for unusable ended-only visits', () => {
     const job = baseJob({
       displaySessions: [
         {
@@ -344,7 +344,7 @@ describe('usable rows for financial completeness', () => {
     });
     expect(isJobFinanciallyComplete({ job })).toBe(false);
     expect(financialCompletenessGaps({ job })).toContain('session');
-    expect(incompletePillsForJobDetail(job)).toContain('sessions');
+    expect(incompletePillsForJobDetail(job)).toContain('visits');
   });
 
   it('treats unknown Labor as incomplete and confirmed zero Labor as complete', () => {

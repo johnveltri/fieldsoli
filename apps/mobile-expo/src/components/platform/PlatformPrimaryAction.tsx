@@ -67,7 +67,7 @@ const MENU_ITEMS: {
   },
   {
     id: 'live_session',
-    label: 'Live Session',
+    label: 'Live Visit',
     icon: (c) => <QuickCaptureStartSessionIcon color={c} />,
   },
   {

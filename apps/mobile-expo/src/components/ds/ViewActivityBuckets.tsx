@@ -196,12 +196,12 @@ export function ViewSessionsBuckets({
               key={session.id}
               typography={typography}
               accessibilityLabel={[
-                'Session',
+                'Visit',
                 session.dateLabel,
                 timeLabel,
                 session.durationLabel,
               ].filter(Boolean).join('. ')}
-              accessibilityHint={onCardPress ? 'Opens session editing' : undefined}
+              accessibilityHint={onCardPress ? 'Opens visit editing' : undefined}
               onPress={onCardPress}
               onDelete={onDeleteSession ? () => onDeleteSession(session.id) : undefined}
               style={[
@@ -251,7 +251,7 @@ export function ViewSessionsBuckets({
 /** Session bucket header — e.g. "MAR 25, 2026 SESSION"; job-scoped buckets use "JOB". */
 export function bucketSessionHeaderTitle(sessionDateLabel: string | undefined): string {
   const d = sessionDateLabel?.trim() ?? '';
-  return `${d} SESSION`.replace(/\s+/g, ' ').trim().toUpperCase();
+  return `${d} VISIT`.replace(/\s+/g, ' ').trim().toUpperCase();
 }
 
 const JOB_BUCKET_HEADER = 'JOB';

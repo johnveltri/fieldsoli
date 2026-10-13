@@ -85,7 +85,7 @@ export function DeleteAccountBottomSheet({
             {' '}below to continue.
           </Text>
           <Text style={[typography.bodySmall, styles.instruction, { color: fg.secondary }]}>
-            Deleting your account permanently deletes all associated jobs, sessions, notes,
+            Deleting your account permanently deletes all associated jobs, visits, notes,
             materials, and other provided job information. There will be no way to recover
             this information for taxes or other recordkeeping purposes.
           </Text>

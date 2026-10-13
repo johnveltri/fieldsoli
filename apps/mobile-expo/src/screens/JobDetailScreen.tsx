@@ -913,7 +913,7 @@ export function JobDetailScreen({
           ? errorObj.message
           : err instanceof Error
             ? err.message
-            : 'Could not start live session.';
+            : 'Could not start live visit.';
 
       // Stale JWT (typically after a `supabase db reset` wiped auth.users
       // while the device still holds the old token): the LiveSessionContext
@@ -961,8 +961,8 @@ export function JobDetailScreen({
           ...errorProperties(err),
         });
         Alert.alert(
-          'Could not start live session',
-          'A previous in-progress session for this job is still open in the database (likely a stale row). Open it and end it before starting a new one, or contact support.',
+          'Could not start live visit',
+          'A previous in-progress visit for this job is still open in the database (likely a stale row). Open it and end it before starting a new one, or contact support.',
         );
         return;
       }
@@ -971,7 +971,7 @@ export function JobDetailScreen({
         .filter((s): s is string => typeof s === 'string' && s.length > 0)
         .join('\n');
       Alert.alert(
-        'Could not start live session',
+        'Could not start live visit',
         detail.length > 0 ? detail : 'Unknown error.',
       );
       analytics.capture('live_session_start_failed', {
@@ -1070,8 +1070,8 @@ export function JobDetailScreen({
       return refreshed ?? job;
     } catch (e) {
       Alert.alert(
-        'Could not end session',
-        formatErrorMessage(e) || 'Could not end the live session.',
+        'Could not end visit',
+        formatErrorMessage(e) || 'Could not end the live visit.',
       );
       return undefined;
     }
@@ -1080,7 +1080,7 @@ export function JobDetailScreen({
   const onDeleteSessionFromView = useCallback(
     (sessionId: string) => {
       if (!job) return;
-      Alert.alert('Delete this session?', 'This cannot be undone.', [
+      Alert.alert('Delete this visit?', 'This cannot be undone.', [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Delete',
@@ -1103,7 +1103,7 @@ export function JobDetailScreen({
                   source: 'job_detail_view',
                   ...errorProperties(e),
                 });
-                Alert.alert('Delete failed', formatErrorMessage(e) || 'Could not delete session.');
+                Alert.alert('Delete failed', formatErrorMessage(e) || 'Could not delete visit.');
               }
             })();
           },
@@ -1554,7 +1554,7 @@ export function JobDetailScreen({
           job_id: job.id,
           ...errorProperties(e),
         });
-        Alert.alert('Save failed', formatErrorMessage(e) || 'Could not save session.');
+        Alert.alert('Save failed', formatErrorMessage(e) || 'Could not save visit.');
       } finally {
         setSessionSaving(false);
       }
@@ -1597,7 +1597,7 @@ export function JobDetailScreen({
           job_id: job?.id ?? null,
           ...errorProperties(e),
         });
-        Alert.alert('Save failed', formatErrorMessage(e) || 'Could not save session.');
+        Alert.alert('Save failed', formatErrorMessage(e) || 'Could not save visit.');
       } finally {
         setSessionSaving(false);
       }
@@ -1631,7 +1631,7 @@ export function JobDetailScreen({
         job_id: job?.id ?? null,
         ...errorProperties(e),
       });
-      Alert.alert('Delete failed', formatErrorMessage(e) || 'Could not delete session.');
+      Alert.alert('Delete failed', formatErrorMessage(e) || 'Could not delete visit.');
     } finally {
       setSessionSaving(false);
     }
@@ -2204,7 +2204,7 @@ export function JobDetailScreen({
           setEditSheetVisible(true);
           break;
         case 'session':
-          setSessionWizardBanner('Missing Session');
+          setSessionWizardBanner('Missing Visit');
           setSessionSheetMounted(true);
           setSessionFlow('addForm');
           setEditingSessionId(null);
@@ -3088,7 +3088,7 @@ export function JobDetailScreen({
       ) : null}
 
       <SectionHeaderFigma
-        title="Sessions"
+        title="Visits"
         typography={typography}
         showAdd={!simplifiedView}
         onAddPress={openSessionChooser}
@@ -3106,7 +3106,7 @@ export function JobDetailScreen({
       <View style={styles.sessionList}>
         {visibleSessions.length === 0 ? (
           <SectionEmptyStateCard
-            message="No sessions recorded"
+            message="No visits recorded"
             typography={typography}
             onPress={
               simplifiedView
@@ -3667,8 +3667,8 @@ export function JobDetailScreen({
             // Derive mode from editingSessionId (not sessionFlow) so the title /
             // primary label stay stable during the slide-down close animation,
             // where sessionFlow has already flipped to 'closed'.
-            title={editingSessionId ? 'Edit Session' : 'Add Session'}
-            primaryLabel={editingSessionId ? 'SAVE CHANGES' : 'SAVE NEW SESSION'}
+            title={editingSessionId ? 'Edit Visit' : 'Add Visit'}
+            primaryLabel={editingSessionId ? 'SAVE CHANGES' : 'SAVE NEW VISIT'}
             sessionError={sessionWizardBanner}
             values={
               editingSessionId && editingSession

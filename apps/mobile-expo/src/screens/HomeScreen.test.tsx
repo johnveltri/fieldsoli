@@ -119,7 +119,7 @@ function job(overrides: Record<string, unknown>) {
   };
 }
 
-describe('HomeScreen quick session', () => {
+describe('HomeScreen quick visit', () => {
   let consoleErrorSpy: jest.SpiedFunction<typeof console.error>;
 
   beforeEach(() => {
