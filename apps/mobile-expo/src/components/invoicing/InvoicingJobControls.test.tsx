@@ -272,7 +272,11 @@ describe('InvoicingJobControls', () => {
     fireEvent.press(await screen.findByLabelText('SHARE ESTIMATE'));
 
     expect(await screen.findByRole('button', { name: 'Text Customer' })).toBeTruthy();
-    expect(screen.getByRole('header', { name: 'Share Estimate' })).toBeTruthy();
+    const shareTitle = screen.getByRole('header', { name: 'Share Estimate' });
+    expect(StyleSheet.flatten(shareTitle.props.style)).toMatchObject({
+      ...typography.titleH3,
+      textAlign: 'center',
+    });
     expect(screen.queryByLabelText('Back to preview')).toBeNull();
     expect(screen.getByRole('button', { name: 'Email Customer' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Share document' })).toBeTruthy();

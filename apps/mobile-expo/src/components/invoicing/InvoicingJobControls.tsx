@@ -967,7 +967,10 @@ export const InvoicingJobControls = forwardRef<
                 accessibilityTitle="Share document"
               >
                 <View style={styles.sheet}>
-                  <Text accessibilityRole="header" style={typography.titleH3}>
+                  <Text
+                    accessibilityRole="header"
+                    style={[typography.titleH3, styles.shareTitle]}
+                  >
                     {active?.documentType === 'estimate'
                       ? 'Share Estimate'
                       : 'Share Invoice'}
@@ -1152,6 +1155,7 @@ const styles = StyleSheet.create({
   },
   web: { width: '100%', backgroundColor: bg.surfaceWhite },
   sheet: { paddingVertical: space('Spacing/20'), gap: space('Spacing/12') },
+  shareTitle: { alignSelf: 'stretch', textAlign: 'center' },
   shareDetails: { gap: space('Spacing/4') },
   shortcuts: {
     flexDirection: 'row',
