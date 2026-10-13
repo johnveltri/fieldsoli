@@ -3040,12 +3040,7 @@ export function JobDetailScreen({
           earnings={job.earnings}
           typography={typography}
           noRevenueConfirmed={job.noRevenueConfirmed}
-          revenueInvoiceLabel={job.revenueInvoice
-            ? `Invoice #${String(job.revenueInvoice.documentNumber).padStart(5, '0')}`
-            : null}
-          onOpenRevenueInvoice={job.revenueInvoice
-            ? () => documentControlsRef.current?.openDocument(job.revenueInvoice!.id)
-            : undefined}
+          isInvoiced={!!job.revenueInvoice}
           onPress={simplifiedView ? () => openEditFromView('metrics', 'view_row') : undefined}
         />
         <JobDetailCtaRow

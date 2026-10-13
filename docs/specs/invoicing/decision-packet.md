@@ -49,7 +49,7 @@ This is a coupled foundation: pricing changes affect Jobs, Materials, Other Cost
 
 These decisions extend and supersede the 2026-10-06 rules for historical migration, invoice payment status, Job completion, and material markup lifecycle:
 
-- One selected Invoice is the Job Revenue source. Revenue remains the pretax saved subtotal, shown with its invoice reference in the Job profit summary. Actual costs and tracked time remain editable and continue to drive Net earnings/Net/hour.
+- One selected Invoice is the Job Revenue source. Revenue remains the pretax saved subtotal, shown as “Invoiced Revenue” in the Job profit summary without the invoice number. Jobs without an adopted Invoice retain “Revenue” with “Not invoiced.” Actual costs and tracked time remain editable and continue to drive Net earnings/Net/hour.
 - Extend the financial-completeness flow for both Complete and Paid. Final review creates an Invoice when none is selected; sharing is optional. With an existing source, final review uses that Invoice's saved total. A separate Replace Invoice action handles intentional replacement; cost corrections alone do not replace.
 - A Job can have one selected revenue Invoice. Job Edit adds “Use for Job Revenue”; selection and Archive & Disable Link changes are staged until Done and save atomically with the Job draft. Estimates cannot be selected, and an established source cannot be cleared without selecting another Invoice.
 - Replacing the source archives/disables the previous Invoice link. Keep the selected Invoice's existing archive/link controls. An archived Invoice can still be a Revenue source. Only the selected Invoice follows later Job Paid/Unpaid changes; prior Invoices keep their last status.

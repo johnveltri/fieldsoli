@@ -15,15 +15,13 @@ export function JobDetailSummaryCard({
   typography,
   onPress,
   noRevenueConfirmed,
-  revenueInvoiceLabel,
-  onOpenRevenueInvoice,
+  isInvoiced,
 }: {
   earnings: JobDetailViewModel['earnings'];
   typography: TextStyles;
   onPress?: () => void;
   noRevenueConfirmed?: boolean;
-  revenueInvoiceLabel?: string | null;
-  onOpenRevenueInvoice?: () => void;
+  isInvoiced?: boolean;
 }) {
   const netTone =
     earnings.netEarningsCents >= 0
@@ -40,7 +38,9 @@ export function JobDetailSummaryCard({
   const content = (
     <View style={styles.summaryStack}>
       <View style={styles.summaryRow}>
-        <Text style={[typography.body, { color: fg.secondary, flex: 1 }]}>Revenue</Text>
+        <Text style={[typography.body, { color: fg.secondary, flex: 1 }]}>
+          {isInvoiced ? 'Invoiced Revenue' : 'Revenue'}
+        </Text>
         <Text style={[typography.bodyBold, styles.summaryMoney]}>
           {noRevenueConfirmed
             ? formatUsdCombined(0)
@@ -49,22 +49,11 @@ export function JobDetailSummaryCard({
               : '—'}
         </Text>
       </View>
-      <View style={styles.invoiceReference}>
-        {revenueInvoiceLabel && onOpenRevenueInvoice ? (
-          <Pressable
-            accessibilityRole="link"
-            accessibilityLabel={`Preview ${revenueInvoiceLabel}`}
-            onPress={(event) => {
-              event.stopPropagation();
-              onOpenRevenueInvoice();
-            }}
-          >
-            <Text style={[typography.bodySmall, { color: fg.secondary }]}>{revenueInvoiceLabel}</Text>
-          </Pressable>
-        ) : (
+      {!isInvoiced ? (
+        <View style={styles.invoiceReference}>
           <Text style={[typography.bodySmall, { color: fg.secondary }]}>Not invoiced</Text>
-        )}
-      </View>
+        </View>
+      ) : null}
       <View style={styles.summaryRow}>
         <Text style={[typography.body, { color: fg.secondary, flex: 1 }]}>Materials</Text>
         <Text style={[typography.bodyBold, styles.summaryMoney, { color: matTone }]}>
