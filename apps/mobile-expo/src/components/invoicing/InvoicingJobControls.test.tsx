@@ -317,9 +317,9 @@ describe('InvoicingJobControls', () => {
     expect(await screen.findByTestId('document-preview-html')).toBeTruthy();
     expect(screen.queryByText('Review Invoice')).toBeNull();
     expect(screen.queryByLabelText('Document type')).toBeNull();
-    expect(screen.getByRole('button', { name: 'CREATE INVOICE & COMPLETE JOB' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'COMPLETE & CREATE INVOICE' })).toBeTruthy();
     await act(async () => {
-      fireEvent.press(screen.getByRole('button', { name: 'CREATE INVOICE & COMPLETE JOB' }));
+      fireEvent.press(screen.getByRole('button', { name: 'COMPLETE & CREATE INVOICE' }));
     });
     expect(mockFinalize).toHaveBeenCalledWith(
       {},

@@ -1185,7 +1185,7 @@ export const InvoicingJobControls = forwardRef<
                       : 'CREATE INVOICE & MARK PAID'
                     : finalization.selected
                       ? 'COMPLETE JOB'
-                      : 'CREATE INVOICE & COMPLETE JOB'}
+                      : 'COMPLETE & CREATE INVOICE'}
                 onPress={() => void confirmFinalization()}
                 disabled={!!busy}
                 includeSafeArea
