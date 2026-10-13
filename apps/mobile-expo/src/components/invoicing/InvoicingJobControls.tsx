@@ -35,9 +35,9 @@ import {
   Copy,
   Download,
   ExternalLink,
+  Forward,
   Mail,
   MessageCircle,
-  Share2,
 } from 'lucide-react-native';
 import { PTSerif_700Bold } from '@expo-google-fonts/pt-serif';
 import {
@@ -1005,7 +1005,7 @@ export const InvoicingJobControls = forwardRef<
                     {([
                       { kind: 'text', label: 'Text', Icon: MessageCircle },
                       { kind: 'email', label: 'Email', Icon: Mail },
-                      { kind: 'share', label: 'Share', Icon: Share2 },
+                      { kind: 'share', label: 'Share', Icon: Forward },
                     ] as const).map(({ kind, label, Icon }) => (
                       <Pressable
                         key={kind}
@@ -1032,7 +1032,7 @@ export const InvoicingJobControls = forwardRef<
                         <View style={styles.shortcutIcon}>
                           <Icon size={24} color={fg.primary} strokeWidth={2} />
                         </View>
-                        <Text style={typography.bodySmall}>{label}</Text>
+                        <Text style={typography.bodyBold}>{label}</Text>
                       </Pressable>
                     ))}
                   </View>
