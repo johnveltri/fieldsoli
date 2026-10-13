@@ -80,7 +80,6 @@ import {
 } from '../../theme/nativeTokens';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PlatformHeaderAction } from '../platform/PlatformHeaderAction';
-import { TopHeaderBackIcon } from '../figma-icons/TopHeaderIcons';
 import { JobDetailIconTopClose } from '../figma-icons/JobDetailScreenIcons';
 import { usePlatformGlass } from '../platform/usePlatformGlass';
 import { ProfileChevronRightIcon } from '../figma-icons/ProfileScreenIcons';
@@ -968,19 +967,11 @@ export const InvoicingJobControls = forwardRef<
                 accessibilityTitle="Share document"
               >
                 <View style={styles.sheet}>
-                  <View style={styles.shareHeading}>
-                    <PlatformHeaderAction
-                      accessibilityLabel="Back to preview"
-                      onPress={closeShareSheet}
-                    >
-                      <TopHeaderBackIcon size={24} color={fg.primary} />
-                    </PlatformHeaderAction>
-                    <Text style={[typography.titleH3, styles.rowLabel]}>
-                      {active?.documentType === 'estimate'
-                        ? 'Share Estimate'
-                        : 'Share Invoice'}
-                    </Text>
-                  </View>
+                  <Text accessibilityRole="header" style={typography.titleH3}>
+                    {active?.documentType === 'estimate'
+                      ? 'Share Estimate'
+                      : 'Share Invoice'}
+                  </Text>
                   {active ? (
                     <View style={styles.shareDetails}>
                       <Text style={[typography.bodySmall, styles.secondary]}>
@@ -1160,7 +1151,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   web: { width: '100%', backgroundColor: bg.surfaceWhite },
-  sheet: { padding: space('Spacing/20'), gap: space('Spacing/12') },
+  sheet: { paddingVertical: space('Spacing/20'), gap: space('Spacing/12') },
   shareDetails: { gap: space('Spacing/4') },
   shortcuts: {
     flexDirection: 'row',
@@ -1184,10 +1175,5 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: border.subtle,
     backgroundColor: bg.surfaceWhite,
-  },
-  shareHeading: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space('Spacing/12'),
   },
 });

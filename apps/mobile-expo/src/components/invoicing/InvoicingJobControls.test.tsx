@@ -272,6 +272,8 @@ describe('InvoicingJobControls', () => {
     fireEvent.press(await screen.findByLabelText('SHARE ESTIMATE'));
 
     expect(await screen.findByRole('button', { name: 'Text Customer' })).toBeTruthy();
+    expect(screen.getByRole('header', { name: 'Share Estimate' })).toBeTruthy();
+    expect(screen.queryByLabelText('Back to preview')).toBeNull();
     expect(screen.getByRole('button', { name: 'Email Customer' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Share document' })).toBeTruthy();
     expect(screen.getByText('Customer · (312) 555-0198 · customer@example.com')).toBeTruthy();
