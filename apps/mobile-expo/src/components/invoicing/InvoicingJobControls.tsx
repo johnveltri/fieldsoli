@@ -1046,7 +1046,7 @@ export const InvoicingJobControls = forwardRef<
                         trailingIcon: (
                           <IconCopy
                             size={20}
-                            color={fg.secondary}
+                            color={fg.primary}
                             strokeWidth={2}
                           />
                         ),
@@ -1058,7 +1058,7 @@ export const InvoicingJobControls = forwardRef<
                         trailingIcon: (
                           <IconExternalLink
                             size={20}
-                            color={fg.secondary}
+                            color={fg.primary}
                             strokeWidth={2}
                           />
                         ),
@@ -1075,7 +1075,7 @@ export const InvoicingJobControls = forwardRef<
                         trailingIcon: (
                           <IconDownload
                             size={20}
-                            color={fg.secondary}
+                            color={fg.primary}
                             strokeWidth={2}
                           />
                         ),
