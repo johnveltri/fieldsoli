@@ -24,6 +24,7 @@ import {
   IconMail,
   IconMapPin,
   IconPhone,
+  IconPercentage,
   IconWorld,
 } from '@tabler/icons-react-native';
 import {
@@ -36,15 +37,14 @@ import {
   type TaxableCategory,
 } from '@fieldsolo/api-client';
 
-import { DsTextInput } from '../components/ds/DsTextInput';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { bg, border, color, fg, radius, space } from '../theme/nativeTokens';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CanvasTiledBackground } from '../components/CanvasTiledBackground';
-import { ProfileRowsCard } from '../components/ds/ProfileRowsCard';
 import { ProfileCheckIcon } from '../components/figma-icons/ProfileScreenIcons';
-import { EditFieldInput, EditIconRow, EditSheet } from '../components/ds/edit-mode/EditFormRows';
+import { EditConfirmNoneRow, EditFieldInput, EditIconGroup, EditIconRow, EditSheet } from '../components/ds/edit-mode/EditFormRows';
+import { JobDetailIconSectionMaterials } from '../components/figma-icons/JobDetailScreenIcons';
 import { TopHeaderBackIcon } from '../components/figma-icons/TopHeaderIcons';
 import { PlatformHeaderAction } from '../components/platform/PlatformHeaderAction';
 import { useContentColumn } from '../theme/useContentColumn';
@@ -102,6 +102,8 @@ export const BusinessSettingsScreen = forwardRef<
   );
   const [markupText, setMarkupText] = useState('0');
   const [taxText, setTaxText] = useState('0');
+  const [markupFocused, setMarkupFocused] = useState(false);
+  const [taxFocused, setTaxFocused] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -196,58 +198,10 @@ export const BusinessSettingsScreen = forwardRef<
     });
   };
 
-  const allSelected = TAX_OPTIONS.every((option) =>
-    draft.taxableCategories.includes(option.value),
-  );
-
   const updateBusinessField = (key: BusinessInfoField, value: string) => {
     setDirty(true);
     setDraft((current) => ({ ...current, [key]: value }));
   };
-
-  const field = (
-    label: string,
-    value: string,
-    onChangeText: (value: string) => void,
-    numeric = false,
-    key?: string,
-  ) => (
-    <View key={key ?? label} style={styles.field}>
-      <Text style={[typography.bodySmall, styles.secondary]}>{label}</Text>
-      <View style={styles.inputRow}>
-        <DsTextInput
-          accessibilityLabel={label}
-          style={[typography.body, styles.input]}
-          value={value}
-          placeholder={
-            numeric
-              ? '0'
-              : `Enter ${label.toLowerCase().replace(' (optional)', '')}`
-          }
-          placeholderTextColor={fg.secondary}
-          editable={!saving}
-          keyboardType={
-            numeric
-              ? 'decimal-pad'
-              : key === 'phone'
-                ? 'phone-pad'
-                : key === 'email'
-                  ? 'email-address'
-                  : key === 'website'
-                    ? 'url'
-                    : 'default'
-          }
-          autoCapitalize={
-            key === 'email' || key === 'website' ? 'none' : 'sentences'
-          }
-          onChangeText={onChangeText}
-        />
-        {numeric ? (
-          <Text style={[typography.body, styles.secondary]}>%</Text>
-        ) : null}
-      </View>
-    </View>
-  );
 
   const choices = <T,>(
     options: { value: T; label: string }[],
@@ -426,66 +380,62 @@ export const BusinessSettingsScreen = forwardRef<
                 </>
               ) : (
                 <>
-                  <Text accessibilityRole="header" style={typography.titleH3}>
-                    Pricing defaults
-                  </Text>
-                  <View style={styles.card}>
-                    {field(
-                      'Default material markup',
-                      markupText,
-                      (value) => {
-                        setDirty(true);
-                        setMarkupText(value);
-                      },
-                      true,
-                    )}
-                    <Text style={[typography.bodySmall, styles.hint]}>
-                      Applies to materials without an explicit markup. Changing it updates job revenue and future documents.
-                    </Text>
-                    {field(
-                      'Tax rate',
-                      taxText,
-                      (value) => {
-                        setDirty(true);
-                        setTaxText(value);
-                      },
-                      true,
-                    )}
-                  </View>
-                  <Text accessibilityRole="header" style={typography.titleH3}>
-                    Apply tax to
-                  </Text>
-                  <ProfileRowsCard
-                    typography={typography}
-                    rows={[
-                      {
-                        kind: 'toggle',
-                        label: 'All categories',
-                        sublabel:
-                          !allSelected && draft.taxableCategories.length > 0
-                            ? `${draft.taxableCategories.length} of 3 selected`
-                            : undefined,
-                        value: allSelected,
-                        disabled: saving,
-                        onValueChange: () => {
+                  <EditSheet>
+                    <EditIconGroup icon={<JobDetailIconSectionMaterials color={fg.secondary} />}>
+                      <Text style={[typography.body, { color: fg.primary }]}>
+                        Default Material Markup
+                      </Text>
+                      <EditFieldInput
+                        typography={typography}
+                        accessibilityLabel="Default material markup"
+                        placeholder="Default Material Markup %"
+                        value={markupFocused || !markupText.trim() ? markupText : `${markupText}% markup`}
+                        keyboardType="decimal-pad"
+                        inputMode="decimal"
+                        editable={!saving}
+                        onFocus={() => setMarkupFocused(true)}
+                        onBlur={() => setMarkupFocused(false)}
+                        onChangeText={(value) => {
                           setDirty(true);
-                          setDraft((current) => ({
-                            ...current,
-                            taxableCategories: allSelected
-                              ? []
-                              : TAX_OPTIONS.map((option) => option.value),
-                          }));
-                        },
-                      },
-                      ...TAX_OPTIONS.map((option) => ({
-                        kind: 'toggle' as const,
-                        label: option.label,
-                        value: draft.taxableCategories.includes(option.value),
-                        disabled: saving,
-                        onValueChange: () => toggleCategory(option.value),
-                      })),
-                    ]}
-                  />
+                          setMarkupText(value);
+                        }}
+                      />
+                    </EditIconGroup>
+                  </EditSheet>
+                  <Text accessibilityRole="header" style={typography.titleH3}>
+                    Taxes
+                  </Text>
+                  <EditSheet>
+                    <EditIconGroup icon={<IconPercentage color={fg.secondary} size={20} />}>
+                      <Text style={[typography.body, { color: fg.primary }]}>Tax rate</Text>
+                      <EditFieldInput
+                        typography={typography}
+                        accessibilityLabel="Tax rate"
+                        placeholder="Tax rate %"
+                        value={taxFocused || !taxText.trim() ? taxText : `${taxText}%`}
+                        keyboardType="decimal-pad"
+                        inputMode="decimal"
+                        editable={!saving}
+                        onFocus={() => setTaxFocused(true)}
+                        onBlur={() => setTaxFocused(false)}
+                        onChangeText={(value) => {
+                          setDirty(true);
+                          setTaxText(value);
+                        }}
+                      />
+                    </EditIconGroup>
+                    {TAX_OPTIONS.map((option) => (
+                      <EditConfirmNoneRow
+                        key={option.value}
+                        typography={typography}
+                        confirmed={draft.taxableCategories.includes(option.value)}
+                        confirmLabel={`Apply to ${option.label}`}
+                        confirmedLabel={`Apply to ${option.label}`}
+                        disabled={saving}
+                        onToggle={() => toggleCategory(option.value)}
+                      />
+                    ))}
+                  </EditSheet>
                   <Text accessibilityRole="header" style={typography.titleH3}>
                     Payment terms
                   </Text>
@@ -552,18 +502,6 @@ const styles = StyleSheet.create({
     borderColor: border.subtle,
     overflow: 'hidden',
   },
-  field: {
-    padding: space('Spacing/16'),
-    gap: space('Spacing/8'),
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: border.subtle,
-  },
-  inputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space('Spacing/8'),
-  },
-  input: { flex: 1, minHeight: 32, padding: 0 },
   choice: {
     minHeight: 56,
     padding: space('Spacing/16'),
@@ -574,11 +512,6 @@ const styles = StyleSheet.create({
   choiceLabel: { flex: 1 },
   separator: { borderTopWidth: 1, borderTopColor: border.subtle },
   secondary: { color: fg.secondary },
-  hint: {
-    color: fg.secondary,
-    paddingHorizontal: space('Spacing/16'),
-    paddingVertical: space('Spacing/12'),
-  },
   accent: { color: color('Brand/Primary') },
   message: { padding: space('Spacing/16') },
   save: {

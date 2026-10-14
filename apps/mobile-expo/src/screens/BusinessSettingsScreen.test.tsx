@@ -68,14 +68,9 @@ describe('BusinessSettingsScreen', () => {
       '12.5',
     );
     fireEvent.changeText(screen.getByLabelText('Tax rate'), '8.25');
-    fireEvent(
-      screen.getByRole('switch', { name: 'Materials' }),
-      'valueChange',
-      false,
-    );
-    expect(
-      screen.getByRole('switch', { name: 'All categories' }).props.value,
-    ).toBe(false);
+    expect(screen.queryByText('All categories')).toBeNull();
+    fireEvent.press(screen.getByRole('checkbox', { name: 'Apply to Materials' }));
+    expect(screen.getByRole('checkbox', { name: 'Apply to Materials' }).props.accessibilityState.checked).toBe(false);
     fireEvent.press(screen.getByRole('radio', { name: 'Net 15' }));
     fireEvent.press(screen.getByRole('radio', { name: '7 days' }));
     fireEvent.press(screen.getByLabelText('Save changes'));
