@@ -44,6 +44,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CanvasTiledBackground } from '../components/CanvasTiledBackground';
 import { ProfileCheckIcon } from '../components/figma-icons/ProfileScreenIcons';
 import { EditConfirmNoneRow, EditFieldInput, EditIconRow, EditSheet } from '../components/ds/edit-mode/EditFormRows';
+import { FullWidthFab } from '../components/ds/FullWidthFab';
 import { JobDetailIconSectionMaterials } from '../components/figma-icons/JobDetailScreenIcons';
 import { TopHeaderBackIcon } from '../components/figma-icons/TopHeaderIcons';
 import { PlatformHeaderAction } from '../components/platform/PlatformHeaderAction';
@@ -248,7 +249,7 @@ export const BusinessSettingsScreen = forwardRef<
         keyboardDismissMode="on-drag"
         contentContainerStyle={{
           paddingTop: insets.top + space('Spacing/20'),
-          paddingBottom: insets.bottom + space('Spacing/32'),
+          paddingBottom: insets.bottom + space('Spacing/100'),
         }}
       >
         <View style={columnStyle}>
@@ -473,25 +474,21 @@ export const BusinessSettingsScreen = forwardRef<
                   )}
                 </>
               )}
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Save changes"
-                accessibilityState={{ disabled: saving, busy: saving }}
-                disabled={saving}
-                onPress={() => void save()}
-                style={({ pressed }) => [
-                  styles.save,
-                  (saving || pressed) && styles.pressed,
-                ]}
-              >
-                <Text style={[typography.ctaPrimaryLabel, styles.saveLabel]}>
-                  {saving ? 'Saving…' : 'Save changes'}
-                </Text>
-              </Pressable>
             </View>
           ) : null}
         </View>
       </ScrollView>
+      {!loading && !failed ? (
+        <View pointerEvents="box-none" style={styles.fabOverlay}>
+          <FullWidthFab
+            typography={typography}
+            label={saving ? 'SAVING…' : 'SAVE CHANGES'}
+            onPress={() => void save()}
+            disabled={saving}
+            includeSafeArea
+          />
+        </View>
+      ) : null}
     </KeyboardAvoidingView>
   );
 });
@@ -525,14 +522,13 @@ const styles = StyleSheet.create({
   secondary: { color: fg.secondary },
   accent: { color: color('Brand/Primary') },
   message: { padding: space('Spacing/16') },
-  save: {
-    minHeight: 52,
-    backgroundColor: color('Brand/Primary'),
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radius('Radius/12'),
-    padding: space('Spacing/16'),
+  fabOverlay: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 2,
+    elevation: 2,
   },
-  saveLabel: { color: bg.surfaceWhite },
   pressed: { opacity: 0.75 },
 });
