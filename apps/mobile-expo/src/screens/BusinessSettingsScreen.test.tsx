@@ -46,7 +46,7 @@ describe('BusinessSettingsScreen', () => {
       />,
     );
     await screen.findByText('Could not load settings.');
-    expect(screen.queryByLabelText('Save changes')).toBeNull();
+    expect(screen.queryByLabelText('SAVE CHANGES')).toBeNull();
     fireEvent.press(screen.getByText('Retry'));
     await screen.findByLabelText('Business name');
     expect(mockFetch).toHaveBeenCalledTimes(2);
@@ -73,7 +73,7 @@ describe('BusinessSettingsScreen', () => {
     expect(screen.getByRole('checkbox', { name: 'Apply to Materials' }).props.accessibilityState.checked).toBe(false);
     fireEvent.press(screen.getByRole('radio', { name: 'Net 15' }));
     fireEvent.press(screen.getByRole('radio', { name: '7 days' }));
-    fireEvent.press(screen.getByLabelText('Save changes'));
+    fireEvent.press(screen.getByLabelText('SAVE CHANGES'));
     await waitFor(() =>
       expect(mockSave).toHaveBeenCalledWith(
         {},

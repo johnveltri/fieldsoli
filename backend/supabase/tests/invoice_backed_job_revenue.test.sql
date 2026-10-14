@@ -3,6 +3,35 @@
 
 begin;
 
+-- Ending a visit on a new job must not require financial finalization.
+do $$
+declare
+  owner_id uuid := gen_random_uuid();
+  job_id uuid;
+  visit_id uuid;
+begin
+  insert into auth.users (id, email)
+  values (owner_id, 'visit-end-' || owner_id || '@example.com');
+  insert into public.jobs (user_id, short_description)
+  values (owner_id, 'Unfinalized visit') returning id into job_id;
+  insert into public.sessions (user_id, job_id, entry_mode, session_status, started_at)
+  values (owner_id, job_id, 'live', 'in_progress', now() - interval '30 minutes')
+  returning id into visit_id;
+  update public.sessions set session_status = 'ended', ended_at = now(),
+    clock_end_explicit = true, clock_times_explicit = true where id = visit_id;
+  if (select session_status from public.sessions where id = visit_id) <> 'ended'
+     or (select revenue_document_id from public.jobs where id = job_id) is not null then
+    raise exception 'ending a visit failed or unexpectedly created an invoice';
+  end if;
+  begin
+    update public.jobs set job_work_status = 'completed' where id = job_id;
+    raise exception 'completion without an invoice was allowed';
+  exception when others then
+    if SQLERRM not like '%financial_document:invoice_required%' then raise; end if;
+  end;
+end;
+$$;
+
 do $$
 #variable_conflict use_variable
 declare
@@ -58,6 +87,13 @@ begin
      or (select markup_override_bps from public.job_costs where id = material_id) <> 1000 then
     raise exception 'completion did not atomically create/select invoice and solidify markup';
   end if;
+
+  begin
+    update public.jobs set revenue_document_id = null where id = job_id;
+    raise exception 'clearing an established revenue invoice was allowed';
+  exception when others then
+    if SQLERRM not like '%financial_document:invoice_required%' then raise; end if;
+  end;
 
   -- Costs and labor can change while the immutable selected snapshot remains revenue.
   update public.job_costs set total_cost_cents = 12000, unit_cost_cents = 12000 where id = material_id;

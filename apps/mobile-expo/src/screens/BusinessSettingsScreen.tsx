@@ -249,7 +249,7 @@ export const BusinessSettingsScreen = forwardRef<
         keyboardDismissMode="on-drag"
         contentContainerStyle={{
           paddingTop: insets.top + space('Spacing/20'),
-          paddingBottom: insets.bottom + space('Spacing/100'),
+          paddingBottom: insets.bottom + space('Spacing/80') + space('Spacing/20'),
         }}
       >
         <View style={columnStyle}>
