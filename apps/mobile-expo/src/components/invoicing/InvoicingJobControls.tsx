@@ -962,7 +962,6 @@ export const InvoicingJobControls = forwardRef<
                 <EditConfirmNoneRow
                   typography={typography}
                   confirmed={doc.archived || !doc.linkEnabled}
-                  confirmedTextColor={color('Brand/Primary')}
                   confirmLabel="Archive & Disable Link"
                   confirmedLabel="Archive & Disable Link"
                   showTopBorder={false}
