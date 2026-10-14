@@ -947,9 +947,22 @@ export const InvoicingJobControls = forwardRef<
                     {`${documentNumberLabel(doc.documentType, doc.documentNumber)} (${doc.issueDate})`}
                   </Text>
                 </Pressable>
+                {doc.documentType === 'invoice' ? (
+                  <EditConfirmNoneRow
+                    typography={typography}
+                    confirmed={revenueDocumentDraft === doc.id}
+                    confirmLabel="Use for Job Revenue"
+                    confirmedLabel="Use for Job Revenue"
+                    showTopBorder={false}
+                    onToggle={() => {
+                      if (revenueDocumentDraft !== doc.id) setRevenueDocumentDraft(doc.id);
+                    }}
+                  />
+                ) : null}
                 <EditConfirmNoneRow
                   typography={typography}
                   confirmed={doc.archived || !doc.linkEnabled}
+                  confirmedTextColor={color('Brand/Primary')}
                   confirmLabel="Archive & Disable Link"
                   confirmedLabel="Archive & Disable Link"
                   showTopBorder={false}
@@ -970,18 +983,6 @@ export const InvoicingJobControls = forwardRef<
                     });
                   }}
                 />
-                {doc.documentType === 'invoice' ? (
-                  <EditConfirmNoneRow
-                    typography={typography}
-                    confirmed={revenueDocumentDraft === doc.id}
-                    confirmLabel="Use for Job Revenue"
-                    confirmedLabel="Use for Job Revenue"
-                    showTopBorder={false}
-                    onToggle={() => {
-                      if (revenueDocumentDraft !== doc.id) setRevenueDocumentDraft(doc.id);
-                    }}
-                  />
-                ) : null}
               </>
             ) : null}
           </View>

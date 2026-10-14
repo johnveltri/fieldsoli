@@ -1068,6 +1068,7 @@ export function EditConfirmNoneRow({
   onToggle,
   showTopBorder = true,
   disabled = false,
+  confirmedTextColor,
 }: {
   typography: TextStyles;
   confirmed: boolean;
@@ -1076,6 +1077,7 @@ export function EditConfirmNoneRow({
   onToggle: () => void;
   showTopBorder?: boolean;
   disabled?: boolean;
+  confirmedTextColor?: string;
 }) {
   const label = confirmed ? confirmedLabel : confirmLabel;
   return (
@@ -1099,7 +1101,7 @@ export function EditConfirmNoneRow({
           style={[
             typography.body,
             editRowText,
-            { color: confirmed ? fg.primary : fg.secondary },
+            { color: confirmed ? (confirmedTextColor ?? fg.primary) : fg.secondary },
           ]}
         >
           {label}
