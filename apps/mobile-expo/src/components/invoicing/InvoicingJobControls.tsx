@@ -891,7 +891,7 @@ export const InvoicingJobControls = forwardRef<
                 style={({ pressed }) => [styles.row, pressed && styles.pressed]}
               >
                 <View style={styles.rowLabel}>
-                  <Text style={[typography.body, styles.secondary]}>
+                  <Text style={[typography.body, { color: fg.primary }]}>
                     {documentNumberLabel(doc.documentType, doc.documentNumber)}
                   </Text>
                   <Text style={[typography.bodySmall, styles.secondary]}>{doc.issueDate}</Text>
