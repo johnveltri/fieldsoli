@@ -253,7 +253,7 @@ export function CaptureComposerSheet({
     : totalCents;
   const totalCostDisplay =
     resolvedTotalCents > 0 || hasCompleteBreakdown
-      ? `${formatUsdCombined(resolvedTotalCents)} total + markup`
+      ? `${formatUsdCombined(resolvedTotalCents)} total`
       : '';
 
   const materialValues = useCallback((): CaptureComposerMaterialValues => {

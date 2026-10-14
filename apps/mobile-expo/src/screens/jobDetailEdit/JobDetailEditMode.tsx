@@ -973,7 +973,7 @@ function MaterialEditBlock({
     : row.totalCostCents;
   const totalCostDisplay =
     displayedTotalCents > 0 || hasCompleteBreakdown
-      ? `${formatUsdCombined(displayedTotalCents)} total`
+      ? `${formatUsdCombined(displayedTotalCents)} total + markup`
       : '';
 
   useEffect(() => {
