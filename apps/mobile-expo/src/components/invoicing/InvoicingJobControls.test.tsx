@@ -2,6 +2,7 @@ import React, { createRef } from 'react';
 import { Animated, StyleSheet } from 'react-native';
 import { act, fireEvent, render, waitFor, within } from '@testing-library/react-native';
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { color } from '@fieldsolo/design-system/lib/tokens';
 import type {
   DocumentPreview,
   FinancialDocumentRecord,
@@ -285,6 +286,9 @@ describe('InvoicingJobControls', () => {
     expect(screen.queryByLabelText('SHARE INVOICE')).toBeNull();
     expect(screen.getAllByText('Invoice #00001').length).toBeGreaterThan(0);
     const confirm = screen.getByRole('button', { name: 'CONFIRM $630.00 PAID' });
+    expect(StyleSheet.flatten(confirm.props.style)).toMatchObject({
+      backgroundColor: color('Semantic/Status/Success/Text'),
+    });
     await act(async () => { fireEvent.press(confirm); });
 
     expect(mockFinalize).toHaveBeenCalledWith(

@@ -1182,6 +1182,11 @@ export const InvoicingJobControls = forwardRef<
             <View pointerEvents="box-none" style={styles.fabOverlay}>
               <FullWidthFab
                 typography={typography}
+                backgroundColor={
+                  finalization.status === 'paid'
+                    ? color('Semantic/Status/Success/Text')
+                    : undefined
+                }
                 label={busy === 'Saving…'
                   ? 'SAVING…'
                   : finalization.status === 'paid'
