@@ -1026,6 +1026,11 @@ export function JobDetailScreen({
     return refreshed ?? undefined;
   }, [job]);
 
+  const onRevenueInvoiceChanged = useCallback(() => {
+    void refetchJob().catch(() => undefined);
+    invalidateJobsList();
+  }, [invalidateJobsList, refetchJob]);
+
   const financialCompleteSnapshotRef = useRef<boolean | null>(null);
   const demoteStatusInFlightRef = useRef(false);
 
@@ -3286,6 +3291,7 @@ export function JobDetailScreen({
           }}
           onFinalized={onInvoiceFinalized}
           onFinalizationClosed={onFinalizationClosed}
+          onRevenueInvoiceChanged={onRevenueInvoiceChanged}
         />
       ) : null}
     </View>
@@ -3405,6 +3411,7 @@ export function JobDetailScreen({
                       beforeOpen={() => saveEditDraft(false)}
                       onFinalized={onInvoiceFinalized}
                       onFinalizationClosed={onFinalizationClosed}
+                      onRevenueInvoiceChanged={onRevenueInvoiceChanged}
                     />
                   ) : null
                 }
@@ -3444,6 +3451,7 @@ export function JobDetailScreen({
                 beforeOpen={() => saveEditDraft(false)}
                 onFinalized={onInvoiceFinalized}
                 onFinalizationClosed={onFinalizationClosed}
+                onRevenueInvoiceChanged={onRevenueInvoiceChanged}
               />
             ) : null
           }

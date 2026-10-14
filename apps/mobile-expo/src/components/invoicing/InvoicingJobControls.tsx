@@ -118,6 +118,7 @@ type Props = {
   beforeOpen?: () => Promise<boolean>;
   onFinalized?: (status: 'completed' | 'paid') => void;
   onFinalizationClosed?: () => void;
+  onRevenueInvoiceChanged?: () => void;
 };
 
 type QueuedHandoff =
@@ -236,6 +237,7 @@ export const InvoicingJobControls = forwardRef<
     beforeOpen,
     onFinalized,
     onFinalizationClosed,
+    onRevenueInvoiceChanged,
   }: Props,
   ref,
 ) {
@@ -455,6 +457,7 @@ export const InvoicingJobControls = forwardRef<
           });
       setSaved(created);
       setRequestKey(null);
+      if (previewType === 'invoice') onRevenueInvoiceChanged?.();
       openShareSheet();
       await reload();
     } catch (error) {
@@ -480,7 +483,7 @@ export const InvoicingJobControls = forwardRef<
     } finally {
       setBusy(null);
     }
-  }, [client, jobId, openShareSheet, preview, previewType, reload, requestKey, workStatus]);
+  }, [client, jobId, onRevenueInvoiceChanged, openShareSheet, preview, previewType, reload, requestKey, workStatus]);
 
   const active = saved;
   const link = active ? shareDocumentUrl(active.token) : '';
