@@ -49,11 +49,6 @@ export function JobDetailSummaryCard({
               : '—'}
         </Text>
       </View>
-      {!isInvoiced ? (
-        <View style={styles.invoiceReference}>
-          <Text style={[typography.bodySmall, { color: fg.secondary }]}>Not invoiced</Text>
-        </View>
-      ) : null}
       <View style={styles.summaryRow}>
         <Text style={[typography.body, { color: fg.secondary, flex: 1 }]}>Materials</Text>
         <Text style={[typography.bodyBold, styles.summaryMoney, { color: matTone }]}>
@@ -119,7 +114,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     minHeight: 24,
   },
-  invoiceReference: { marginTop: -space('Spacing/4'), marginBottom: space('Spacing/4') },
   summaryMoney: {
     color: fg.primary,
     textAlign: 'right',
