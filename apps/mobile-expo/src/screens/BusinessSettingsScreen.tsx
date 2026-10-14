@@ -19,6 +19,14 @@ import {
   View,
 } from 'react-native';
 import {
+  IconBuildingStore,
+  IconLicense,
+  IconMail,
+  IconMapPin,
+  IconPhone,
+  IconWorld,
+} from '@tabler/icons-react-native';
+import {
   DEFAULT_BUSINESS_SETTINGS,
   fetchBusinessSettings,
   saveBusinessSettings,
@@ -36,6 +44,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CanvasTiledBackground } from '../components/CanvasTiledBackground';
 import { ProfileRowsCard } from '../components/ds/ProfileRowsCard';
 import { ProfileCheckIcon } from '../components/figma-icons/ProfileScreenIcons';
+import { EditFieldInput, EditIconRow, EditSheet } from '../components/ds/edit-mode/EditFormRows';
 import { TopHeaderBackIcon } from '../components/figma-icons/TopHeaderIcons';
 import { PlatformHeaderAction } from '../components/platform/PlatformHeaderAction';
 import { useContentColumn } from '../theme/useContentColumn';
@@ -76,6 +85,8 @@ function percentToBps(text: string): number | null {
 }
 
 export type BusinessSettingsScreenHandle = { requestBack: () => void };
+
+type BusinessInfoField = 'businessName' | 'address' | 'phone' | 'email' | 'website' | 'license';
 
 export const BusinessSettingsScreen = forwardRef<
   BusinessSettingsScreenHandle,
@@ -188,6 +199,11 @@ export const BusinessSettingsScreen = forwardRef<
   const allSelected = TAX_OPTIONS.every((option) =>
     draft.taxableCategories.includes(option.value),
   );
+
+  const updateBusinessField = (key: BusinessInfoField, value: string) => {
+    setDirty(true);
+    setDraft((current) => ({ ...current, [key]: value }));
+  };
 
   const field = (
     label: string,
@@ -320,29 +336,93 @@ export const BusinessSettingsScreen = forwardRef<
                   <Text style={[typography.bodySmall, styles.secondary]}>
                     These details appear on your estimates and invoices.
                   </Text>
-                  <View style={styles.card}>
-                    {(
-                      [
-                        ['Business name', 'businessName'],
-                        ['Address', 'address'],
-                        ['Phone', 'phone'],
-                        ['Email', 'email'],
-                        ['Website', 'website'],
-                        ['License # (optional)', 'license'],
-                      ] as const
-                    ).map(([label, key]) =>
-                      field(
-                        label,
-                        draft[key] ?? '',
-                        (value) => {
-                          setDirty(true);
-                          setDraft((current) => ({ ...current, [key]: value }));
-                        },
-                        false,
-                        key,
-                      ),
-                    )}
-                  </View>
+                  <EditSheet>
+                    <EditIconRow icon={<IconBuildingStore color={fg.secondary} size={20} />}>
+                      <EditFieldInput
+                        typography={typography}
+                        placeholder="Business name"
+                        accessibilityLabel="Business name"
+                        value={draft.businessName ?? ''}
+                        onChangeText={(value) => updateBusinessField('businessName', value)}
+                        editable={!saving}
+                        autoCapitalize="words"
+                      />
+                    </EditIconRow>
+                    <EditIconRow
+                      icon={<IconMapPin color={fg.secondary} size={20} />}
+                      showTopBorder
+                    >
+                      <EditFieldInput
+                        typography={typography}
+                        placeholder="Address"
+                        accessibilityLabel="Address"
+                        value={draft.address ?? ''}
+                        onChangeText={(value) => updateBusinessField('address', value)}
+                        editable={!saving}
+                        autoCapitalize="words"
+                      />
+                    </EditIconRow>
+                    <EditIconRow
+                      icon={<IconPhone color={fg.secondary} size={20} />}
+                      showTopBorder
+                    >
+                      <EditFieldInput
+                        typography={typography}
+                        placeholder="Phone"
+                        accessibilityLabel="Phone"
+                        value={draft.phone ?? ''}
+                        onChangeText={(value) => updateBusinessField('phone', value)}
+                        editable={!saving}
+                        keyboardType="phone-pad"
+                      />
+                    </EditIconRow>
+                    <EditIconRow
+                      icon={<IconMail color={fg.secondary} size={20} />}
+                      showTopBorder
+                    >
+                      <EditFieldInput
+                        typography={typography}
+                        placeholder="Email"
+                        accessibilityLabel="Email"
+                        value={draft.email ?? ''}
+                        onChangeText={(value) => updateBusinessField('email', value)}
+                        editable={!saving}
+                        keyboardType="email-address"
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                      />
+                    </EditIconRow>
+                    <EditIconRow
+                      icon={<IconWorld color={fg.secondary} size={20} />}
+                      showTopBorder
+                    >
+                      <EditFieldInput
+                        typography={typography}
+                        placeholder="Website"
+                        accessibilityLabel="Website"
+                        value={draft.website ?? ''}
+                        onChangeText={(value) => updateBusinessField('website', value)}
+                        editable={!saving}
+                        keyboardType="url"
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                      />
+                    </EditIconRow>
+                    <EditIconRow
+                      icon={<IconLicense color={fg.secondary} size={20} />}
+                      showTopBorder
+                    >
+                      <EditFieldInput
+                        typography={typography}
+                        placeholder="License # (optional)"
+                        accessibilityLabel="License # (optional)"
+                        value={draft.license ?? ''}
+                        onChangeText={(value) => updateBusinessField('license', value)}
+                        editable={!saving}
+                        autoCapitalize="characters"
+                      />
+                    </EditIconRow>
+                  </EditSheet>
                 </>
               ) : (
                 <>
