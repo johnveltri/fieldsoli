@@ -381,7 +381,7 @@ export const BusinessSettingsScreen = forwardRef<
               ) : (
                 <>
                   <Text accessibilityRole="header" style={typography.titleH3}>
-                    Default Material Markup
+                    Material Markup
                   </Text>
                   <EditSheet>
                     <EditIconRow
@@ -390,11 +390,11 @@ export const BusinessSettingsScreen = forwardRef<
                       <EditFieldInput
                         typography={typography}
                         accessibilityLabel="Default material markup"
-                        placeholder="Default Material Markup"
+                        placeholder="Material Markup"
                         value={
                           markupFocused || !markupText.trim()
                             ? markupText
-                            : `${markupText}% markup`
+                            : `${markupText}% Default Markup`
                         }
                         keyboardType="decimal-pad"
                         inputMode="decimal"
