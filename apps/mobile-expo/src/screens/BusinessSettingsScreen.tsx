@@ -43,7 +43,7 @@ import { bg, border, color, fg, radius, space } from '../theme/nativeTokens';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CanvasTiledBackground } from '../components/CanvasTiledBackground';
 import { ProfileCheckIcon } from '../components/figma-icons/ProfileScreenIcons';
-import { EditConfirmNoneRow, EditFieldInput, EditIconGroup, EditIconRow, EditSheet } from '../components/ds/edit-mode/EditFormRows';
+import { EditConfirmNoneRow, EditFieldInput, EditIconRow, EditSheet } from '../components/ds/edit-mode/EditFormRows';
 import { JobDetailIconSectionMaterials } from '../components/figma-icons/JobDetailScreenIcons';
 import { TopHeaderBackIcon } from '../components/figma-icons/TopHeaderIcons';
 import { PlatformHeaderAction } from '../components/platform/PlatformHeaderAction';
@@ -380,16 +380,22 @@ export const BusinessSettingsScreen = forwardRef<
                 </>
               ) : (
                 <>
+                  <Text accessibilityRole="header" style={typography.titleH3}>
+                    Default Material Markup
+                  </Text>
                   <EditSheet>
-                    <EditIconGroup icon={<JobDetailIconSectionMaterials color={fg.secondary} />}>
-                      <Text style={[typography.body, { color: fg.primary }]}>
-                        Default Material Markup
-                      </Text>
+                    <EditIconRow
+                      icon={<JobDetailIconSectionMaterials color={fg.secondary} />}
+                    >
                       <EditFieldInput
                         typography={typography}
                         accessibilityLabel="Default material markup"
-                        placeholder="Default Material Markup %"
-                        value={markupFocused || !markupText.trim() ? markupText : `${markupText}% markup`}
+                        placeholder="Default Material Markup"
+                        value={
+                          markupFocused || !markupText.trim()
+                            ? markupText
+                            : `${markupText}% markup`
+                        }
                         keyboardType="decimal-pad"
                         inputMode="decimal"
                         editable={!saving}
@@ -400,19 +406,24 @@ export const BusinessSettingsScreen = forwardRef<
                           setMarkupText(value);
                         }}
                       />
-                    </EditIconGroup>
+                    </EditIconRow>
                   </EditSheet>
                   <Text accessibilityRole="header" style={typography.titleH3}>
                     Taxes
                   </Text>
                   <EditSheet>
-                    <EditIconGroup icon={<IconPercentage color={fg.secondary} size={20} />}>
-                      <Text style={[typography.body, { color: fg.primary }]}>Tax rate</Text>
+                    <EditIconRow
+                      icon={<IconPercentage color={fg.secondary} size={20} />}
+                    >
                       <EditFieldInput
                         typography={typography}
                         accessibilityLabel="Tax rate"
-                        placeholder="Tax rate %"
-                        value={taxFocused || !taxText.trim() ? taxText : `${taxText}%`}
+                        placeholder="Tax Rate"
+                        value={
+                          taxFocused || !taxText.trim()
+                            ? taxText
+                            : `${taxText}% Tax Rate`
+                        }
                         keyboardType="decimal-pad"
                         inputMode="decimal"
                         editable={!saving}
@@ -423,7 +434,7 @@ export const BusinessSettingsScreen = forwardRef<
                           setTaxText(value);
                         }}
                       />
-                    </EditIconGroup>
+                    </EditIconRow>
                     {TAX_OPTIONS.map((option) => (
                       <EditConfirmNoneRow
                         key={option.value}
