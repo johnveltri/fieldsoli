@@ -134,8 +134,9 @@ export function renderDocumentPreview(
   payload: DocumentPayload,
   paymentProjection: PaymentProjection,
   fonts?: PreviewFontData,
+  pendingNumber = false,
 ): string {
-  return renderDocumentLayout(version, payload, paymentProjection, fonts, 'preview');
+  return renderDocumentLayout(version, payload, paymentProjection, fonts, 'preview', pendingNumber);
 }
 
 function renderDocumentLayout(
@@ -144,6 +145,7 @@ function renderDocumentLayout(
   paymentProjection: PaymentProjection,
   fonts: PreviewFontData | undefined,
   presentation: 'preview' | 'document' | 'pdf',
+  pendingNumber = false,
 ): string {
   if (version !== RENDERER_VERSION)
     throw new Error("unsupported_renderer_version");
@@ -246,7 +248,7 @@ ${detail(payload.businessAddress)}${detail(payload.businessPhone)}${detail(paylo
 <section class="recipient"><h2>Recipient</h2>${payload.customerName.trim() ? `<p class="name">${escapeHtml(payload.customerName.trim())}</p>` : ""}
 ${detail(payload.serviceAddress)}${detail(payload.customerPhone)}${detail(payload.customerEmail)}</section>
 </div><section class="document-summary" aria-label="Document summary">
-<div class="document-title"><div class="document-title-row"><h2>${escapeHtml(title)}${presentation !== "preview" || payload.documentNumber == null ? "" : '<span class="pending-label"> (pending)</span>'}</h2></div>${!estimate ? `<p class="payment-status">${paid ? "Paid" : "Unpaid"}</p>` : ""}</div>
+<div class="document-title"><div class="document-title-row"><h2>${escapeHtml(title)}${presentation !== "preview" || !pendingNumber || payload.documentNumber == null ? "" : '<span class="pending-label"> (pending)</span>'}</h2></div>${!estimate ? `<p class="payment-status">${paid ? "Paid" : "Unpaid"}</p>` : ""}</div>
 ${row("Issued", formatDate(payload.issueDate))}
 ${estimate ? (payload.validUntil ? row("Valid until", formatDate(payload.validUntil)) : "") : payload.dueDate ? row("Due", formatDate(payload.dueDate)) : ""}
 ${!estimate && payload.paymentTerms ? row("Terms", PAYMENT_TERMS_LABEL[payload.paymentTerms]) : ""}

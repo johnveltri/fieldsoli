@@ -72,7 +72,7 @@ describe('renderDocument', () => {
     const pdf = renderDocument(1, detailedPayload, 'unpaid', fonts, 'pdf');
     const preview = renderDocumentPreview(1, detailedPayload, 'unpaid', fonts);
     const body = (html: string) => html.slice(html.indexOf('<article'));
-    expect(body(pdf)).toBe(body(preview).replace('<span class="pending-label"> (pending)</span>', ''));
+    expect(body(pdf)).toBe(body(preview));
     expect(pdf).toContain('Screen door assembly');
     expect(pdf).toContain('1 ea @ $292.50');
     expect(pdf).toContain('Haul-away');
@@ -99,6 +99,14 @@ describe("renderDocumentPreview", () => {
     );
     expect(html).toContain("Amount Due");
     expect(html).toContain("$627.00");
+  });
+
+  it("shows pending only for a reserved number that has not been created", () => {
+    const createdPreview = renderDocumentPreview(1, payload, "unpaid");
+    const reservedPreview = renderDocumentPreview(1, payload, "unpaid", undefined, true);
+
+    expect(createdPreview).not.toContain('(pending)');
+    expect(reservedPreview).toContain('Invoice #00001<span class="pending-label"> (pending)</span>');
   });
 
   it("handles an unnumbered estimate without invoice-only metadata or empty notes", () => {

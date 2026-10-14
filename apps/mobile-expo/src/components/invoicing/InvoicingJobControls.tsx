@@ -159,7 +159,7 @@ function htmlFor(record: {
   rendererVersion: number;
   payload: DocumentPreview['payload'];
   paymentProjection: DocumentPreview['paymentProjection'];
-}, presentation: 'document' | 'preview' | 'pdf' = 'document', fonts?: PreviewFontData) {
+}, presentation: 'document' | 'preview' | 'pdf' = 'document', fonts?: PreviewFontData, pendingNumber = false) {
   if (record.rendererVersion !== RENDERER_VERSION)
     return unsupportedRendererHtml();
   const payload = {
@@ -177,6 +177,7 @@ function htmlFor(record: {
       payload,
       record.paymentProjection,
       fonts,
+      pendingNumber,
     );
   }
   return renderDocument(
@@ -1119,6 +1120,7 @@ export const InvoicingJobControls = forwardRef<
                               },
                               'preview',
                               previewFonts ?? undefined,
+                              true,
                             )
                           : '<html><body></body></html>',
                     }}
