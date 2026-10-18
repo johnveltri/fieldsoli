@@ -58,6 +58,8 @@ type ProfileShape = {
 const mockFetchProfile = jest.fn<() => Promise<ProfileShape | null>>();
 const mockUpdateProfile = jest.fn<(...args: unknown[]) => Promise<ProfileShape>>();
 jest.mock('@fieldsolo/api-client', () => ({
+  ...jest.requireActual<object>('@fieldsolo/api-client'),
+  fetchBusinessSettings: jest.fn(async () => jest.requireActual<{ DEFAULT_BUSINESS_SETTINGS: object }>('@fieldsolo/api-client').DEFAULT_BUSINESS_SETTINGS),
   fetchCurrentUserProfile: (...args: unknown[]) => mockFetchProfile(...(args as [])),
   updateCurrentUserProfile: (...args: unknown[]) => mockUpdateProfile(...(args as [])),
 }));
@@ -86,7 +88,7 @@ describe('ProfileScreen', () => {
   it('groups the Account hub without personal summaries or an edit pill', async () => {
     const screen = render(<ProfileScreen onBack={jest.fn()} />);
     await waitFor(() => expect(mockFetchProfile).toHaveBeenCalled());
-    expect(screen.getByText('ACCOUNT')).toBeTruthy();
+    await waitFor(() => expect(screen.getByText('ACCOUNT')).toBeTruthy());
     expect(screen.getAllByRole('button').map((button) => button.props.accessibilityLabel)).toEqual([
       'Back', 'Business Details', 'Estimates & Invoices', 'Export Job Summary', 'Personal Details',
       'Change Password', 'Help & Support', 'Privacy Choices', 'Send Feedback', 'Log Out', 'Delete Account',
@@ -99,6 +101,20 @@ describe('ProfileScreen', () => {
     expect(screen.queryByText('Alex Builder')).toBeNull();
     expect(screen.queryByText('Your data')).toBeNull();
     expect(screen.queryByLabelText('EDIT')).toBeNull();
+  });
+
+  it.each([
+    ['Business Details', 'Business name'],
+    ['Estimates & Invoices', 'Default material markup'],
+  ])('returns from %s after the slide closes', async (label, field) => {
+    const screen = render(<ProfileScreen onBack={jest.fn()} />);
+    await act(async () => {});
+    fireEvent.press(screen.getByText(label));
+    await screen.findByLabelText(field);
+    expect(screen.queryByText('ACCOUNT')).toBeNull();
+    fireEvent.press(screen.getByLabelText('Back'));
+    await waitFor(() => expect(screen.getByText('ACCOUNT')).toBeTruthy());
+    expect(screen.queryByLabelText(field)).toBeNull();
   });
 
   it('logs the user out when "Log Out" is pressed', async () => {
@@ -149,7 +165,7 @@ describe('ProfileScreen', () => {
     await waitFor(() => expect(mockUpdateProfile).toHaveBeenCalledWith(
       expect.anything(), { firstName: 'Jamie', lastName: 'Builder', trades: ['Handyman', 'Electrical', 'Stonework'] },
     ));
-    expect(screen.getByText('ACCOUNT')).toBeTruthy();
+    await waitFor(() => expect(screen.getByText('ACCOUNT')).toBeTruthy());
   });
 
   it('leaves Personal Details without prompting after reverting equivalent edits', async () => {
@@ -164,7 +180,7 @@ describe('ProfileScreen', () => {
     fireEvent.changeText(screen.getByLabelText('Custom trade'), 'plumbing');
     fireEvent.press(screen.getByLabelText('Back'));
     expect(alert).not.toHaveBeenCalled();
-    expect(screen.getByText('ACCOUNT')).toBeTruthy();
+    await waitFor(() => expect(screen.getByText('ACCOUNT')).toBeTruthy());
     expect(mockUpdateProfile).not.toHaveBeenCalled();
     alert.mockRestore();
   });
@@ -176,7 +192,7 @@ describe('ProfileScreen', () => {
     fireEvent.press(screen.getByText('Personal Details'));
     fireEvent.press(screen.getByLabelText('Back'));
     expect(alert).not.toHaveBeenCalled();
-    expect(screen.getByText('ACCOUNT')).toBeTruthy();
+    await waitFor(() => expect(screen.getByText('ACCOUNT')).toBeTruthy());
     alert.mockRestore();
   });
 
@@ -191,6 +207,7 @@ describe('ProfileScreen', () => {
     const buttons = alertSpy.mock.calls[0][2];
     act(() => buttons?.find((button) => button.text === 'Discard')?.onPress?.());
     expect(mockUpdateProfile).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.getByText('ACCOUNT')).toBeTruthy());
     fireEvent.press(screen.getByText('Personal Details'));
     expect(screen.getByLabelText('First name').props.value).toBe('Alex');
     alertSpy.mockRestore();

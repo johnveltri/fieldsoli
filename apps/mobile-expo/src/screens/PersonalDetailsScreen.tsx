@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { forwardRef, useImperativeHandle, useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Animated, BackHandler, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { IconBriefcase, IconMail, IconUser } from '@tabler/icons-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -21,7 +21,10 @@ type Props = {
   onSave: (values: UpdateProfileValues) => void;
 };
 
-export function PersonalDetailsScreen({ typography, values, email, saving, onBack, onSave }: Props) {
+export type PersonalDetailsScreenHandle = { requestBack: () => void };
+
+export const PersonalDetailsScreen = forwardRef<PersonalDetailsScreenHandle, Props>(
+function PersonalDetailsScreen({ typography, values, email, saving, onBack, onSave }: Props, ref) {
   const insets = useSafeAreaInsets();
   const [scrollY] = useState(() => new Animated.Value(0));
   const { columnStyle } = useContentColumn();
@@ -50,6 +53,7 @@ export function PersonalDetailsScreen({ typography, values, email, saving, onBac
       { text: 'Discard', style: 'destructive', onPress: onBack },
     ]);
   }, [dirty, onBack, saving]);
+  useImperativeHandle(ref, () => ({ requestBack: back }), [back]);
   useEffect(() => {
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
       back();
@@ -160,7 +164,7 @@ export function PersonalDetailsScreen({ typography, values, email, saving, onBac
       </View>
     </KeyboardAvoidingView>
   );
-}
+});
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: bg.canvasWarm },

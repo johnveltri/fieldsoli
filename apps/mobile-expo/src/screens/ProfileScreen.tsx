@@ -3,7 +3,7 @@ import {
   fieldsoloExpoFontAssets,
   fieldsoloLoadedFonts,
 } from '@fieldsolo/design-system/expo/loadFieldSoloFonts';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Animated,
@@ -24,7 +24,7 @@ import { color } from '@fieldsolo/design-system/lib/tokens';
 
 import { CanvasTiledBackground } from '../components/CanvasTiledBackground';
 import { useInvoicingFlag } from '../lib/featureFlags';
-import { BusinessSettingsScreen } from './BusinessSettingsScreen';
+import { BusinessSettingsScreen, type BusinessSettingsScreenHandle } from './BusinessSettingsScreen';
 import {
   ChangePasswordBottomSheet,
   DeleteAccountBottomSheet,
@@ -48,7 +48,7 @@ import { PrivacyChoicesScreen } from './PrivacyChoicesScreen';
 import { HelpScreen } from './HelpScreen';
 import { JobExportScreen } from './JobExportScreen';
 import { OverlaySlideHost } from '../navigation/OverlaySlideHost';
-import { PersonalDetailsScreen } from './PersonalDetailsScreen';
+import { PersonalDetailsScreen, type PersonalDetailsScreenHandle } from './PersonalDetailsScreen';
 import {
   bg,
   createTextStyles,
@@ -103,6 +103,10 @@ export function ProfileScreen({ onBack, onBackToHome = onBack }: ProfileScreenPr
   const { enabled: invoicingEnabled, ready: invoicingReady } = useInvoicingFlag(session?.user.id);
   const showInvoicing = invoicingReady && invoicingEnabled;
   const [businessScreen, setBusinessScreen] = useState<null | 'business' | 'settings'>(null);
+  const [businessOpen, setBusinessOpen] = useState(false);
+  const [personalMounted, setPersonalMounted] = useState(false);
+  const businessRef = useRef<BusinessSettingsScreenHandle>(null);
+  const personalRef = useRef<PersonalDetailsScreenHandle>(null);
 
   const [fontsLoaded] = useFonts(fieldsoloExpoFontAssets);
 
@@ -194,6 +198,7 @@ export function ProfileScreen({ onBack, onBackToHome = onBack }: ProfileScreenPr
       lastName: profile?.lastName ?? '',
       trades: profile?.trades ?? [],
     });
+    setPersonalMounted(true);
     setFlow('editProfile');
     analytics.capture('profile_edit_opened', {
       first_name_present: (profile?.firstName ?? '').trim().length > 0,
@@ -415,29 +420,6 @@ export function ProfileScreen({ onBack, onBackToHome = onBack }: ProfileScreenPr
     </>
   );
 
-  if (fontsLoaded && flow === 'editProfile') {
-    return (
-      <PersonalDetailsScreen
-        typography={typography}
-        values={editDraft}
-        email={session?.user.email ?? null}
-        saving={saving}
-        onBack={closeEditProfile}
-        onSave={onSaveProfile}
-      />
-    );
-  }
-
-  if (fontsLoaded && businessScreen) {
-    return (
-      <BusinessSettingsScreen
-        typography={typography}
-        mode={businessScreen}
-        onBack={() => setBusinessScreen(null)}
-      />
-    );
-  }
-
   if (!fontsLoaded) {
     return (
       <View style={styles.root}>
@@ -446,10 +428,15 @@ export function ProfileScreen({ onBack, onBackToHome = onBack }: ProfileScreenPr
     );
   }
 
+  const secondaryMounted = personalMounted || businessScreen !== null
+    || helpMounted || privacyMounted || jobExportMounted;
+
   return (
     <View style={styles.root}>
       <CanvasTiledBackground scrollY={scrollY} contentHeight={scrollContentHeight} />
       <Animated.ScrollView
+        accessibilityElementsHidden={secondaryMounted}
+        importantForAccessibility={secondaryMounted ? 'no-hide-descendants' : 'auto'}
         style={[styles.scroll, { paddingTop: headerTopPad }]}
         contentContainerStyle={[
           styles.scrollContent,
@@ -486,8 +473,8 @@ export function ProfileScreen({ onBack, onBackToHome = onBack }: ProfileScreenPr
               typography={typography}
               rows={[
                 ...(showInvoicing ? [
-                  { kind: 'link' as const, label: 'Business Details', onPress: () => setBusinessScreen('business') },
-                  { kind: 'link' as const, label: 'Estimates & Invoices', onPress: () => setBusinessScreen('settings') },
+                  { kind: 'link' as const, label: 'Business Details', onPress: () => { setBusinessScreen('business'); setBusinessOpen(true); } },
+                  { kind: 'link' as const, label: 'Estimates & Invoices', onPress: () => { setBusinessScreen('settings'); setBusinessOpen(true); } },
                 ] : []),
                 { kind: 'link', label: 'Export Job Summary', onPress: openJobExport },
               ]}
@@ -507,6 +494,42 @@ export function ProfileScreen({ onBack, onBackToHome = onBack }: ProfileScreenPr
           </View>
         </View>
       </Animated.ScrollView>
+
+      {personalMounted ? (
+        <OverlaySlideHost
+          visible={flow === 'editProfile'}
+          axis="horizontal"
+          enableSwipeDismiss={false}
+          onRequestClose={() => personalRef.current?.requestBack()}
+          onExited={() => setPersonalMounted(false)}
+        >
+          <PersonalDetailsScreen
+            ref={personalRef}
+            typography={typography}
+            values={editDraft}
+            email={session?.user.email ?? null}
+            saving={saving}
+            onBack={closeEditProfile}
+            onSave={onSaveProfile}
+          />
+        </OverlaySlideHost>
+      ) : null}
+      {businessScreen ? (
+        <OverlaySlideHost
+          visible={businessOpen}
+          axis="horizontal"
+          enableSwipeDismiss={false}
+          onRequestClose={() => businessRef.current?.requestBack()}
+          onExited={() => setBusinessScreen(null)}
+        >
+          <BusinessSettingsScreen
+            ref={businessRef}
+            typography={typography}
+            mode={businessScreen}
+            onBack={() => setBusinessOpen(false)}
+          />
+        </OverlaySlideHost>
+      ) : null}
 
       {Platform.OS === 'android' ? (
         profileSheetsMounted ? (
