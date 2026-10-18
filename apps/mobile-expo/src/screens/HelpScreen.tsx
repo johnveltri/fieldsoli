@@ -110,12 +110,11 @@ const styles = StyleSheet.create({
   scrollContent: { alignItems: 'stretch' },
   topHeaderRow: {
     width: '100%',
-    flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     paddingHorizontal: 0,
     paddingTop: space('Spacing/32'),
     paddingBottom: space('Spacing/16'),
-    gap: space('Spacing/8'),
+    gap: space('Spacing/16'),
   },
   backHit: {
     minWidth: 44,
@@ -124,7 +123,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   title: {
-    flex: 1,
+    alignSelf: 'stretch',
     color: fg.primary,
   },
   bodyWrap: {

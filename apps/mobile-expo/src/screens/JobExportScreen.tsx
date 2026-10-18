@@ -176,8 +176,8 @@ export function JobExportScreen({ onBack, onBackToHome }: JobExportScreenProps) 
             <PlatformHeaderAction accessibilityLabel="Back" onPress={onBack}>
               <TopHeaderBackIcon size={BACK_ICON_SIZE} color={fg.primary} />
             </PlatformHeaderAction>
-            <Text {...screenHeaderA11y()} selectable style={[typography.displayH1, styles.title]}>
-              EXPORT JOBS
+            <Text {...screenHeaderA11y()} selectable style={[typography.headingH2, styles.title]}>
+              Export Job Summary
             </Text>
           </View>
 
@@ -296,13 +296,12 @@ const styles = StyleSheet.create({
   scrollContent: { paddingBottom: space('Spacing/32'), flexGrow: 1, alignItems: 'stretch' },
   topHeaderRow: {
     width: '100%',
-    flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     paddingTop: space('Spacing/32'),
     paddingBottom: space('Spacing/16'),
-    gap: space('Spacing/8'),
+    gap: space('Spacing/16'),
   },
-  title: { flex: 1, color: fg.primary },
+  title: { alignSelf: 'stretch', color: fg.primary },
   body: { width: '100%', gap: space('Spacing/12'), paddingBottom: space('Spacing/24') },
   label: { color: color('Brand/Accent'), paddingTop: space('Spacing/12') },
   selector: {

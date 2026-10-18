@@ -56,7 +56,7 @@ describe('JobExportScreen', () => {
 
   it('builds the year selector locally and waits to request until pressed', async () => {
     const screen = render(<JobExportScreen onBack={jest.fn()} onBackToHome={jest.fn()} />);
-    expect(screen.getByText('EXPORT JOBS')).toBeTruthy();
+    expect(screen.getByText('Export Job Summary')).toBeTruthy();
     expect(screen.getByText('2026')).toBeTruthy();
     expect(mockRequestJobExport).not.toHaveBeenCalled();
     expect(screen.getByText('tech@example.com')).toBeTruthy();
@@ -98,7 +98,7 @@ describe('JobExportScreen', () => {
     });
     expect(screen.getByText(/Your 2026 job export has been requested/)).toBeTruthy();
     expect(screen.getByText('Export requested')).toBeTruthy();
-    expect(screen.getByText('EXPORT JOBS')).toBeTruthy();
+    expect(screen.getByText('Export Job Summary')).toBeTruthy();
     expect(screen.getByText(/within a few minutes/)).toBeTruthy();
     expect(screen.getByLabelText('Back to Home')).toBeTruthy();
     expect(screen.queryByLabelText('Request Export')).toBeNull();
