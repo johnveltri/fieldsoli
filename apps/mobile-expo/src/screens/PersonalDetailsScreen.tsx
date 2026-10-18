@@ -164,8 +164,8 @@ export function PersonalDetailsScreen({ typography, values, email, saving, onBac
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: bg.canvasWarm },
-  header: { alignItems: 'flex-start', gap: space('Spacing/16'), paddingBottom: space('Spacing/24') },
-  title: { alignSelf: 'stretch', color: fg.primary },
+  header: { flexDirection: 'row', alignItems: 'center', gap: space('Spacing/12'), paddingBottom: space('Spacing/24') },
+  title: { flex: 1, minWidth: 0, color: fg.primary },
   tradesTitle: { marginTop: space('Spacing/24') },
   fabOverlay: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 2, elevation: 2 },
 });

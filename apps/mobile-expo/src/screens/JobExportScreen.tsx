@@ -296,12 +296,12 @@ const styles = StyleSheet.create({
   scrollContent: { paddingBottom: space('Spacing/32'), flexGrow: 1, alignItems: 'stretch' },
   topHeaderRow: {
     width: '100%',
-    alignItems: 'flex-start',
+    flexDirection: 'row', alignItems: 'center',
     paddingTop: space('Spacing/32'),
     paddingBottom: space('Spacing/16'),
-    gap: space('Spacing/16'),
+    gap: space('Spacing/12'),
   },
-  title: { alignSelf: 'stretch', color: fg.primary },
+  title: { flex: 1, minWidth: 0, color: fg.primary },
   body: { width: '100%', gap: space('Spacing/12'), paddingBottom: space('Spacing/24') },
   label: { color: color('Brand/Accent'), paddingTop: space('Spacing/12') },
   selector: {

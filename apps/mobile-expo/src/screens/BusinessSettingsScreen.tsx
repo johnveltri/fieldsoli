@@ -497,11 +497,11 @@ export const BusinessSettingsScreen = forwardRef<
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: bg.canvasWarm },
   header: {
-    alignItems: 'flex-start',
-    gap: space('Spacing/16'),
+    flexDirection: 'row', alignItems: 'center',
+    gap: space('Spacing/12'),
     paddingBottom: space('Spacing/24'),
   },
-  title: { alignSelf: 'stretch', color: fg.primary },
+  title: { flex: 1, minWidth: 0, color: fg.primary },
   form: { gap: space('Spacing/16') },
   card: {
     backgroundColor: bg.surfaceWhite,
