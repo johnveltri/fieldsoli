@@ -17,21 +17,16 @@ import {
   updateCurrentUserProfile,
   type UserProfile,
 } from '@fieldsolo/api-client';
-import { color } from '@fieldsolo/design-system/lib/tokens';
 
 import { CanvasTiledBackground } from '../components/CanvasTiledBackground';
 import { useInvoicingFlag } from '../lib/featureFlags';
 import { BusinessSettingsScreen, type BusinessSettingsScreenHandle } from './BusinessSettingsScreen';
 import {
   ChangePasswordBottomSheet,
-  DeleteAccountBottomSheet,
   ProfileRowsCard,
   type ProfileRowsCardRow,
   type UpdateProfileValues,
 } from '../components/ds';
-import {
-  ProfileTrashIcon,
-} from '../components/figma-icons/ProfileScreenIcons';
 import { PlatformHeaderAction } from '../components/platform/PlatformHeaderAction';
 import {
   PlatformHeaderTitle,
@@ -82,8 +77,7 @@ function extractErrorMessage(e: unknown, fallback: string): string {
 type ProfileFlow =
   | 'closed'
   | 'editProfile'
-  | 'changePassword'
-  | 'deleteAccount';
+  | 'changePassword';
 
 export type ProfileScreenProps = {
   onBack: () => void;
@@ -167,7 +161,6 @@ export function ProfileScreen({ onBack, onBackToHome = onBack }: ProfileScreenPr
    * has already returned to `closed`. Mirrors the JobDetail pattern.
    */
   const [changePasswordMounted, setChangePasswordMounted] = useState(false);
-  const [deleteAccountMounted, setDeleteAccountMounted] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const setProfileSheetsMounted = useShellChromeOptional()?.setProfileSheetsMounted;
@@ -298,15 +291,7 @@ export function ProfileScreen({ onBack, onBackToHome = onBack }: ProfileScreenPr
     [saving, updatePassword],
   );
 
-  const openDeleteAccount = useCallback(() => {
-    analytics.capture('account_delete_requested', { source: 'profile' });
-    setDeleteAccountMounted(true);
-    setFlow('deleteAccount');
-  }, []);
-  const closeDeleteAccount = useCallback(() => {
-    setFlow('closed');
-  }, []);
-  const onDeleteAccountSheetSubmit = useCallback(() => {
+  const onDeleteAccountSubmit = useCallback(() => {
     Alert.alert(
       'Delete account?',
       'This permanently deletes your account and all associated data. This cannot be undone.',
@@ -371,19 +356,6 @@ export function ProfileScreen({ onBack, onBackToHome = onBack }: ProfileScreenPr
     { kind: 'link', label: 'Send Feedback', onPress: sendFeedback, hideChevron: true },
   ];
 
-  const deleteRows: ProfileRowsCardRow[] = useMemo(
-    () => [
-      {
-        kind: 'linkWithIcon',
-        label: 'Delete Account',
-        icon: <ProfileTrashIcon color={color('Semantic/Status/Error/Text')} />,
-        tone: 'danger',
-        onPress: openDeleteAccount,
-      },
-    ],
-    [openDeleteAccount],
-  );
-
   if (!fontsLoaded) {
     return (
       <View style={styles.root}>
@@ -393,7 +365,7 @@ export function ProfileScreen({ onBack, onBackToHome = onBack }: ProfileScreenPr
   }
 
   const secondaryMounted = personalMounted || businessScreen !== null
-    || helpMounted || privacyMounted || jobExportMounted || changePasswordMounted || deleteAccountMounted;
+    || helpMounted || privacyMounted || jobExportMounted || changePasswordMounted;
 
   return (
     <View style={styles.root}>
@@ -447,14 +419,12 @@ export function ProfileScreen({ onBack, onBackToHome = onBack }: ProfileScreenPr
             <ProfileRowsCard typography={typography} rows={accountRows} />
             <ProfileSectionHeader typography={typography} title="Help & Privacy" />
             <ProfileRowsCard typography={typography} rows={helpRows} />
-            <View style={styles.deleteSpacer} />
+            <View style={styles.footerSpacer} />
             <ProfileRowsCard
               typography={typography}
               rows={[{ kind: 'link', label: 'Log Out', hideChevron: true, onPress: () => void signOut() }]}
             />
 
-            <View style={styles.deleteSpacer} />
-            <ProfileRowsCard typography={typography} rows={deleteRows} plain framed={false} />
           </View>
         </View>
       </Animated.ScrollView>
@@ -512,23 +482,6 @@ export function ProfileScreen({ onBack, onBackToHome = onBack }: ProfileScreenPr
           />
         </OverlaySlideHost>
       ) : null}
-      {deleteAccountMounted ? (
-        <OverlaySlideHost
-          visible={flow === 'deleteAccount'}
-          axis="horizontal"
-          onRequestClose={closeDeleteAccount}
-          onExited={() => setDeleteAccountMounted(false)}
-        >
-          <DeleteAccountBottomSheet
-            presentation="page"
-            typography={typography}
-            visible={flow === 'deleteAccount'}
-            onBack={closeDeleteAccount}
-            onSubmit={onDeleteAccountSheetSubmit}
-          />
-        </OverlaySlideHost>
-      ) : null}
-
       {helpMounted ? (
         <OverlaySlideHost
           visible={helpOpen}
@@ -550,6 +503,7 @@ export function ProfileScreen({ onBack, onBackToHome = onBack }: ProfileScreenPr
           <PrivacyChoicesScreen
             userId={session.user.id}
             onBack={() => setPrivacyChoicesOpen(false)}
+            onDeleteAccount={onDeleteAccountSubmit}
           />
         </OverlaySlideHost>
       ) : null}
@@ -614,7 +568,7 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
   },
-  deleteSpacer: {
+  footerSpacer: {
     height: space('Spacing/4'),
   },
   pressed: { opacity: 0.75 },

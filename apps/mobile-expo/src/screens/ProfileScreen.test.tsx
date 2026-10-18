@@ -91,11 +91,11 @@ describe('ProfileScreen', () => {
     await waitFor(() => expect(screen.getByText('ACCOUNT')).toBeTruthy());
     expect(screen.getAllByRole('button').map((button) => button.props.accessibilityLabel)).toEqual([
       'Back', 'Business Details', 'Estimates & Invoices', 'Export Job Summary', 'Personal Details',
-      'Change Password', 'Help & Support', 'Privacy Choices', 'Send Feedback', 'Log Out', 'Delete Account',
+      'Change Password', 'Help & Support', 'Privacy Choices', 'Send Feedback', 'Log Out',
     ]);
     for (const label of ['Business', 'Business Details', 'Estimates & Invoices', 'Export Job Summary',
       'Account', 'Personal Details', 'Change Password', 'Help & Privacy', 'Help & Support',
-      'Privacy Choices', 'Send Feedback', 'Log Out', 'Delete Account']) {
+      'Privacy Choices', 'Send Feedback', 'Log Out']) {
       expect(screen.getByText(label)).toBeTruthy();
     }
     expect(screen.queryByText('Alex Builder')).toBeNull();
@@ -295,9 +295,9 @@ describe('ProfileScreen', () => {
   it('opens the Delete Account page before showing the system confirmation', async () => {
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     const screen = render(<ProfileScreen onBack={jest.fn()} />);
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Delete Account' })).toBeTruthy();
-    });
+    expect(screen.queryByRole('button', { name: 'Delete Account' })).toBeNull();
+    fireEvent.press(screen.getByText('Privacy Choices'));
+    await screen.findByRole('button', { name: 'Delete Account' });
 
     fireEvent.press(screen.getByRole('button', { name: 'Delete Account' }));
     expect(alertSpy).not.toHaveBeenCalled();
