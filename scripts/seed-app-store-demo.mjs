@@ -132,7 +132,7 @@ async function main() {
 
   const privacyVersion = readLegalVersion('REQUIRED_PRIVACY_VERSION');
   const termsVersion = readLegalVersion('REQUIRED_TERMS_VERSION');
-  console.log('Seeding fictional user-owned jobs, sessions, notes, and costs...');
+  console.log('Seeding fictional business settings, jobs, sessions, notes, and costs...');
   run(
     'psql',
     [
@@ -185,6 +185,29 @@ async function main() {
     throw new Error(
       `Authenticated fixture verification expected ${SCREENSHOT_JOB_COUNT} visible jobs with one in-progress job.`,
     );
+  }
+
+  const settings = await requestJson(
+    new URL('/rest/v1/business_settings?select=*', apiUrl),
+    {
+      headers: {
+        apikey: publishableKey,
+        Authorization: `Bearer ${token.access_token}`,
+      },
+    },
+  );
+  const business = Array.isArray(settings) && settings.length === 1 ? settings[0] : null;
+  if (
+    business?.user_id !== user.id
+    || business.business_name !== 'Carter Home Services'
+    || !business.address || !business.phone || !business.email || !business.website || !business.license
+    || business.material_markup_bps !== 2000
+    || business.tax_rate_bps !== 825
+    || JSON.stringify(business.taxable_categories) !== JSON.stringify(['materials'])
+    || business.payment_terms !== 'net_15'
+    || business.estimate_expiration_days !== 30
+  ) {
+    throw new Error('Authenticated fixture verification expected complete business information and invoice defaults.');
   }
 
   console.log('\nApp Store fixture is ready (local only).');

@@ -23,6 +23,28 @@ set
   last_name = excluded.last_name,
   trades = excluded.trades;
 
+-- Fictional business identity and invoice defaults for capture-ready settings.
+-- Seed before materials so the fixture uses the same defaults as new app data.
+insert into public.business_settings (
+  user_id, business_name, address, phone, email, website, license,
+  material_markup_bps, tax_rate_bps, taxable_categories,
+  payment_terms, estimate_expiration_days
+)
+values (
+  :'demo_user_id'::uuid,
+  'Carter Home Services',
+  E'125 Maple Avenue\nSpringfield, IL 62704',
+  '(217) 555-0142',
+  'alex@carterhomeservices.example',
+  'https://carterhomeservices.example',
+  'DEMO-2026-0142',
+  2000,
+  825,
+  array['materials']::text[],
+  'net_15',
+  30
+);
+
 -- Sign-in should lead directly to capture-ready content rather than a legal or
 -- analytics prompt. These are local fixture records only.
 insert into public.legal_acceptances (

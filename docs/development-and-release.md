@@ -79,7 +79,10 @@ npm run mobile
 
 The first command starts local Supabase, rebuilds its database from migrations, creates the
 fictional account `app-store-demo@fieldsoli.local`, and seeds thirteen owned jobs with sessions,
-notes, materials, other costs, legal acceptance, and an analytics choice. Five completed jobs fall
+notes, materials, other costs, legal acceptance, and an analytics choice. Business Info is filled
+with fictional Carter Home Services contact details. Invoicing defaults include 20% material
+markup, 8.25% tax on materials, Net 15 payment terms, and 30-day estimate expiration. These are
+fictional screenshot settings. Five completed jobs fall
 in the past-week Earnings window and ten in the past-month window, so each ranking section has
 useful variation. It prints the local-only password needed to sign in from the simulator. The normal
 authenticated API is checked before the command finishes, so the app uses its regular RLS-protected
