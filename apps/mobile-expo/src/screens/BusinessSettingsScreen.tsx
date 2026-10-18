@@ -42,7 +42,7 @@ import { supabase } from '../lib/supabase';
 import { bg, border, color, fg, radius, space } from '../theme/nativeTokens';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CanvasTiledBackground } from '../components/CanvasTiledBackground';
-import { ProfileCheckIcon } from '../components/figma-icons/ProfileScreenIcons';
+import { AccountSingleSelectCard } from '../components/ds/AccountSingleSelectCard';
 import { EditConfirmNoneRow, EditFieldInput, EditIconRow, EditSheet } from '../components/ds/edit-mode/EditFormRows';
 import { FullWidthFab } from '../components/ds/FullWidthFab';
 import { JobDetailIconSectionMaterials } from '../components/figma-icons/JobDetailScreenIcons';
@@ -218,33 +218,13 @@ export const BusinessSettingsScreen = forwardRef<
     selected: T,
     onSelect: (value: T) => void,
   ) => (
-    <View style={styles.card} accessibilityRole="radiogroup">
-      {options.map((option, index) => (
-        <Pressable
-          key={option.label}
-          accessibilityRole="radio"
-          accessibilityLabel={option.label}
-          accessibilityState={{
-            checked: selected === option.value,
-            disabled: saving,
-          }}
-          disabled={saving}
-          onPress={() => onSelect(option.value)}
-          style={({ pressed }) => [
-            styles.choice,
-            index > 0 && styles.separator,
-            pressed && styles.pressed,
-          ]}
-        >
-          <Text style={[typography.body, styles.choiceLabel]}>
-            {option.label}
-          </Text>
-          {selected === option.value ? (
-            <ProfileCheckIcon color={color('Brand/Primary')} size={20} />
-          ) : null}
-        </Pressable>
-      ))}
-    </View>
+    <AccountSingleSelectCard
+      typography={typography}
+      options={options}
+      selected={selected}
+      onSelect={onSelect}
+      disabled={saving}
+    />
   );
 
   return (
@@ -517,8 +497,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: space('Spacing/12'),
   },
-  choiceLabel: { flex: 1 },
-  separator: { borderTopWidth: 1, borderTopColor: border.subtle },
   secondary: { color: fg.secondary },
   accent: { color: color('Brand/Primary') },
   message: { padding: space('Spacing/16') },

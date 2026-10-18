@@ -66,18 +66,18 @@ describe('JobExportScreen', () => {
   });
 
   it('submits only the selected year and resolved timezone', async () => {
+    mockSession.user.created_at = '2024-02-01T12:00:00Z';
     const screen = render(<JobExportScreen onBack={jest.fn()} onBackToHome={jest.fn()} />);
-    fireEvent.press(screen.getByLabelText('Export year 2026'));
-    expect(screen.getByText('Export year')).toBeTruthy();
-    await act(async () => {
-      fireEvent.press(screen.getByLabelText('2026'));
-    });
+    expect(screen.getByRole('radio', { name: '2026' }).props.accessibilityState.checked).toBe(true);
+    fireEvent.press(screen.getByRole('radio', { name: '2025' }));
+    expect(screen.getByRole('radio', { name: '2025' }).props.accessibilityState.checked).toBe(true);
+    expect(screen.getByRole('radio', { name: '2026' }).props.accessibilityState.checked).toBe(false);
     await waitFor(() => expect(screen.getByLabelText('Request Export')).toBeTruthy());
     await act(async () => {
       fireEvent.press(screen.getByLabelText('Request Export'));
     });
     expect(mockRequestJobExport).toHaveBeenCalledWith(expect.anything(), {
-      year: 2026,
+      year: 2025,
       timeZone: expect.any(String),
     });
   });
@@ -102,7 +102,7 @@ describe('JobExportScreen', () => {
     expect(screen.getByText(/within a few minutes/)).toBeTruthy();
     expect(screen.getByLabelText('Back to Home')).toBeTruthy();
     expect(screen.queryByLabelText('Request Export')).toBeNull();
-    expect(screen.queryByLabelText('Export year 2026')).toBeNull();
+    expect(screen.queryByRole('radiogroup')).toBeNull();
   });
 
   it('shows no-jobs state and closes both overlays through Back to Home', async () => {
@@ -115,7 +115,7 @@ describe('JobExportScreen', () => {
     expect(screen.getByText('No completed jobs found for 2026.')).toBeTruthy();
     expect(screen.getByLabelText('Back to Home')).toBeTruthy();
     expect(screen.queryByLabelText('Request Export')).toBeNull();
-    expect(screen.queryByLabelText('Export year 2026')).toBeNull();
+    expect(screen.queryByRole('radiogroup')).toBeNull();
     fireEvent.press(screen.getByLabelText('Back to Home'));
     expect(onBackToHome).toHaveBeenCalledTimes(1);
   });
