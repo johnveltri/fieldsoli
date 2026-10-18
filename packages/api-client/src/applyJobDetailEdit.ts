@@ -16,6 +16,8 @@ export type ApplyJobDetailEditJobPatch = {
   laborServicesCents?: number | null;
   pricingIntent?: 'labor' | 'revenue';
   noRevenueConfirmed: boolean;
+  /** Explicit zero Labor & Services, independently of the total customer charge. */
+  noLaborServicesConfirmed?: boolean;
   noMaterialsConfirmed: boolean;
   noOtherCostsConfirmed: boolean;
 };
@@ -144,6 +146,7 @@ function toRpcPayload(payload: ApplyJobDetailEditPayload): Record<string, unknow
         ? {
             pricingIntent: 'labor' as const,
             laborServicesCents: payload.job.laborServicesCents ?? null,
+            noLaborServicesConfirmed: payload.job.noLaborServicesConfirmed ?? false,
           }
         : {}),
       noRevenueConfirmed: payload.job.noRevenueConfirmed,

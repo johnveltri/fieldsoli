@@ -345,13 +345,15 @@ begin
     raise exception 'completed partial session did not drive derived job state';
   end if;
 
+  -- Keep aggregate Revenue above the earlier $100 material fixture so the
+  -- compatibility residual remains valid while testing confirmation rollback.
   perform public.apply_job_detail_edit_atomic(job_a, jsonb_build_object(
     'job', jsonb_build_object(
       'shortDescription', 'Updated title',
       'longDescription', 'Replace the valve and recaulk.',
       'customerName', 'Pat',
       'serviceAddress', '1 Main St',
-      'revenueCents', 6000,
+      'revenueCents', 16000,
       'noRevenueConfirmed', false,
       'noMaterialsConfirmed', true,
       'noOtherCostsConfirmed', true
@@ -396,7 +398,7 @@ begin
   if not exists (
     select 1 from public.jobs
     where id = job_a
-      and revenue_cents = 6000
+      and revenue_cents = 16000
       and no_revenue_confirmed_at is null
       and materials_reviewed_at is not null
       and other_costs_reviewed_at is not null

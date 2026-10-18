@@ -347,17 +347,11 @@ describe('usable rows for financial completeness', () => {
     expect(incompletePillsForJobDetail(job)).toContain('visits');
   });
 
-  it('treats unknown Labor as incomplete and confirmed zero Labor as complete', () => {
+  it('keeps unknown Labor incomplete, requires its own confirmation, and accepts billable charges with zero Labor', () => {
     const unknownLabor = baseJob({
       pricingMode: 'component',
       laborServicesCents: null,
-      earnings: {
-        revenueCents: 0,
-        materialsCents: 0,
-        otherCostsCents: 0,
-        feesCents: 0,
-        netEarningsCents: 0,
-      },
+      earnings: { ...baseJob().earnings, revenueCents: 1500 },
       noRevenueConfirmed: false,
     });
     expect(isJobFinanciallyComplete({ job: unknownLabor })).toBe(false);
@@ -365,15 +359,39 @@ describe('usable rows for financial completeness', () => {
     const explicitZero = baseJob({
       pricingMode: 'component',
       laborServicesCents: 0,
-      noRevenueConfirmed: true,
-      earnings: {
-        revenueCents: 0,
-        materialsCents: 0,
-        otherCostsCents: 0,
-        feesCents: 0,
-        netEarningsCents: 0,
-      },
+      noRevenueConfirmed: false,
+      noLaborServicesConfirmed: false,
+      earnings: { ...baseJob().earnings, revenueCents: 1500 },
     });
-    expect(financialCompletenessGaps({ job: explicitZero })).not.toContain('revenue');
+    expect(financialCompletenessGaps({ job: explicitZero })).toContain('revenue');
+
+    const confirmedZeroWithBillables = {
+      ...explicitZero,
+      noLaborServicesConfirmed: true,
+    };
+    expect(isJobFinanciallyComplete({ job: confirmedZeroWithBillables })).toBe(true);
+    expect(financialCompletenessGaps({ job: confirmedZeroWithBillables })).not.toContain('revenue');
+  });
+
+  it('treats selected invoice Revenue as complete while proposed Labor is unknown', () => {
+    const job = baseJob({
+      pricingMode: 'component',
+      laborServicesCents: null,
+      earnings: { ...baseJob().earnings, revenueCents: 1500 },
+      revenueInvoice: { id: 'invoice-1' } as JobDetailViewModel['revenueInvoice'],
+    });
+    expect(isJobFinanciallyComplete({ job })).toBe(true);
+    expect(financialCompletenessGaps({ job })).not.toContain('revenue');
+  });
+
+  it('preserves legacy Revenue completeness while invoicing is disabled', () => {
+    const job = baseJob({
+      pricingMode: 'component',
+      laborServicesCents: null,
+      earnings: { ...baseJob().earnings, revenueCents: 1500 },
+    });
+    expect(isJobFinanciallyComplete({ job, invoicingEnabled: false })).toBe(true);
+    expect(financialCompletenessGaps({ job, invoicingEnabled: false })).not.toContain('revenue');
+    expect(incompletePillsForJobDetail(job, false)).not.toContain('revenue');
   });
 });

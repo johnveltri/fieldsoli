@@ -83,6 +83,8 @@ export type JobEditDraft = {
   pricingNeedsReview?: boolean;
   /** Job-level “no revenue” confirmation (persisted with revenue_cents = 0). */
   noRevenueConfirmed: boolean;
+  /** Invoicing confirmation that Labor & Services is intentionally zero. */
+  noLaborServicesConfirmed?: boolean;
   /** Job-level “no materials used” confirmation (persisted as materials_reviewed_at). */
   noMaterialsConfirmed: boolean;
   /** Job-level “no other costs” confirmation (persisted as other_costs_reviewed_at). */
@@ -232,6 +234,7 @@ export function createJobEditDraft(job: JobDetailViewModel): JobEditDraft {
     pricingMode: job.pricingMode,
     pricingNeedsReview: job.pricingNeedsReview === true,
     noRevenueConfirmed: job.noRevenueConfirmed ?? false,
+    noLaborServicesConfirmed: job.noLaborServicesConfirmed === true,
     noMaterialsConfirmed: job.noMaterialsConfirmed,
     noOtherCostsConfirmed: job.noOtherCostsConfirmed,
     sessions,
@@ -254,6 +257,7 @@ export function createEmptyJobEditDraft(): JobEditDraft {
     revenueCents: null,
     laborServicesCents: null,
     noRevenueConfirmed: false,
+    noLaborServicesConfirmed: false,
     noMaterialsConfirmed: false,
     noOtherCostsConfirmed: false,
     sessions: [],
@@ -495,6 +499,7 @@ export function buildApplyJobDetailEditPayload(
           }
         : {}),
       noRevenueConfirmed: draft.noRevenueConfirmed,
+      noLaborServicesConfirmed: draft.noLaborServicesConfirmed,
       noMaterialsConfirmed: draft.noMaterialsConfirmed,
       noOtherCostsConfirmed: draft.noOtherCostsConfirmed,
     },
@@ -661,6 +666,9 @@ export function useJobEditDraft(
       const next = { ...prev, ...patch };
       if ((next.revenueCents ?? 0) > 0) {
         next.noRevenueConfirmed = false;
+      }
+      if ((next.laborServicesCents ?? 0) > 0) {
+        next.noLaborServicesConfirmed = false;
       }
       draftRef.current = next;
       return next;

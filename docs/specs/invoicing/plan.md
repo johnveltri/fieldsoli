@@ -36,7 +36,7 @@ Expected new filenames are implementation suggestions, not unapproved endpoints 
    - Implement preview/create/read/list/control RPCs, owner-safe server fallback, counter/key race handling and Job/account revocation. Add one owner/job-validated selected-Invoice reference, stored historical payment status, transactional source/control updates and finalization RPCs. Local DB tests must prove these boundaries before connected UI.
 3. **Implement financial compatibility and staged backfill** (REQ-02/05/13, STATE-01/09, DATA-03/09/10/11, UX-02/03; TEST-03/04/08/15).
    - Add versioned payload support before enabling new UI. Preserve existing Jobs, amounts, documents, payment status and links; do not auto-select historical documents or generate invoices during migration. Existing Jobs remain legacy-readable until explicit finalization, replacement or source selection.
-   - New Jobs require invoice-backed Complete/Paid. Once adopted, database guards reject older-client completion/payment bypasses; direct costs and time remain editable while selected Invoice Revenue stays fixed.
+   - With invoicing enabled, Complete/Paid uses invoice review; with it disabled, unadopted Jobs retain legacy Complete/Paid. Once adopted, database guards reject older-client completion/payment bypasses; direct costs and time remain editable while selected Invoice Revenue stays fixed.
    - Compare legacy/adopted exports, list/earnings/completeness and selected versus unselected payment badges. Do not change CSV columns or Revenue's pretax meaning.
 4. **Implement shared renderer and guarded website** (REQ-07/09/12/15, DATA-04..08/13, UX-04/09/10; TEST-07..09/13/14/17).
    - Add shared payload decoder, canonical renderDocument(version,payload,paymentProjection), HTML escaping and CSS including @media print/@page. Maintain historical render versions.
@@ -69,7 +69,7 @@ Use Node >=22.13.0 <23 and lockfile clean install for implementation validation.
 
 ## Migration/release sequence
 
-1. Local additive schema/RPC and legacy-client tests; no production feature exposure. Migration must preserve all historic values and links while adding guards for new/adopted Jobs.
+1. Local additive schema/RPC and legacy-client tests; no production feature exposure. Migration must preserve all historic values and links while adding guards only for explicitly adopted Jobs; both existing and newly created unadopted Jobs retain flag-off legacy completion/payment compatibility.
 2. Staging migration/server functions and financial diff/RLS tests; deploy the additive backend before any new client flow. Existing deploy scripts separate dry-run and apply. Verify linked project/ref and --workdir backend. Production rollout is a later authorization.
 3. Website preview using staging data, dynamic routes/card/access/cache proof and representative client versions; then approved production schema/backfill and server web deployment with public creation feature gated until validated.
 4. Native build with new dependencies/config and physical-device evidence. New native modules require new binaries; an OTA-only rollout is insufficient.
@@ -81,3 +81,11 @@ Rollback disables new creation/UI gates while keeping compatible reads, existing
 ## Product-context closeout
 
 After implementation, update current-product.html from verified behavior, npm run product:export and npm run design:check, synchronize maintained design exports without editing archived design pages, and record release/test evidence here. Review privacy/help copy for public bearer links/live payment state/local PDFs; update consent/legal revision only if policy text changes under existing process. No documentation should imply payment processing or proof of payment. Shaping alone does not revise shipped-product documentation or Figma screens.
+
+## Review corrections — 2026-10-18
+
+Implemented the 11 agreed review findings: fail-closed Job Detail flag gating; opt-in invoice enforcement; authoritative proposal rollups after cost-only edits; distinct zero-Labor confirmation; fresh saved-document/payment reads; Visit-attached material markup solidification; archiving only the previous Revenue source; committed Estimate replay; selected-Invoice Revenue protection during stale draft saves; stale finalization rejection; and durable request recovery across screen/app restarts. Visit reparenting was withdrawn because no current product flow exposes that operation.
+
+Validation uses Node 22.23.3. The non-mobile suites pass 211 tests; the full mobile suite passes 453 tests across 72 suites, including the final recovery/concurrency regressions from integration review. Typecheck, the marketing production build, local database suites, database function lint, product export, and design checks pass. Both iOS and Android bundles export successfully. Database tests exercise actual authenticated-role writes, owner rejection, rollback behavior, legacy Revenue residuals, immutable selected-source Revenue, stale final reviews, historical controls, and idempotent retries. The additive migration is applied and recorded only in local Supabase; no local reset or production deployment occurred.
+
+Local security advisors report the pre-existing mutable-search-path warning on `private.job_cost_is_material` from the August migration; no advisor errors were reported. Automated renderer/PDF and lifecycle tests do not replace physical-device composer, PDF, foreground, or accessibility verification before release. The feature remains behind its rollout flag, and production migrations must precede enabling the client flow.

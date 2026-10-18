@@ -1,5 +1,6 @@
 import React, { createRef } from 'react';
-import { Animated, StyleSheet } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Animated, AppState, StyleSheet } from 'react-native';
 import { act, fireEvent, render, waitFor, within } from '@testing-library/react-native';
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { color } from '@fieldsolo/design-system/lib/tokens';
@@ -20,9 +21,17 @@ const mockSetControls =
   jest.fn<(...args: unknown[]) => Promise<FinancialDocumentRecord>>();
 const mockFinalize =
   jest.fn<(...args: unknown[]) => Promise<FinancialDocumentRecord>>();
+const mockCreate =
+  jest.fn<(...args: unknown[]) => Promise<FinancialDocumentRecord>>();
+const mockCreateAndSelect =
+  jest.fn<(...args: unknown[]) => Promise<FinancialDocumentRecord>>();
+const mockPrintToFile = jest.fn<(...args: unknown[]) => Promise<{ uri: string }>>();
+const mockPdfSharingAvailable = jest.fn<() => Promise<boolean>>();
 
 jest.mock('@fieldsolo/api-client', () => ({
   ...jest.requireActual<object>('@fieldsolo/api-client'),
+  createFinancialDocument: (...args: unknown[]) => mockCreate(...args),
+  createAndSelectFinancialDocument: (...args: unknown[]) => mockCreateAndSelect(...args),
   listFinancialDocuments: (...args: unknown[]) => mockList(...args),
   previewFinancialDocument: (...args: unknown[]) => mockPreview(...args),
   setFinancialDocumentControls: (...args: unknown[]) =>
@@ -34,8 +43,20 @@ jest.mock('react-native-webview', () => ({
 }));
 jest.mock('expo-clipboard', () => ({ setStringAsync: jest.fn() }));
 jest.mock('expo-mail-composer', () => ({ isAvailableAsync: jest.fn() }));
-jest.mock('expo-print', () => ({ printToFileAsync: jest.fn() }));
-jest.mock('expo-sharing', () => ({ isAvailableAsync: jest.fn() }));
+jest.mock('expo-print', () => ({ printToFileAsync: (...args: unknown[]) => mockPrintToFile(...args) }));
+jest.mock('expo-sharing', () => ({ isAvailableAsync: () => mockPdfSharingAvailable(), shareAsync: jest.fn() }));
+jest.mock('expo-asset', () => ({
+  Asset: { fromModule: () => ({ downloadAsync: async () => ({ localUri: 'file:///font.ttf' }) }) },
+}));
+jest.mock('expo-file-system', () => ({
+  File: class MockFile {
+    uri: string;
+    constructor(base: string, name?: string) { this.uri = name ? `${base}/${name}` : base; }
+    async base64() { return 'Zm9udA=='; }
+    async copy(target: { uri: string }) { this.uri = target.uri; }
+  },
+  Paths: { cache: 'file:///cache' },
+}));
 jest.mock('../../screens/BusinessSettingsScreen', () => ({
   BusinessSettingsScreen: ({ onBack }: { onBack: () => void }) => {
     const { Text } = require('react-native');
@@ -47,8 +68,8 @@ jest.mock('../ds/BottomSheetShell', () => ({
 }));
 jest.mock('@fieldsolo/document-renderer', () => ({
   RENDERER_VERSION: 1,
-  renderDocument: () => '<html></html>',
-  renderDocumentPreview: () => '<html></html>',
+  renderDocument: (_version: number, _payload: unknown, status: unknown) => String(status),
+  renderDocumentPreview: (_version: number, _payload: unknown, status: unknown) => String(status),
 }));
 
 const typography = createTextStyles({
@@ -80,6 +101,7 @@ const doc = {
 } as FinancialDocumentRecord;
 const props = {
   client: {} as never,
+  ownerId: 'owner-1',
   jobId: 'job-1',
   workStatus: 'inProgress',
   typography,
@@ -89,6 +111,7 @@ describe('InvoicingJobControls', () => {
   afterEach(() => jest.restoreAllMocks());
   beforeEach(() => {
     jest.clearAllMocks();
+    void AsyncStorage.clear();
     // Complete animations synchronously; Jest has no native animation host.
     jest.spyOn(Animated, 'timing').mockImplementation((value, config) => ({
       start: (callback) => {
@@ -100,6 +123,10 @@ describe('InvoicingJobControls', () => {
     }) as unknown as Animated.CompositeAnimation);
     mockList.mockResolvedValue([doc]);
     mockFinalize.mockResolvedValue(doc);
+    mockCreate.mockResolvedValue(doc);
+    mockCreateAndSelect.mockResolvedValue(doc);
+    mockPrintToFile.mockResolvedValue({ uri: 'file:///generated.pdf' });
+    mockPdfSharingAvailable.mockResolvedValue(true);
     mockPreview.mockResolvedValue({
       payload,
       gaps: ['labor'],
@@ -125,6 +152,206 @@ describe('InvoicingJobControls', () => {
     expect(await screen.findByLabelText('SHARE ESTIMATE')).toBeTruthy();
     expect(screen.queryByText('Estimate #00002')).toBeNull();
     expect(mockPreview).not.toHaveBeenCalled();
+  });
+
+  it('refreshes saved payment status before rendering a preview', async () => {
+    const paid = { ...doc, paymentProjection: 'paid' } as FinancialDocumentRecord;
+    const unpaid = { ...doc, paymentProjection: 'unpaid' } as FinancialDocumentRecord;
+    mockList.mockResolvedValue([paid]);
+    const screen = render(<InvoicingJobControls {...props} mode="view" />);
+    const row = await screen.findByLabelText(/^Preview Estimate #00001,/);
+    mockList.mockResolvedValue([unpaid]);
+    fireEvent.press(row);
+
+    expect(await screen.findByTestId('document-preview-html')).toBeTruthy();
+    await waitFor(() => expect(screen.getByTestId('document-preview-html').props.source.html).toBe('unpaid'));
+  });
+
+  it('refreshes an open saved preview when the Job payment status changes', async () => {
+    const paid = { ...doc, paymentProjection: 'paid' } as FinancialDocumentRecord;
+    const unpaid = { ...doc, paymentProjection: 'unpaid' } as FinancialDocumentRecord;
+    mockList.mockResolvedValue([paid]);
+    const screen = render(<InvoicingJobControls {...props} mode="view" workStatus="paid" />);
+    fireEvent.press(await screen.findByLabelText(/^Preview Estimate #00001,/));
+    await waitFor(() => expect(screen.getByTestId('document-preview-html').props.source.html).toBe('paid'));
+
+    mockList.mockResolvedValue([unpaid]);
+    screen.rerender(<InvoicingJobControls {...props} mode="view" workStatus="inProgress" />);
+
+    await waitFor(() => expect(screen.getByTestId('document-preview-html').props.source.html).toBe('unpaid'));
+  });
+
+  it('does not render the cached document when its fresh owner read fails', async () => {
+    const screen = render(<InvoicingJobControls {...props} mode="view" />);
+    const row = await screen.findByLabelText(/^Preview Estimate #00001,/);
+    mockList.mockRejectedValueOnce(new Error('offline'));
+
+    fireEvent.press(row);
+
+    await waitFor(() => expect(screen.getByText('Offline — payment status may be out of date.')).toBeTruthy());
+    expect(screen.queryByLabelText('SHARE ESTIMATE')).toBeNull();
+    expect(screen.queryByText('paid')).toBeNull();
+  });
+
+  it('renders the freshly read payment status into a requested PDF', async () => {
+    const paid = { ...doc, paymentProjection: 'paid' } as FinancialDocumentRecord;
+    const unpaid = { ...doc, paymentProjection: 'unpaid' } as FinancialDocumentRecord;
+    mockList.mockResolvedValue([paid]);
+    const screen = render(<InvoicingJobControls {...props} mode="edit" />);
+    fireEvent.press(await screen.findByLabelText('Preview and Share'));
+    expect(await screen.findByLabelText('SHARE ESTIMATE')).toBeTruthy();
+    mockList.mockResolvedValue([unpaid]);
+    fireEvent.press(screen.getByLabelText('SHARE ESTIMATE'));
+    fireEvent.press(await screen.findByRole('button', { name: 'Download PDF' }));
+
+    await waitFor(() => expect(mockPrintToFile).toHaveBeenCalled());
+    expect(mockPrintToFile.mock.calls[0]?.[0]).toEqual(expect.objectContaining({ html: 'unpaid' }));
+  });
+
+  it('does not generate a PDF when its fresh owner read fails', async () => {
+    mockList.mockResolvedValue([doc]);
+    const screen = render(<InvoicingJobControls {...props} mode="edit" />);
+    fireEvent.press(await screen.findByLabelText('Preview and Share'));
+    fireEvent.press(await screen.findByLabelText('SHARE ESTIMATE'));
+    await screen.findByRole('button', { name: 'Download PDF' });
+    mockList.mockRejectedValueOnce(new Error('offline'));
+    fireEvent.press(screen.getByRole('button', { name: 'Download PDF' }));
+
+    await waitFor(() => expect(screen.getByText('Offline — payment status may be out of date.')).toBeTruthy());
+    expect(mockPrintToFile).not.toHaveBeenCalled();
+  });
+
+  it('refreshes an open saved preview when the app returns to the foreground', async () => {
+    const appStateListener = jest.fn<(state: string) => void>();
+    jest.spyOn(AppState, 'addEventListener').mockImplementation((event, listener) => {
+      if (event === 'change') appStateListener.mockImplementation(listener as (state: string) => void);
+      return { remove: jest.fn() } as never;
+    });
+    mockList.mockResolvedValue([{ ...doc, paymentProjection: 'paid' } as FinancialDocumentRecord]);
+    const screen = render(<InvoicingJobControls {...props} mode="view" />);
+    fireEvent.press(await screen.findByLabelText(/^Preview Estimate #00001,/));
+    await waitFor(() => expect(screen.getByTestId('document-preview-html').props.source.html).toBe('paid'));
+
+    mockList.mockResolvedValue([{ ...doc, paymentProjection: 'unpaid' } as FinancialDocumentRecord]);
+    const readsBeforeResume = mockList.mock.calls.length;
+    act(() => appStateListener('active'));
+
+    await waitFor(() => expect(mockList.mock.calls.length).toBeGreaterThan(readsBeforeResume));
+    await waitFor(() => expect(screen.getByTestId('document-preview-html').props.source.html).toBe('unpaid'));
+  });
+
+  it('replays an existing durable key when another control already owns the request slot', async () => {
+    mockPreview.mockResolvedValue({
+      payload,
+      gaps: [],
+      rendererVersion: 1,
+      fingerprint: 'new-preview-fingerprint',
+    } as DocumentPreview);
+    mockList.mockResolvedValue([]);
+    const screen = render(<InvoicingJobControls {...props} mode="edit" />);
+    fireEvent.press(await screen.findByLabelText('Create Estimate'));
+    const button = await screen.findByRole('button', { name: 'CREATE & SHARE ESTIMATE' });
+    await AsyncStorage.setItem(
+      'fieldsolo.financial-document-intent.v1:owner-1:job-1',
+      JSON.stringify({
+        kind: 'create', requestKey: 'other-control-key', jobId: 'job-1', type: 'estimate',
+        fingerprint: 'original-fingerprint', timezone: 'America/Chicago',
+        confirmedPaidTotalCents: null,
+      }),
+    );
+
+    await act(async () => { fireEvent.press(button); });
+    expect(await AsyncStorage.getItem('fieldsolo.financial-document-intent.v1:owner-1:job-1')).toContain('other-control-key');
+    expect(mockCreate).not.toHaveBeenCalled();
+    await act(async () => { fireEvent.press(button); });
+
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledWith(
+      {},
+      expect.objectContaining({ requestKey: 'other-control-key', fingerprint: 'original-fingerprint' }),
+    ));
+    expect(mockCreate.mock.calls[0]?.[1]).not.toEqual(expect.objectContaining({ fingerprint: 'new-preview-fingerprint' }));
+  });
+
+  it('replays the retained creation key after remount before allowing another request', async () => {
+    await AsyncStorage.setItem(
+      'fieldsolo.financial-document-intent.v1:owner-1:job-1',
+      JSON.stringify({
+        kind: 'create', requestKey: 'retained-key', jobId: 'job-1', type: 'estimate',
+        fingerprint: 'retained-fingerprint', timezone: 'America/Chicago',
+        confirmedPaidTotalCents: null,
+      }),
+    );
+
+    render(<InvoicingJobControls {...props} mode="view" />);
+
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledWith(
+      {},
+      expect.objectContaining({ requestKey: 'retained-key', fingerprint: 'retained-fingerprint' }),
+    ));
+    await waitFor(() => expect(AsyncStorage.getItem(
+      'fieldsolo.financial-document-intent.v1:owner-1:job-1',
+    )).resolves.toBeNull());
+  });
+
+  it('retains and retries an unknown-outcome request after another remount', async () => {
+    await AsyncStorage.setItem(
+      'fieldsolo.financial-document-intent.v1:owner-1:job-1',
+      JSON.stringify({
+        kind: 'create', requestKey: 'unknown-key', jobId: 'job-1', type: 'estimate',
+        fingerprint: 'same-fingerprint', timezone: 'America/Chicago',
+        confirmedPaidTotalCents: null,
+      }),
+    );
+    mockCreate.mockRejectedValueOnce(new Error('network_timeout'));
+
+    const first = render(<InvoicingJobControls {...props} mode="view" />);
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+    expect(await AsyncStorage.getItem(
+      'fieldsolo.financial-document-intent.v1:owner-1:job-1',
+    )).toContain('unknown-key');
+    first.unmount();
+
+    render(<InvoicingJobControls {...props} mode="view" />);
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(2));
+    expect(mockCreate.mock.calls[1]?.[1]).toEqual(expect.objectContaining({
+      requestKey: 'unknown-key',
+      fingerprint: 'same-fingerprint',
+    }));
+    await waitFor(() => expect(AsyncStorage.getItem(
+      'fieldsolo.financial-document-intent.v1:owner-1:job-1',
+    )).resolves.toBeNull());
+  });
+
+  it('restarts intent hydration after focus changes interrupt storage loading', async () => {
+    let releaseFirstRead!: () => void;
+    const firstRead = new Promise<void>((resolve) => { releaseFirstRead = resolve; });
+    let intentReads = 0;
+    jest.spyOn(AsyncStorage, 'getItem').mockImplementation(async () => {
+      intentReads += 1;
+      if (intentReads === 1) await firstRead;
+      return null;
+    });
+    mockPreview.mockResolvedValue({
+      payload,
+      gaps: [],
+      rendererVersion: 1,
+      fingerprint: 'focus-fingerprint',
+    } as DocumentPreview);
+    const ref = createRef<InvoicingJobControlsHandle>();
+    const screen = render(
+      <InvoicingJobControls {...props} ref={ref} mode="edit" active />,
+    );
+
+    screen.rerender(<InvoicingJobControls {...props} ref={ref} mode="edit" active={false} />);
+    screen.rerender(<InvoicingJobControls {...props} ref={ref} mode="edit" active />);
+    releaseFirstRead();
+    await waitFor(() => expect(intentReads).toBeGreaterThanOrEqual(2));
+
+    await act(async () => { ref.current?.openPreview(); });
+    await waitFor(() => expect(mockPreview).toHaveBeenCalled());
+    await screen.findByRole('button', { name: 'CREATE & SHARE ESTIMATE' });
+    fireEvent.press(screen.getByRole('button', { name: 'CREATE & SHARE ESTIMATE' }));
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
   });
 
   it('stages archive and link changes until the Job Edit Done action saves them', async () => {

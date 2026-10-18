@@ -23,7 +23,7 @@
     "test:edge-functions": "vitest run backend/supabase/functions/_shared/*.test.ts",
     "test:mobile": "npm run test -w mobile-expo",
     "test:db": "npm run test:db:job-costs-soft-delete && npm run test:db:consent-rls && npm run test:db:prelaunch-hardening && npm run test:db:legacy-cost-review && npm run test:db:legacy-profile-upsert && npm run test:db:job-exports && npm run test:db:apply-job-detail-edit && npm run test:db:job-customers && npm run test:db:invoicing && npm run test:db:no-revenue-paid",
-    "test:db:invoicing": "PGPASSWORD=postgres psql -h 127.0.0.1 -p 54322 -U postgres -d postgres -v ON_ERROR_STOP=1 -f backend/supabase/tests/invoicing_documents.test.sql -f backend/supabase/tests/current_business_material_markup.test.sql -f backend/supabase/tests/invoice_backed_job_revenue.test.sql",
+    "test:db:invoicing": "PGPASSWORD=postgres psql -h 127.0.0.1 -p 54322 -U postgres -d postgres -v ON_ERROR_STOP=1 -f backend/supabase/tests/invoicing_documents.test.sql -f backend/supabase/tests/current_business_material_markup.test.sql -f backend/supabase/tests/invoice_backed_job_revenue.test.sql -f backend/supabase/tests/invoicing_review_fixes.test.sql",
     "test:db:no-revenue-paid": "PGPASSWORD=postgres psql -h 127.0.0.1 -p 54322 -U postgres -d postgres -v ON_ERROR_STOP=1 -f backend/supabase/tests/no_revenue_marked_paid.test.sql",
     "test:db:job-costs-soft-delete": "PGPASSWORD=postgres psql -h 127.0.0.1 -p 54322 -U postgres -d postgres -v ON_ERROR_STOP=1 -f backend/supabase/tests/materials_soft_delete.test.sql",
     "test:db:consent-rls": "PGPASSWORD=postgres psql -h 127.0.0.1 -p 54322 -U postgres -d postgres -v ON_ERROR_STOP=1 -f backend/supabase/tests/consent_tables_rls.test.sql",

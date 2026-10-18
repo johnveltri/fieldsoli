@@ -517,6 +517,26 @@ describe('useJobEditDraft confirm-none and refs', () => {
     });
   });
 
+  it('persists no Labor & Services independently from no Revenue', () => {
+    const snapshot = createJobEditDraft(minimalJob());
+    const draft: JobEditDraft = {
+      ...snapshot,
+      revenueCents: 1500,
+      laborServicesCents: 0,
+      pricingIntent: 'labor',
+      noRevenueConfirmed: false,
+      noLaborServicesConfirmed: true,
+    };
+
+    expect(buildApplyJobDetailEditPayload(snapshot, draft).job).toMatchObject({
+      revenueCents: 1500,
+      laborServicesCents: 0,
+      pricingIntent: 'labor',
+      noRevenueConfirmed: false,
+      noLaborServicesConfirmed: true,
+    });
+  });
+
   it('delegates shared Back through the registered field-flushing handler', () => {
     const result = setupHook(minimalJob());
     const handler = jest.fn();

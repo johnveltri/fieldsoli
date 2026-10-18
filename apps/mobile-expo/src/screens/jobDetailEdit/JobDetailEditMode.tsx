@@ -385,7 +385,8 @@ export function JobDetailEditMode({
           laborServicesCents: parsed,
           pricingIntent: 'labor',
           pricingNeedsReview: false,
-          noRevenueConfirmed: parsed != null && parsed > 0 ? false : getDraftSnapshot().draft?.noRevenueConfirmed === true,
+          noLaborServicesConfirmed: false,
+          noRevenueConfirmed: false,
         });
         return;
       }
@@ -611,7 +612,11 @@ export function JobDetailEditMode({
                   setRevenueText(t);
                   const parsed = parseRevenueInput(t);
                   if (parsed != null && parsed > 0) {
-                    updateDraft({ noRevenueConfirmed: false });
+                    updateDraft(
+                      invoicingEnabled
+                        ? { noLaborServicesConfirmed: false }
+                        : { noRevenueConfirmed: false },
+                    );
                   }
                 }}
               />
@@ -619,16 +624,29 @@ export function JobDetailEditMode({
             {(invoicingEnabled ? (draft.laborServicesCents ?? 0) : (draft.revenueCents ?? 0)) <= 0 ? (
               <EditConfirmNoneRow
                 typography={typography}
-                confirmed={draft.noRevenueConfirmed}
-                confirmLabel="Confirm no labor"
-                confirmedLabel="No revenue confirmed"
+                confirmed={invoicingEnabled
+                  ? draft.noLaborServicesConfirmed === true
+                  : draft.noRevenueConfirmed}
+                confirmLabel={invoicingEnabled
+                  ? 'Confirm no Labor & Services'
+                  : 'Confirm no Revenue'}
+                confirmedLabel={invoicingEnabled
+                  ? 'No Labor & Services confirmed'
+                  : 'No revenue confirmed'}
                 disabled={saving}
                 onToggle={() => {
                   if (saving) return;
-                  if (draft.noRevenueConfirmed) {
+                  const isConfirmed = invoicingEnabled
+                    ? draft.noLaborServicesConfirmed === true
+                    : draft.noRevenueConfirmed;
+                  if (isConfirmed) {
                     updateDraft(
                       invoicingEnabled
-                        ? { noRevenueConfirmed: false, laborServicesCents: null, pricingIntent: 'labor' }
+                        ? {
+                            noLaborServicesConfirmed: false,
+                            laborServicesCents: null,
+                            pricingIntent: 'labor',
+                          }
                         : { noRevenueConfirmed: false, revenueCents: null },
                     );
                     setRevenueText('');
@@ -636,7 +654,8 @@ export function JobDetailEditMode({
                     updateDraft(
                       invoicingEnabled
                         ? {
-                            noRevenueConfirmed: true,
+                            noRevenueConfirmed: false,
+                            noLaborServicesConfirmed: true,
                             laborServicesCents: 0,
                             pricingIntent: 'labor',
                             pricingNeedsReview: false,

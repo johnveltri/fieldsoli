@@ -729,6 +729,7 @@ export function LiveSessionOverlay({
         customerId: null,
         serviceAddress: '',
         revenue: '',
+        noLaborServicesConfirmed: false,
       };
     }
     const moneyCents = showInvoicing
@@ -750,6 +751,7 @@ export function LiveSessionOverlay({
       customerId: jobDetail.customerId,
       serviceAddress: jobDetail.serviceAddress,
       revenue,
+      noLaborServicesConfirmed: jobDetail.noLaborServicesConfirmed === true,
     };
   }, [jobDetail, liveSession, showInvoicing]);
 
@@ -911,9 +913,13 @@ export function LiveSessionOverlay({
             serviceAddress: values.serviceAddress.trim(),
             revenueCents: showInvoicing ? jobDetail.earnings.revenueCents : revenueCents,
             ...(showInvoicing
-              ? { pricingIntent: 'labor' as const, laborServicesCents: revenueCents }
+              ? {
+                  pricingIntent: 'labor' as const,
+                  laborServicesCents: revenueCents,
+                  noLaborServicesConfirmed: values.noLaborServicesConfirmed === true,
+                }
               : {}),
-            noRevenueConfirmed: jobDetail.noRevenueConfirmed,
+            noRevenueConfirmed: showInvoicing ? false : jobDetail.noRevenueConfirmed,
             noMaterialsConfirmed: jobDetail.noMaterialsConfirmed,
             noOtherCostsConfirmed: jobDetail.noOtherCostsConfirmed,
           },

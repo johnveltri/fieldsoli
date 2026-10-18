@@ -213,6 +213,8 @@ export type JobDetailViewModel = {
    * completeness leg until positive revenue is entered.
    */
   noRevenueConfirmed: boolean;
+  /** Explicit confirmation of zero Labor & Services; billable charges may remain. */
+  noLaborServicesConfirmed?: boolean;
   /**
    * User confirmed there were no materials for this job; satisfies the materials
    * leg of financial completeness until a material row is added.

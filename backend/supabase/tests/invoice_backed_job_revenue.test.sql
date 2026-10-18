@@ -23,12 +23,11 @@ begin
      or (select revenue_document_id from public.jobs where id = job_id) is not null then
     raise exception 'ending a visit failed or unexpectedly created an invoice';
   end if;
-  begin
-    update public.jobs set job_work_status = 'completed' where id = job_id;
-    raise exception 'completion without an invoice was allowed';
-  exception when others then
-    if SQLERRM not like '%financial_document:invoice_required%' then raise; end if;
-  end;
+  -- Flag-off/older clients can finish an unadopted Job during rollout.
+  update public.jobs set job_work_status = 'completed' where id = job_id;
+  if (select revenue_invoice_required from public.jobs where id = job_id) then
+    raise exception 'new Job opted in to invoice enforcement without adoption';
+  end if;
 end;
 $$;
 

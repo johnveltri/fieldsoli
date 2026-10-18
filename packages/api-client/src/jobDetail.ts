@@ -46,6 +46,7 @@ type JobRow = {
   materials_reviewed_at: string | null;
   other_costs_reviewed_at: string | null;
   no_revenue_confirmed_at: string | null;
+  no_labor_services_confirmed_at?: string | null;
   revenue_document_id?: string | null;
 };
 
@@ -92,7 +93,7 @@ type MaterialRow = {
 };
 
 const JOB_DETAIL_JOB_SELECT_BASE =
-  'id, short_description, long_description, customer_name, customer_phone, customer_email, customer_id, service_address, job_type, job_work_status, job_payment_state, revenue_cents, revenue_document_id, labor_services_cents, pricing_mode, pricing_needs_review, collected_cents, updated_at, last_worked_at, materials_reviewed_at, other_costs_reviewed_at, no_revenue_confirmed_at';
+  'id, short_description, long_description, customer_name, customer_phone, customer_email, customer_id, service_address, job_type, job_work_status, job_payment_state, revenue_cents, revenue_document_id, labor_services_cents, pricing_mode, pricing_needs_review, collected_cents, updated_at, last_worked_at, materials_reviewed_at, other_costs_reviewed_at, no_revenue_confirmed_at, no_labor_services_confirmed_at';
 
 const OTHER_COST_TYPE_LABELS: Record<string, string> = {
   helper_labor: 'Helper Labor',
@@ -603,5 +604,6 @@ export async function fetchJobDetail(
     noMaterialsConfirmed: j.materials_reviewed_at != null,
     noOtherCostsConfirmed: j.other_costs_reviewed_at != null,
     noRevenueConfirmed: j.no_revenue_confirmed_at != null,
+    noLaborServicesConfirmed: j.no_labor_services_confirmed_at != null,
   };
 }

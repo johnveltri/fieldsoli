@@ -8,6 +8,8 @@ import {
 
 export type JobFinancialCompletenessContext = {
   job: JobDetailViewModel;
+  /** Feature rollout state; false preserves the legacy Revenue gate. */
+  invoicingEnabled?: boolean;
 };
 
 export type FinancialCompletenessGap = 'revenue' | 'session' | 'materials' | 'otherCosts';
@@ -41,23 +43,36 @@ function hasRevenueComplete(job: {
   noRevenueConfirmed: boolean;
   laborServicesCents?: number | null;
   pricingMode?: 'legacy' | 'component';
-}): boolean {
-  // Unknown Labor stays incomplete. Explicit zero Labor keeps the same
-  // confirmation rule as explicit zero Revenue so backfill does not mark
-  // unconfirmed zero-revenue Jobs complete.
-  if (job.pricingMode === 'component' && job.laborServicesCents == null) return false;
+  noLaborServicesConfirmed?: boolean;
+  revenueInvoice?: { id: string } | null;
+}, invoicingEnabled = true): boolean {
+  // A selected immutable invoice is the authoritative Revenue source even if
+  // the editable Labor & Services proposal has not been reviewed yet.
+  if (job.revenueInvoice?.id) return true;
+  if (invoicingEnabled && job.pricingMode === 'component') {
+    // Null means Labor is still unknown. Zero requires the distinct
+    // no-Labor confirmation; billable charges may still make Revenue positive.
+    if (job.laborServicesCents == null) return false;
+    if (job.laborServicesCents === 0) {
+      return job.noLaborServicesConfirmed === true ||
+        ((job.revenueCents ?? 0) === 0 && job.noRevenueConfirmed);
+    }
+  }
   return (job.revenueCents ?? 0) > 0 || job.noRevenueConfirmed;
 }
 
 export function isJobFinanciallyComplete(ctx: JobFinancialCompletenessContext): boolean {
   const { job } = ctx;
+  const invoicingEnabled = ctx.invoicingEnabled !== false;
   return (
     hasRevenueComplete({
       revenueCents: job.earnings.revenueCents,
       noRevenueConfirmed: job.noRevenueConfirmed,
       laborServicesCents: job.laborServicesCents,
       pricingMode: job.pricingMode,
-    }) &&
+      noLaborServicesConfirmed: job.noLaborServicesConfirmed,
+      revenueInvoice: job.revenueInvoice,
+    }, invoicingEnabled) &&
     hasUsableSession(job) &&
     hasMaterialsComplete(job) &&
     hasOtherCostsComplete(job)
@@ -69,6 +84,7 @@ export function financialCompletenessGaps(
   ctx: JobFinancialCompletenessContext,
 ): FinancialCompletenessGap[] {
   const { job } = ctx;
+  const invoicingEnabled = ctx.invoicingEnabled !== false;
   const gaps: FinancialCompletenessGap[] = [];
   if (
     !hasRevenueComplete({
@@ -76,7 +92,9 @@ export function financialCompletenessGaps(
       noRevenueConfirmed: job.noRevenueConfirmed,
       laborServicesCents: job.laborServicesCents,
       pricingMode: job.pricingMode,
-    })
+      noLaborServicesConfirmed: job.noLaborServicesConfirmed,
+      revenueInvoice: job.revenueInvoice,
+    }, invoicingEnabled)
   ) {
     gaps.push('revenue');
   }
@@ -92,7 +110,10 @@ export function financialCompletenessGaps(
   return gaps;
 }
 
-export function incompletePillsForJobDetail(job: JobDetailViewModel): string[] {
+export function incompletePillsForJobDetail(
+  job: JobDetailViewModel,
+  invoicingEnabled = true,
+): string[] {
   const pills: string[] = [];
   if (
     !hasRevenueComplete({
@@ -100,7 +121,9 @@ export function incompletePillsForJobDetail(job: JobDetailViewModel): string[] {
       noRevenueConfirmed: job.noRevenueConfirmed,
       laborServicesCents: job.laborServicesCents,
       pricingMode: job.pricingMode,
-    })
+      noLaborServicesConfirmed: job.noLaborServicesConfirmed,
+      revenueInvoice: job.revenueInvoice,
+    }, invoicingEnabled)
   ) {
     pills.push('revenue');
   }

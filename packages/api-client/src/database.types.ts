@@ -381,6 +381,7 @@ export type Database = {
           pricing_needs_review: boolean
           pricing_revision: number
           no_revenue_confirmed_at: string | null
+          no_labor_services_confirmed_at: string | null
           no_revenue_marked_paid: boolean
           other_costs_reviewed_at: string | null
           paid_at: string | null
@@ -414,6 +415,7 @@ export type Database = {
           long_description?: string | null
           materials_reviewed_at?: string | null
           no_revenue_confirmed_at?: string | null
+          no_labor_services_confirmed_at?: string | null
           no_revenue_marked_paid?: boolean
           other_costs_reviewed_at?: string | null
           paid_at?: string | null
@@ -450,6 +452,7 @@ export type Database = {
           long_description?: string | null
           materials_reviewed_at?: string | null
           no_revenue_confirmed_at?: string | null
+          no_labor_services_confirmed_at?: string | null
           no_revenue_marked_paid?: boolean
           other_costs_reviewed_at?: string | null
           paid_at?: string | null

@@ -104,9 +104,14 @@ jest.mock('../components/ds', () => ({
     intended === 'completed' && noRevenueConfirmed && current === 'inProgress'
       ? 'paid'
       : intended,
-  EditJobBottomSheet: ({ visible }: { visible: boolean }) => {
+  EditJobBottomSheet: ({ visible, invoicingEnabled }: { visible: boolean; invoicingEnabled?: boolean }) => {
     const { Text } = require('react-native');
-    return visible ? <Text accessibilityLabel="Legacy edit">Legacy Edit Job</Text> : null;
+    return visible ? (
+      <>
+        <Text accessibilityLabel="Legacy edit">Legacy Edit Job</Text>
+        {invoicingEnabled ? <Text accessibilityLabel="Legacy labor field">Labor &amp; Services</Text> : null}
+      </>
+    ) : null;
   },
   ConfirmMinimumInfoBottomSheet: ({
     visible,
@@ -871,6 +876,7 @@ describe('JobDetailScreen manual visit and note flows', () => {
   });
 
   it('gates completion behind invoice finalization', async () => {
+    mockInvoicingFlagState = { enabled: true, ready: true };
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     mockClaimFeedbackPromptMilestone.mockResolvedValueOnce(1);
     let jobState: JobDetailViewModel = {
@@ -1410,6 +1416,7 @@ describe('JobDetailScreen edit mode', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockFullscreenEditFlagState = { enabled: true, ready: true };
+    mockInvoicingFlagState = { enabled: false, ready: true };
     setupDefaultApiMocks(apiClient);
     apiClient.fetchJobDetail.mockResolvedValue(baseJob);
   });
@@ -1420,6 +1427,36 @@ describe('JobDetailScreen edit mode', () => {
     fireEvent.press(screen.getByLabelText('Edit job'));
     expect(screen.getByLabelText('Done')).toBeTruthy();
     expect(screen.getByLabelText('Close')).toBeTruthy();
+  });
+
+  it('completes a financially complete job directly when invoicing is disabled', async () => {
+    apiClient.fetchJobDetail.mockResolvedValue({
+      ...baseJob,
+      displaySessions: [
+        {
+          id: 'sess-usable',
+          startedAt: '2026-04-17T14:00:00.000Z',
+          endedAt: '2026-04-17T15:00:00.000Z',
+          dateLabel: 'Apr 17, 2026',
+          timeRangeLabel: '9:00 AM – 10:00 AM',
+          durationLabel: '1.0h',
+          clockTimesExplicit: true,
+          clockStartExplicit: true,
+          clockEndExplicit: true,
+          calendarDateExplicit: true,
+          attachments: [],
+        },
+      ],
+      noMaterialsConfirmed: true,
+      noOtherCostsConfirmed: true,
+    });
+    const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
+    await waitFor(() => expect(screen.getByText('Primary status action')).toBeTruthy());
+    fireEvent.press(screen.getByText('Primary status action'));
+    await waitFor(() =>
+      expect(apiClient.updateJobStatusById).toHaveBeenCalledWith({}, 'job-1', 'completed'),
+    );
+    expect(mockOpenFinalization).not.toHaveBeenCalled();
   });
 
   it('opens the legacy edit sheet from the header when fullscreen editing is disabled', async () => {
@@ -1567,6 +1604,7 @@ describe('JobDetailScreen simplified view (flag on)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockFullscreenEditFlagState = { enabled: true, ready: true };
+    mockInvoicingFlagState = { enabled: true, ready: true };
     setupDefaultApiMocks(apiClient);
     apiClient.fetchJobDetail.mockResolvedValue(incompleteJob);
   });
@@ -1661,6 +1699,39 @@ describe('JobDetailScreen simplified view (flag on)', () => {
     const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
     await waitFor(() => expect(screen.getByText('No visits recorded')).toBeTruthy());
   });
+
+  it.each(['completed', 'paid'] as const)(
+    'does not demote a %s job only because the invoicing flag resolves on',
+    async (workStatus) => {
+      mockInvoicingFlagState = { enabled: false, ready: true };
+      apiClient.fetchJobDetail.mockResolvedValue({
+        ...incompleteJob,
+        workStatus,
+        pricingMode: 'component',
+        laborServicesCents: null,
+        noLaborServicesConfirmed: false,
+        earnings: {
+          ...incompleteJob.earnings,
+          revenueCents: 40000,
+        },
+        noMaterialsConfirmed: true,
+        noOtherCostsConfirmed: true,
+      });
+
+      const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
+      await waitFor(() => expect(screen.getByText('No Visit Date')).toBeTruthy());
+
+      mockInvoicingFlagState = { enabled: true, ready: true };
+      screen.rerender(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
+
+      await waitFor(() => expect(apiClient.fetchJobDetail).toHaveBeenCalled());
+      expect(apiClient.updateJobStatusById).not.toHaveBeenCalledWith(
+        {},
+        'job-1',
+        'inProgress',
+      );
+    },
+  );
 
   it('blocks Paid from the status sheet until financial completeness is met', async () => {
     const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
@@ -2151,12 +2222,12 @@ describe('JobDetailScreen simplified view (flag on)', () => {
     expect(apiClient.updateJobStatusById).not.toHaveBeenCalledWith({}, 'job-1', 'completed');
   });
 
-  it('shows invoicing actions even when the optional flag is off', async () => {
+  it('keeps invoicing UI hidden when the feature flag is off', async () => {
     mockInvoicingFlagState = { enabled: false, ready: true };
     const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
-    await waitFor(() => expect(screen.getByLabelText('Share job document')).toBeTruthy());
-    fireEvent.press(screen.getByLabelText('Share job document'));
-    expect(mockOpenDocumentPreview).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(screen.getByLabelText('Edit job')).toBeTruthy());
+    expect(screen.queryByLabelText('Share job document')).toBeNull();
+    expect(screen.queryByLabelText('Manage documents')).toBeNull();
   });
 
   it('shows Share when invoicing is ready and enabled', async () => {
@@ -2169,10 +2240,23 @@ describe('JobDetailScreen simplified view (flag on)', () => {
     await waitFor(() => expect(screen.getByTestId('edit-focus-target').props.children).toBe('\"docs\"'));
   });
 
-  it('shows invoicing actions while the optional flag is loading', async () => {
+  it('fails closed while the invoicing flag is loading', async () => {
     mockInvoicingFlagState = { enabled: true, ready: false };
     const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
+    await waitFor(() => expect(screen.getByLabelText('Edit job')).toBeTruthy());
+    expect(screen.queryByLabelText('Share job document')).toBeNull();
+    mockInvoicingFlagState = { enabled: true, ready: true };
+    screen.rerender(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
     await waitFor(() => expect(screen.getByLabelText('Share job document')).toBeTruthy());
+  });
+
+  it('keeps Revenue reachable when invoicing is on and fullscreen edit is off', async () => {
+    mockFullscreenEditFlagState = { enabled: false, ready: true };
+    mockInvoicingFlagState = { enabled: true, ready: true };
+    const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
+    await waitFor(() => expect(screen.getByLabelText('Share job document')).toBeTruthy());
+    fireEvent.press(screen.getByLabelText('Edit job'));
+    await waitFor(() => expect(screen.getByLabelText('Legacy labor field')).toBeTruthy());
   });
 
   it('TEST-V09 flag off keeps ADD pills and confirm cards', async () => {

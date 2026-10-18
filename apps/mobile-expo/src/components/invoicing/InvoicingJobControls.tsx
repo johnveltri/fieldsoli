@@ -8,6 +8,7 @@ import {
 } from 'react';
 import {
   ActivityIndicator,
+  AppState,
   Animated,
   Easing,
   useWindowDimensions,
@@ -79,6 +80,12 @@ import {
   mailtoUrl,
   pdfFileName,
 } from '../../lib/documentShare';
+import {
+  clearFinancialDocumentIntent,
+  readFinancialDocumentIntent,
+  writeFinancialDocumentIntent,
+  type FinancialDocumentIntent,
+} from '../../lib/financialDocumentIntentStorage';
 import { announceAccessibilityMessage } from '../../lib/accessibility';
 import { formatUsdCombined } from '../../lib/formatUsd';
 import {
@@ -108,6 +115,7 @@ import type { TextStyles } from '../../theme/nativeTokens';
 
 type Props = {
   client: FieldSoloSupabaseClient;
+  ownerId: string;
   jobId: string;
   workStatus: string;
   typography: TextStyles;
@@ -229,6 +237,7 @@ export const InvoicingJobControls = forwardRef<
 >(function InvoicingJobControls(
   {
     client,
+    ownerId,
     jobId,
     workStatus,
     typography,
@@ -259,6 +268,10 @@ export const InvoicingJobControls = forwardRef<
     defaultDocumentType(workStatus),
   );
   const [saved, setSaved] = useState<FinancialDocumentRecord | null>(null);
+  const [savedWorkStatus, setSavedWorkStatus] = useState(workStatus);
+  const [refreshingSaved, setRefreshingSaved] = useState(false);
+  const workStatusRef = useRef(workStatus);
+  workStatusRef.current = workStatus;
   const [previewOpen, setPreviewOpenState] = useState(false);
   const { height: previewWindowHeight } = useWindowDimensions();
   const previewTranslateY = useRef(new Animated.Value(previewWindowHeight)).current;
@@ -304,8 +317,11 @@ export const InvoicingJobControls = forwardRef<
   const [shareModalMounted, setShareModalMounted] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [copySuccess, setCopySuccess] = useState(false);
-  const [requestKey, setRequestKey] = useState<string | null>(null);
   const [offline, setOffline] = useState(false);
+  const [recoveringIntent, setRecoveringIntent] = useState(true);
+  const recoveryBlockedRef = useRef(false);
+  const recoveryScopeRef = useRef<string | null>(null);
+  const creationRunningRef = useRef(false);
   const queuedHandoffRef = useRef<QueuedHandoff | null>(null);
   const handoffRunningRef = useRef(false);
   const copySuccessTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -350,23 +366,178 @@ export const InvoicingJobControls = forwardRef<
   }, [previewOpen]);
 
   const reload = useCallback(async () => {
+    setRefreshingSaved(true);
     setLoading(true);
     setError(null);
     try {
       const nextDocuments = await listFinancialDocuments(client, jobId);
       setDocuments(nextDocuments);
       setRevenueDocumentDraft(nextDocuments.find((doc) => doc.isRevenueSource)?.id ?? null);
+      setSaved((current) => current
+        ? nextDocuments.find((doc) => doc.id === current.id) ?? null
+        : null);
+      setSavedWorkStatus(workStatusRef.current);
       setOffline(false);
     } catch {
       setError('Could not load this document.');
+      setOffline(true);
+      setSaved(null);
     } finally {
+      setRefreshingSaved(false);
       setLoading(false);
     }
   }, [client, jobId]);
 
+  const refreshDocument = useCallback(async (documentId: string) => {
+    const fresh = (await listFinancialDocuments(client, jobId)).find((item) => item.id === documentId);
+    if (!fresh) throw new Error('financial_document_not_available');
+    setDocuments((current) => current.map((item) => item.id === fresh.id ? fresh : item));
+    setOffline(false);
+    return fresh;
+  }, [client, jobId]);
+
+  const openFreshShareSheet = useCallback(async (documentId: string) => {
+    try {
+      const fresh = await refreshDocument(documentId);
+      setSaved(fresh);
+      setSavedWorkStatus(workStatus);
+      openShareSheet();
+    } catch {
+      setSaved(null);
+      setOffline(true);
+      Alert.alert('Could not refresh this document.', 'Reconnect before sharing it.');
+    }
+  }, [openShareSheet, refreshDocument, workStatus]);
+
+  const executeIntent = useCallback(async (intent: FinancialDocumentIntent) => {
+    if (intent.kind === 'create') {
+      return intent.type === 'invoice'
+        ? createAndSelectFinancialDocument(client, {
+            jobId: intent.jobId,
+            fingerprint: intent.fingerprint,
+            timezone: intent.timezone,
+            requestKey: intent.requestKey,
+            confirmedPaidTotalCents: intent.confirmedPaidTotalCents,
+          })
+        : createFinancialDocument(client, {
+            jobId: intent.jobId,
+            type: intent.type,
+            fingerprint: intent.fingerprint,
+            timezone: intent.timezone,
+            requestKey: intent.requestKey,
+          });
+    }
+    return finalizeJobWithInvoice(client, {
+      jobId: intent.jobId,
+      status: intent.status,
+      documentId: intent.documentId,
+      fingerprint: intent.fingerprint,
+      timezone: intent.timezone,
+      requestKey: intent.requestKey,
+      confirmedPaidTotalCents: intent.confirmedPaidTotalCents,
+    });
+  }, [client]);
+
+  const clearIntent = useCallback(async (requestKey: string | undefined) => {
+    if (!ownerId || !requestKey) return;
+    recoveryBlockedRef.current = !(await clearFinancialDocumentIntent(ownerId, jobId, requestKey));
+  }, [jobId, ownerId]);
+
+  const retryPendingIntent = useCallback(async () => {
+    if (!ownerId) return;
+    let intent: FinancialDocumentIntent | null = null;
+    try {
+      intent = await readFinancialDocumentIntent(ownerId, jobId);
+      if (!intent) {
+        recoveryBlockedRef.current = false;
+        return;
+      }
+      const recovered = await executeIntent(intent);
+      await clearIntent(intent.requestKey);
+      setSaved(recovered);
+      setSavedWorkStatus(workStatus);
+      setOffline(false);
+      if (intent.kind === 'create') {
+        if (intent.type === 'invoice') onRevenueInvoiceChanged?.();
+        await openFreshShareSheet(recovered.id);
+      } else {
+        setPreviewOpen(false);
+        setFinalization(null);
+        onFinalized?.(intent.status);
+      }
+      await reload();
+      Alert.alert('The previous request completed.', 'Its saved document is available in Documents.');
+    } catch (error) {
+      if (error instanceof FinancialDocumentError) {
+        await clearIntent(intent?.requestKey);
+        if (error.code === 'stale') {
+          Alert.alert('The Job changed before this request completed.', 'Review the current details and try again.');
+        } else {
+          Alert.alert('The previous request could not be completed.', 'Review the current details and try again.');
+        }
+      } else {
+        recoveryBlockedRef.current = true;
+        Alert.alert('The request is still being confirmed.', 'Retry it before creating another document.');
+      }
+    }
+  }, [clearIntent, executeIntent, jobId, onFinalized, onRevenueInvoiceChanged, openFreshShareSheet, ownerId, reload, setPreviewOpen, workStatus]);
+
   useEffect(() => {
-    if (isActive) void reload();
-  }, [isActive, reload]);
+    const scope = `${ownerId}:${jobId}`;
+    if (!isActive || !ownerId || recoveryScopeRef.current === scope) return;
+    recoveryScopeRef.current = scope;
+    recoveryBlockedRef.current = false;
+    let cancelled = false;
+    const recover = async () => {
+      setRecoveringIntent(true);
+      try {
+        const intent = await readFinancialDocumentIntent(ownerId, jobId);
+        if (cancelled) return;
+        if (intent) {
+          recoveryBlockedRef.current = true;
+          try {
+            await executeIntent(intent);
+            recoveryBlockedRef.current = !(await clearFinancialDocumentIntent(ownerId, jobId, intent.requestKey));
+            if (!cancelled && intent.kind === 'create' && intent.type === 'invoice') onRevenueInvoiceChanged?.();
+            if (!cancelled && intent.kind === 'finalize') onFinalized?.(intent.status);
+            if (!cancelled) Alert.alert('Document creation recovered.', 'Find the saved document in Documents.');
+          } catch (recoveryError) {
+            if (recoveryError instanceof FinancialDocumentError) {
+              recoveryBlockedRef.current = !(await clearFinancialDocumentIntent(ownerId, jobId, intent.requestKey));
+              if (!cancelled && recoveryError.code === 'stale') {
+                Alert.alert('The Job changed before this request completed.', 'Review the current details and try again.');
+              }
+            } else {
+              recoveryBlockedRef.current = true;
+              if (!cancelled) Alert.alert('A document request is still being confirmed.', 'Retry it before creating another document.');
+            }
+          }
+        }
+        if (!cancelled) await reload();
+      } catch {
+        recoveryBlockedRef.current = true;
+        if (!cancelled) setOffline(true);
+      } finally {
+        if (!cancelled) setRecoveringIntent(false);
+      }
+    };
+    void recover();
+    return () => {
+      cancelled = true;
+      if (recoveryScopeRef.current === scope) recoveryScopeRef.current = null;
+    };
+  }, [client, executeIntent, isActive, jobId, onFinalized, onRevenueInvoiceChanged, ownerId, reload]);
+
+  useEffect(() => {
+    if (isActive && !recoveringIntent) void reload();
+  }, [isActive, recoveringIntent, reload, workStatus]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active' && isActive && !recoveringIntent) void reload();
+    });
+    return () => subscription.remove();
+  }, [isActive, recoveringIntent, reload]);
 
   const openUnsaved = useCallback(async () => {
     if (beforeOpen) {
@@ -427,10 +598,23 @@ export const InvoicingJobControls = forwardRef<
   );
 
   const createAndShare = useCallback(async () => {
-    if (!preview || preview.gaps.length > 0) return;
-    const key = requestKey ?? newRequestKey();
-    setRequestKey(key);
+    if (!preview || preview.gaps.length > 0 || creationRunningRef.current || recoveringIntent) return;
+    if (!ownerId) {
+      Alert.alert('Could not verify your account. Sign in and try again.');
+      return;
+    }
+    if (recoveryBlockedRef.current) {
+      creationRunningRef.current = true;
+      setBusy('Confirming…');
+      try { await retryPendingIntent(); } finally {
+        creationRunningRef.current = false;
+        setBusy(null);
+      }
+      return;
+    }
+    creationRunningRef.current = true;
     setBusy('Creating…');
+    let intent: FinancialDocumentIntent | null = null;
     try {
       let confirmedPaidTotalCents: number | null = null;
       if (previewType === 'invoice' && workStatus === 'paid') {
@@ -442,25 +626,23 @@ export const InvoicingJobControls = forwardRef<
         });
         if (confirmedPaidTotalCents == null) return;
       }
-      const created = previewType === 'invoice'
-        ? await createAndSelectFinancialDocument(client, {
-            jobId,
-            fingerprint: preview.fingerprint,
-            timezone: deviceIanaTimeZone(),
-            requestKey: key,
-            confirmedPaidTotalCents,
-          })
-        : await createFinancialDocument(client, {
-            jobId,
-            type: previewType,
-            fingerprint: preview.fingerprint,
-            timezone: deviceIanaTimeZone(),
-            requestKey: key,
-          });
+      intent = {
+        kind: 'create',
+        requestKey: newRequestKey(),
+        jobId,
+        type: previewType,
+        fingerprint: preview.fingerprint,
+        timezone: deviceIanaTimeZone(),
+        confirmedPaidTotalCents,
+      };
+      await writeFinancialDocumentIntent(ownerId, jobId, intent);
+      recoveryBlockedRef.current = true;
+      const created = await executeIntent(intent);
+      await clearIntent(intent.requestKey);
       setSaved(created);
-      setRequestKey(null);
+      setSavedWorkStatus(workStatus);
       if (previewType === 'invoice') onRevenueInvoiceChanged?.();
-      openShareSheet();
+      await openFreshShareSheet(created.id);
       await reload();
     } catch (error) {
       if (error instanceof FinancialDocumentError && error.code === 'stale') {
@@ -473,44 +655,32 @@ export const InvoicingJobControls = forwardRef<
           timezone: deviceIanaTimeZone(),
         }).catch(() => null);
         if (next) setPreview(next);
-        setRequestKey(null);
+        await clearIntent(intent?.requestKey);
       } else if (
         error instanceof FinancialDocumentError &&
         error.code === 'incomplete'
       ) {
         Alert.alert('Complete these details before sharing.');
+        await clearIntent(intent?.requestKey);
+      } else if (error instanceof Error && error.message.startsWith('financial_document_intent_')) {
+        // A different mounted control may own the durable request already.
+        // Block this control and let its next action replay that stored intent.
+        recoveryBlockedRef.current = true;
+        Alert.alert('A previous document request is still being confirmed.', 'Retry it before creating another document.');
       } else {
         Alert.alert('Could not confirm creation. Try again.');
+        if (error instanceof FinancialDocumentError) await clearIntent(intent?.requestKey);
       }
     } finally {
+      creationRunningRef.current = false;
       setBusy(null);
     }
-  }, [client, jobId, onRevenueInvoiceChanged, openShareSheet, preview, previewType, reload, requestKey, workStatus]);
+  }, [clearIntent, client, executeIntent, jobId, onRevenueInvoiceChanged, openFreshShareSheet, ownerId, preview, previewType, recoveringIntent, reload, retryPendingIntent, workStatus]);
 
-  const active = saved;
-  const link = active ? shareDocumentUrl(active.token) : '';
-  const linkText = active
-    ? documentLinkText({
-        type: active.documentType,
-        number: active.documentNumber,
-        businessName: active.payload.businessName,
-        url: link,
-    })
-    : '';
-
-  const offerNativeShareFallback = useCallback((message: string) => {
-    Alert.alert(message, undefined, [
-      { text: 'Cancel', style: 'cancel', onPress: () => setPreviewOpen(true) },
-      {
-        text: 'Share link…',
-        onPress: () => {
-          void Share.share({ message: linkText, title: active ? documentNumberLabel(active.documentType, active.documentNumber) : undefined })
-            .catch(() => Alert.alert('Could not share this link. Try again.'))
-            .finally(() => setPreviewOpen(true));
-        },
-      },
-    ]);
-  }, [active, linkText, setPreviewOpen]);
+  const displaySaved = saved && !refreshingSaved && savedWorkStatus === workStatus
+    ? saved
+    : null;
+  const active = displaySaved;
 
   const performQueuedHandoff = useCallback(async () => {
     const action = queuedHandoffRef.current;
@@ -519,48 +689,84 @@ export const InvoicingJobControls = forwardRef<
     handoffRunningRef.current = true;
     let fallbackAlertOpen = false;
     let handoffFailed = false;
+    let handoffDocument = active;
+    if (action.kind !== 'pdf') {
+      try {
+        handoffDocument = await refreshDocument(active.id);
+        if (!handoffDocument.linkEnabled) throw new Error('link_disabled');
+        setSaved(handoffDocument);
+        setSavedWorkStatus(workStatus);
+      } catch {
+        setSaved(null);
+        setOffline(true);
+        handoffRunningRef.current = false;
+        Alert.alert('Could not refresh this document.', 'Reconnect and verify its link before sharing.');
+        return;
+      }
+    }
+    const handoffUrl = shareDocumentUrl(handoffDocument.token);
+    const handoffText = documentLinkText({
+      type: handoffDocument.documentType,
+      number: handoffDocument.documentNumber,
+      businessName: handoffDocument.payload.businessName,
+      url: handoffUrl,
+    });
     try {
       if (action.kind === 'text') {
         if (!(await SMS.isAvailableAsync())) {
           fallbackAlertOpen = true;
-          offerNativeShareFallback('Messages is unavailable on this device.');
+          Alert.alert('Messages is unavailable on this device.', undefined, [
+            { text: 'Cancel', style: 'cancel', onPress: () => setPreviewOpen(true) },
+            { text: 'Share link…', onPress: () => {
+              void Share.share({ message: handoffText, title: documentNumberLabel(handoffDocument.documentType, handoffDocument.documentNumber) })
+                .catch(() => Alert.alert('Could not share this link. Try again.'))
+                .finally(() => setPreviewOpen(true));
+            } },
+          ]);
           return;
         }
-        await SMS.sendSMSAsync(active.payload.customerPhone ?? '', linkText);
+        await SMS.sendSMSAsync(handoffDocument.payload.customerPhone ?? '', handoffText);
       } else if (action.kind === 'email') {
         const subject = gmailSubject({
-          type: active.documentType,
-          number: active.documentNumber,
-          businessName: active.payload.businessName,
+          type: handoffDocument.documentType,
+          number: handoffDocument.documentNumber,
+          businessName: handoffDocument.payload.businessName,
         });
         try {
           await Linking.openURL(mailtoUrl({
-            email: active.payload.customerEmail,
+            email: handoffDocument.payload.customerEmail,
             subject,
-            body: linkText,
+            body: handoffText,
           }));
         } catch {
           if (await MailComposer.isAvailableAsync()) {
             await MailComposer.composeAsync({
               subject,
-              body: linkText,
-              recipients: active.payload.customerEmail
-                ? [active.payload.customerEmail]
+              body: handoffText,
+              recipients: handoffDocument.payload.customerEmail
+                ? [handoffDocument.payload.customerEmail]
                 : [],
             });
           } else {
             fallbackAlertOpen = true;
-            offerNativeShareFallback('Email is unavailable on this device.');
+            Alert.alert('Email is unavailable on this device.', undefined, [
+              { text: 'Cancel', style: 'cancel', onPress: () => setPreviewOpen(true) },
+              { text: 'Share link…', onPress: () => {
+                void Share.share({ message: handoffText, title: documentNumberLabel(handoffDocument.documentType, handoffDocument.documentNumber) })
+                  .catch(() => Alert.alert('Could not share this link. Try again.'))
+                  .finally(() => setPreviewOpen(true));
+              } },
+            ]);
             return;
           }
         }
       } else if (action.kind === 'share') {
         await Share.share({
-          message: linkText,
-          title: documentNumberLabel(active.documentType, active.documentNumber),
+          message: handoffText,
+          title: documentNumberLabel(handoffDocument.documentType, handoffDocument.documentNumber),
         });
       } else if (action.kind === 'browser') {
-        await Linking.openURL(link);
+        await Linking.openURL(handoffUrl);
       } else if (action.kind === 'pdf') {
         await Sharing.shareAsync(action.uri, {
           mimeType: 'application/pdf',
@@ -577,14 +783,14 @@ export const InvoicingJobControls = forwardRef<
           : 'Could not open the share option. Try again.';
       Alert.alert(message, undefined, [
         { text: 'Close', style: 'cancel', onPress: () => setPreviewOpen(true) },
-        { text: 'Try again', onPress: openShareSheet },
+        { text: 'Try again', onPress: () => { if (active) void openFreshShareSheet(active.id); } },
       ]);
     } finally {
       handoffRunningRef.current = false;
       setBusy(null);
       if (!fallbackAlertOpen && !handoffFailed) setPreviewOpen(true);
     }
-  }, [active, link, linkText, offerNativeShareFallback, openShareSheet, setPreviewOpen]);
+  }, [active, openFreshShareSheet, refreshDocument, setPreviewOpen, workStatus]);
 
   const closePreviewForHandoff = useCallback(() => {
     if (!queuedHandoffRef.current) return;
@@ -606,11 +812,24 @@ export const InvoicingJobControls = forwardRef<
     kind: 'text' | 'email' | 'share' | 'browser' | 'pdf',
   ) => {
     if (!active || handoffRunningRef.current || queuedHandoffRef.current) return;
-    if (!active.linkEnabled && kind !== 'pdf') {
+    handoffRunningRef.current = true;
+    let fresh: FinancialDocumentRecord;
+    try {
+      fresh = await refreshDocument(active.id);
+    } catch {
+      setSaved(null);
+      setOffline(true);
+      handoffRunningRef.current = false;
+      Alert.alert('Could not refresh this document.', 'Reconnect before sharing or creating a PDF.');
+      return;
+    }
+    if (!fresh.linkEnabled && kind !== 'pdf') {
+      handoffRunningRef.current = false;
       Alert.alert('Enable the shared link in Documents to share this document.');
       return;
     }
-    handoffRunningRef.current = true;
+    setSaved(fresh);
+    setSavedWorkStatus(workStatus);
     if (kind === 'pdf') {
       setBusy('Creating PDF…');
       try {
@@ -621,13 +840,13 @@ export const InvoicingJobControls = forwardRef<
           return;
         }
         const generated = await Print.printToFileAsync({
-          html: htmlFor(active, 'pdf', await loadPreviewFontData()),
+          html: htmlFor(fresh, 'pdf', await loadPreviewFontData()),
           margins: { top: 36, right: 36, bottom: 36, left: 36 },
         });
         const filename = pdfFileName(
-          active.documentType,
-          active.documentNumber,
-          active.payload.businessName,
+          fresh.documentType,
+          fresh.documentNumber,
+          fresh.payload.businessName,
         );
         const namedFile = new File(Paths.cache, filename);
         await new File(generated.uri).copy(namedFile, { overwrite: true });
@@ -645,16 +864,26 @@ export const InvoicingJobControls = forwardRef<
     queuedHandoffRef.current = { kind };
     handoffRunningRef.current = false;
     closeShareSheet();
-  }, [active, closeShareSheet]);
+  }, [active, closeShareSheet, refreshDocument]);
 
   const copyLink = useCallback(async () => {
     if (!active) return;
-    if (!active.linkEnabled) {
+    let fresh: FinancialDocumentRecord;
+    try {
+      fresh = await refreshDocument(active.id);
+    } catch {
+      setSaved(null);
+      setOffline(true);
+      Alert.alert('Could not refresh this document.', 'Reconnect before copying its link.');
+      return;
+    }
+    if (!fresh.linkEnabled) {
       Alert.alert('Enable the shared link in Documents to share this document.');
       return;
     }
+    setSaved(fresh);
     try {
-      await Clipboard.setStringAsync(link);
+      await Clipboard.setStringAsync(shareDocumentUrl(fresh.token));
       setCopySuccess(true);
       announceAccessibilityMessage('Link copied');
       if (copySuccessTimeoutRef.current) clearTimeout(copySuccessTimeoutRef.current);
@@ -662,7 +891,7 @@ export const InvoicingJobControls = forwardRef<
     } catch {
       Alert.alert('Could not copy the link. Try again.');
     }
-  }, [active, link]);
+  }, [active, refreshDocument, workStatus]);
 
   const archiveDocument = async (doc: FinancialDocumentRecord) => {
     if (archivingRef.current) return;
@@ -684,17 +913,31 @@ export const InvoicingJobControls = forwardRef<
   };
 
   const openDocument = useCallback((documentId: string) => {
-    const doc = documents.find((item) => item.id === documentId);
-    if (!doc) {
-      void reload();
-      Alert.alert('Could not load this invoice. Try again.');
-      return;
-    }
     previewRequestRef.current += 1;
-    setSaved(doc);
+    const request = previewRequestRef.current;
+    setSaved(null);
     setPreview(null);
     setPreviewOpen(true);
-  }, [documents, reload, setPreviewOpen]);
+    setOffline(false);
+    setBusy('Loading…');
+    void refreshDocument(documentId)
+      .then((doc) => {
+        if (request === previewRequestRef.current) {
+          setSaved(doc);
+          setSavedWorkStatus(workStatus);
+        }
+      })
+      .catch(() => {
+        if (request === previewRequestRef.current) {
+          setSaved(null);
+          setOffline(true);
+          Alert.alert('Could not refresh this document.', 'Connect and retry before viewing or sharing it.');
+        }
+      })
+      .finally(() => {
+        if (request === previewRequestRef.current) setBusy(null);
+      });
+  }, [refreshDocument, setPreviewOpen, workStatus]);
 
   const openFinalization = useCallback(async (status: 'completed' | 'paid') => {
     setBusy('Reviewing…');
@@ -711,6 +954,7 @@ export const InvoicingJobControls = forwardRef<
       setFinalization({ status, selected, preview: nextPreview });
       previewRequestRef.current += 1;
       setSaved(selected);
+      setSavedWorkStatus(workStatus);
       setPreview(nextPreview);
       setPreviewType('invoice');
       setShareOpen(false);
@@ -721,7 +965,7 @@ export const InvoicingJobControls = forwardRef<
     } finally {
       setBusy(null);
     }
-  }, [client, jobId, onFinalizationClosed, setPreviewOpen]);
+  }, [client, jobId, onFinalizationClosed, setPreviewOpen, workStatus]);
 
   const openBusinessSettings = useCallback((returnTo: NonNullable<typeof businessReturnRef.current>) => {
     businessReturnRef.current = returnTo;
@@ -740,43 +984,69 @@ export const InvoicingJobControls = forwardRef<
   }, [openFinalization, previewType, switchType]);
 
   const confirmFinalization = useCallback(async () => {
-    if (!finalization) return;
+    if (!finalization || creationRunningRef.current || recoveringIntent) return;
+    if (!ownerId) {
+      Alert.alert('Could not verify your account. Sign in and try again.');
+      return;
+    }
+    if (recoveryBlockedRef.current) {
+      creationRunningRef.current = true;
+      setBusy('Confirming…');
+      try { await retryPendingIntent(); } finally {
+        creationRunningRef.current = false;
+        setBusy(null);
+      }
+      return;
+    }
     const totalCents = finalization.selected?.payload.totalCents ?? finalization.preview?.payload.totalCents;
     if (totalCents == null || (!finalization.selected && (finalization.preview?.gaps.length ?? 0) > 0)) return;
-    const key = requestKey ?? newRequestKey();
-    setRequestKey(key);
+    creationRunningRef.current = true;
     setBusy('Saving…');
+    let intent: FinancialDocumentIntent | null = null;
     try {
-      await finalizeJobWithInvoice(client, {
+      intent = {
+        kind: 'finalize',
+        requestKey: newRequestKey(),
         jobId,
         status: finalization.status,
         documentId: finalization.selected?.id ?? null,
-        fingerprint: finalization.selected ? null : finalization.preview?.fingerprint,
+        fingerprint: finalization.selected ? null : finalization.preview?.fingerprint ?? null,
         timezone: deviceIanaTimeZone(),
-        requestKey: key,
         confirmedPaidTotalCents: finalization.status === 'paid' ? totalCents : null,
-      });
-      setRequestKey(null);
+      };
+      await writeFinancialDocumentIntent(ownerId, jobId, intent);
+      recoveryBlockedRef.current = true;
+      await executeIntent(intent);
+      await clearIntent(intent.requestKey);
       setPreviewOpen(false);
       setFinalization(null);
       await reload();
       onFinalized?.(finalization.status);
     } catch (error) {
-      if (error instanceof FinancialDocumentError && error.code === 'stale') {
+      if (error instanceof FinancialDocumentError && (error.code === 'stale' || error.code === 'conflict')) {
         Alert.alert('This Job changed. Review the updated invoice before continuing.');
         void openFinalization(finalization.status);
+        await clearIntent(intent?.requestKey);
       } else if (error instanceof FinancialDocumentError && error.code === 'incomplete') {
         Alert.alert('Complete the invoice details before finishing this Job.');
+        await clearIntent(intent?.requestKey);
       } else if (error instanceof FinancialDocumentError && error.code === 'confirmation_required') {
         Alert.alert('The invoice total changed. Review it and confirm the current amount.');
         void openFinalization(finalization.status);
+        await clearIntent(intent?.requestKey);
+      } else if (error instanceof Error && error.message.startsWith('financial_document_intent_')) {
+        // Preserve the original request when another control has a pending key.
+        recoveryBlockedRef.current = true;
+        Alert.alert('A previous document request is still being confirmed.', 'Retry it before finishing this Job.');
       } else {
         Alert.alert('Could not finish this Job. Try again.');
+        if (error instanceof FinancialDocumentError) await clearIntent(intent?.requestKey);
       }
     } finally {
+      creationRunningRef.current = false;
       setBusy(null);
     }
-  }, [client, finalization, jobId, onFinalized, openFinalization, reload, requestKey, setPreviewOpen]);
+  }, [clearIntent, executeIntent, finalization, jobId, onFinalized, openFinalization, ownerId, recoveringIntent, reload, retryPendingIntent, setPreviewOpen]);
 
   const closeInvoicePreview = () => {
     if (busy) return;
@@ -885,12 +1155,7 @@ export const InvoicingJobControls = forwardRef<
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={`Preview ${documentNumberLabel(doc.documentType, doc.documentNumber)}, ${doc.issueDate}, ${formatUsdCombined(doc.payload.totalCents)}`}
-                onPress={() => {
-                  previewRequestRef.current += 1;
-                  setSaved(doc);
-                  setPreviewOpen(true);
-                  setShareOpen(false);
-                }}
+                onPress={() => openDocument(doc.id)}
                 style={({ pressed }) => [styles.row, pressed && styles.pressed]}
               >
                 <View style={styles.rowLabel}>
@@ -910,12 +1175,7 @@ export const InvoicingJobControls = forwardRef<
                 accessibilityLabel={doc.archived ? 'Un-Archive to Preview' : 'Preview and Share'}
                 accessibilityState={{ disabled: doc.archived }}
                 disabled={doc.archived}
-                onPress={() => {
-                  previewRequestRef.current += 1;
-                  setSaved(doc);
-                  setPreviewOpen(true);
-                  setShareOpen(false);
-                }}
+                onPress={() => openDocument(doc.id)}
                 style={({ pressed }) => [
                   styles.documentPreviewRow,
                   pressed && !doc.archived && styles.pressed,
@@ -1040,7 +1300,7 @@ export const InvoicingJobControls = forwardRef<
             style={styles.previewScroll}
             contentContainerStyle={styles.previewContent}
           >
-            {!saved && !finalization ? (
+            {!displaySaved && !finalization ? (
               <View style={[columnStyle, styles.previewBar]}>
                 <SegmentedControl
                   accessibilityLabel="Document type"
@@ -1065,7 +1325,7 @@ export const InvoicingJobControls = forwardRef<
                 {busy}
               </Text>
             ) : null}
-            {preview && !saved && preview.gaps.length > 0 ? (
+            {preview && !displaySaved && preview.gaps.length > 0 ? (
               <View style={[columnStyle, styles.gapWrap]}>
                 {businessGaps.length > 0 ? (
                   <ActionSummaryCard
@@ -1101,8 +1361,8 @@ export const InvoicingJobControls = forwardRef<
                     testID="document-preview-html"
                     originWhitelist={['*']}
                     source={{
-                      html: saved
-                        ? htmlFor(saved, 'preview', previewFonts ?? undefined)
+                      html: displaySaved
+                        ? htmlFor(displaySaved, 'preview', previewFonts ?? undefined)
                         : preview
                           ? htmlFor(
                               {
@@ -1138,7 +1398,7 @@ export const InvoicingJobControls = forwardRef<
               </View>
             </View>
           </ScrollView>
-          {!finalization && !saved && preview && preview.gaps.length === 0 ? (
+          {!finalization && !displaySaved && preview && preview.gaps.length === 0 ? (
             <View pointerEvents="box-none" style={styles.fabOverlay}>
               <FullWidthFab
                 typography={typography}
@@ -1155,16 +1415,16 @@ export const InvoicingJobControls = forwardRef<
               />
             </View>
           ) : null}
-          {!finalization && saved ? (
+          {!finalization && displaySaved ? (
             <View pointerEvents="box-none" style={styles.fabOverlay}>
               <FullWidthFab
                 typography={typography}
                 label={
-                  saved.documentType === 'estimate'
+                  displaySaved.documentType === 'estimate'
                     ? 'SHARE ESTIMATE'
                     : 'SHARE INVOICE'
                 }
-                onPress={openShareSheet}
+                onPress={() => void openFreshShareSheet(displaySaved.id)}
                 includeSafeArea
               />
             </View>

@@ -242,16 +242,16 @@
 
     <section id="status-approved" data-status="approved-not-shipped">
       <h2>Approved but not shipped</h2>
-      <aside class="notice">Invoice-backed Job Revenue is approved and being implemented, but is not shipped current functionality. This branch removes the previous PostHog flag gate; deploy the additive backend migrations before enabling the client flow. No production rollout or store release is included here. Historical Jobs, amounts, documents, and links remain unchanged until explicit adoption.</aside>
+      <aside class="notice">Invoice-backed Job Revenue is approved and being implemented, but is not shipped current functionality. The client flow remains behind the invoicing PostHog flag; deploy the additive backend migrations before enabling it. New and existing unadopted Jobs retain legacy completion behavior while the flag is disabled. No production rollout or store release is included here. Historical Jobs, amounts, documents, and links remain unchanged until explicit adoption.</aside>
       <article id="capability-invoicing" data-status="approved-not-shipped">
         <h3>Estimates, invoices, and sharing</h3>
         <ul>
           <li>Account stores business defaults. Documents appears after Notes on Job Detail, and Job Edit stages document controls alongside Labor &amp; Services, material markup, and whether an Other Cost is billed to the customer. Historical Jobs keep their existing Revenue until the user adopts an Invoice.</li>
-          <li>A Job has one selected Invoice as its Revenue source. Revenue uses that saved Invoice’s pretax subtotal; current actual costs and tracked time continue to update Net earnings and Net/hour. Invoice snapshots remain immutable.</li>
+          <li>A Job has one selected Invoice as its Revenue source. Revenue uses that saved Invoice’s pretax subtotal; current actual costs and tracked time continue to update Net earnings and Net/hour. Invoice snapshots remain immutable. Explicitly confirming no Labor &amp; Services still permits billable materials and Other Costs.</li>
           <li>Complete and Paid finish through financial review. If no revenue Invoice exists, the flow creates one without requiring the user to share it. Replacing an Invoice is explicit; cost corrections alone do not replace it. On a Paid Job, a different replacement total requires confirmation of the new amount.</li>
           <li>When an unsaved Estimate or Invoice preview lacks required details, Business Details and Job Details action cards list the missing fields in red and open the matching edit screen. The incomplete document remains visible below the cards.</li>
           <li>Job Edit can select an Invoice for Job Revenue and stage archive/link controls until Done. A selected Invoice can remain archived; only the selected Invoice follows later Job Paid/Unpaid changes, while previous Invoices retain their last status.</li>
-          <li>Sharing hands off a bearer link or an on-device PDF. The app does not collect or prove payment.</li>
+          <li>Sharing hands off a bearer link or an on-device PDF after a fresh document/status read. Unresolved creation requests retain their original key across app restart and reconcile before another creation. The app does not collect or prove payment.</li>
           <li>A shared link opens a no-store page on fieldsoli.com. Disabling the link, deleting the job, or deleting the account makes that link unavailable. The page does not say why.</li>
           <li>Only the selected Invoice’s payment wording follows the Job’s Paid/Unpaid state. It reflects recorded status, not a receipt or a payment-processor result.</li>
         </ul>

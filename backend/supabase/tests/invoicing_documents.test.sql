@@ -137,6 +137,8 @@ begin
     raise exception 'disabled link was distinguishable';
   end if;
 
+  -- Existing legacy documents are adopted explicitly before final review.
+  perform public.select_job_revenue_invoice(job_id, (created ->> 'id')::uuid, null);
   perform public.finalize_job_with_invoice(
     job_id, 'paid', (created ->> 'id')::uuid, null, 'America/Chicago',
     gen_random_uuid(), (created -> 'payload' ->> 'totalCents')::bigint

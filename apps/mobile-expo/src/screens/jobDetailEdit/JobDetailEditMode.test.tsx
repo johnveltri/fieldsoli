@@ -43,8 +43,8 @@ const job = {
   noOtherCostsConfirmed: false,
 } as unknown as JobDetailViewModel;
 
-function Harness({ onDirtyBack, docsOnly = false, invoicingEnabled = false }: { onDirtyBack: (dirty: boolean) => void; docsOnly?: boolean; invoicingEnabled?: boolean }) {
-  const editApi = useJobEditDraft(job);
+function Harness({ onDirtyBack, docsOnly = false, invoicingEnabled = false, revenueOnly = false }: { onDirtyBack: (dirty: boolean) => void; docsOnly?: boolean; invoicingEnabled?: boolean; revenueOnly?: boolean }) {
+  const editApi = useJobEditDraft(job, { invoicingEnabled });
 
   useEffect(() => {
     editApi.resetFromJob(job);
@@ -59,7 +59,7 @@ function Harness({ onDirtyBack, docsOnly = false, invoicingEnabled = false }: { 
       columnStyle={{}}
       saving={false}
       invoicingEnabled={invoicingEnabled}
-      focusTarget={docsOnly ? 'docs' : 'materials'}
+      focusTarget={docsOnly ? 'docs' : revenueOnly ? 'revenue' : 'materials'}
       footer={<Text>Docs management</Text>}
       onBack={() => {
         onDirtyBack(editApi.isDirty());
@@ -86,6 +86,20 @@ describe('JobDetailEditMode buffered numeric fields', () => {
     await screen.findByText('Docs management');
     expect(screen.queryByLabelText('Job title')).toBeNull();
     expect(screen.queryByLabelText('Unit price')).toBeNull();
+  });
+
+  it('confirms zero Labor & Services separately from zero Revenue', async () => {
+    const screen = render(
+      <Harness revenueOnly invoicingEnabled onDirtyBack={() => {}} />,
+    );
+    const confirm = await screen.findByLabelText('Confirm no Labor & Services');
+    expect(confirm.props.accessibilityRole).toBe('checkbox');
+    fireEvent.press(confirm);
+    await waitFor(() => {
+      expect(screen.getByLabelText('No Labor & Services confirmed').props.accessibilityState)
+        .toMatchObject({ checked: true });
+    });
+    expect(screen.queryByLabelText('Confirm no Revenue')).toBeNull();
   });
   it('flushes a focused value before Back checks dirty and restores it after discard', async () => {
     const onDirtyBack = jest.fn();
