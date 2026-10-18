@@ -245,7 +245,7 @@ export const BusinessSettingsScreen = forwardRef<
     >
       <CanvasTiledBackground scrollY={scrollY} />
       <ScrollView
-        keyboardShouldPersistTaps="handled"
+        keyboardShouldPersistTaps="never"
         keyboardDismissMode="on-drag"
         contentContainerStyle={{
           paddingTop: insets.top + space('Spacing/20'),

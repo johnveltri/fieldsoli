@@ -143,7 +143,7 @@ describe('ProfileScreen', () => {
     fireEvent.press(screen.getByRole('checkbox', { name: 'Plumbing' }));
     fireEvent.press(screen.getByRole('checkbox', { name: 'Electrical' }));
     fireEvent.changeText(screen.getByLabelText('Custom trade'), 'Stonework');
-    fireEvent.press(screen.getByLabelText('Add custom trade'));
+    expect(screen.queryByLabelText('Add custom trade')).toBeNull();
     expect(mockUpdateProfile).not.toHaveBeenCalled();
     fireEvent.press(screen.getByLabelText('SAVE CHANGES'));
     await waitFor(() => expect(mockUpdateProfile).toHaveBeenCalledWith(
