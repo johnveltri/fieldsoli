@@ -19,7 +19,7 @@ import { color } from '@fieldsolo/design-system/lib/tokens';
 
 import { CanvasTiledBackground } from '../components/CanvasTiledBackground';
 import { shellBottomNavOuterHeight } from '../components/shell/ShellBottomNav';
-import { ProfileRowsCard, type ProfileRowsCardRow } from '../components/ds';
+import { DeleteAccountBottomSheet, ProfileRowsCard, type ProfileRowsCardRow } from '../components/ds';
 import { PlatformHeaderAction } from '../components/platform/PlatformHeaderAction';
 import { TopHeaderBackIcon } from '../components/figma-icons/TopHeaderIcons';
 import {
@@ -35,6 +35,9 @@ import {
   space,
 } from '../theme/nativeTokens';
 import { useContentColumn } from '../theme/useContentColumn';
+import { OverlaySlideHost } from '../navigation/OverlaySlideHost';
+import { ProfileTrashIcon } from '../components/figma-icons/ProfileScreenIcons';
+import { analytics } from '../lib/analytics';
 import { screenHeaderA11y } from '../lib/accessibility';
 
 const BACK_ICON_SIZE = 28;
@@ -42,6 +45,7 @@ const BACK_ICON_SIZE = 28;
 export type PrivacyChoicesScreenProps = {
   userId: string;
   onBack: () => void;
+  onDeleteAccount: () => void;
 };
 
 function extractErrorMessage(e: unknown, fallback: string): string {
@@ -54,7 +58,7 @@ function extractErrorMessage(e: unknown, fallback: string): string {
   return fallback;
 }
 
-export function PrivacyChoicesScreen({ userId, onBack }: PrivacyChoicesScreenProps) {
+export function PrivacyChoicesScreen({ userId, onBack, onDeleteAccount }: PrivacyChoicesScreenProps) {
   const insets = useSafeAreaInsets();
   const { columnStyle } = useContentColumn();
   const scrollY = useMemo(() => new Animated.Value(0), []);
@@ -74,6 +78,8 @@ export function PrivacyChoicesScreen({ userId, onBack }: PrivacyChoicesScreenPro
   const [loading, setLoading] = useState(true);
   const [analyticsEnabled, setAnalyticsEnabled] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteMounted, setDeleteMounted] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -164,6 +170,8 @@ export function PrivacyChoicesScreen({ userId, onBack }: PrivacyChoicesScreenPro
     <View style={styles.root}>
       <CanvasTiledBackground scrollY={scrollY} contentHeight={scrollContentHeight} />
       <Animated.ScrollView
+        accessibilityElementsHidden={deleteMounted}
+        importantForAccessibility={deleteMounted ? 'no-hide-descendants' : 'auto'}
         style={[styles.scroll, { paddingTop: headerTopPad }]}
         contentContainerStyle={[
           styles.scrollContent,
@@ -183,13 +191,13 @@ export function PrivacyChoicesScreen({ userId, onBack }: PrivacyChoicesScreenPro
             <PlatformHeaderAction accessibilityLabel="Back" onPress={onBack}>
               <TopHeaderBackIcon size={BACK_ICON_SIZE} color={fg.primary} />
             </PlatformHeaderAction>
-            <Text {...screenHeaderA11y()} style={[typography.displayH1, styles.title]}>
-              PRIVACY
+            <Text {...screenHeaderA11y()} style={[typography.headingH2, styles.title]}>
+              Privacy Choices
             </Text>
           </View>
 
           <View style={styles.bodyWrap}>
-            <Text style={[typography.metricS, styles.sectionLabel]}>ANALYTICS</Text>
+            <Text accessibilityRole="header" style={[typography.titleH3, styles.sectionLabel]}>Analytics</Text>
             {loading ? (
               <View style={styles.loadingRow}>
                 <ActivityIndicator />
@@ -198,11 +206,45 @@ export function PrivacyChoicesScreen({ userId, onBack }: PrivacyChoicesScreenPro
               <ProfileRowsCard typography={typography} rows={analyticsRows} />
             )}
 
-            <Text style={[typography.metricS, styles.sectionLabel]}>LEGAL</Text>
+            <Text accessibilityRole="header" style={[typography.titleH3, styles.sectionLabel]}>Legal</Text>
             <ProfileRowsCard typography={typography} rows={legalRows} />
+            <View style={styles.deleteAction}>
+              <ProfileRowsCard
+                typography={typography}
+                plain
+                framed={false}
+                rows={[{
+                  kind: 'linkWithIcon',
+                  label: 'Delete Account',
+                  icon: <ProfileTrashIcon color={color('Semantic/Status/Error/Text')} />,
+                  tone: 'danger',
+                  onPress: () => {
+                    analytics.capture('account_delete_requested', { source: 'profile' });
+                    setDeleteMounted(true);
+                    setDeleteOpen(true);
+                  },
+                }]}
+              />
+            </View>
           </View>
         </View>
       </Animated.ScrollView>
+      {deleteMounted ? (
+        <OverlaySlideHost
+          visible={deleteOpen}
+          axis="horizontal"
+          onRequestClose={() => setDeleteOpen(false)}
+          onExited={() => setDeleteMounted(false)}
+        >
+          <DeleteAccountBottomSheet
+            presentation="page"
+            typography={typography}
+            visible={deleteOpen}
+            onBack={() => setDeleteOpen(false)}
+            onSubmit={onDeleteAccount}
+          />
+        </OverlaySlideHost>
+      ) : null}
     </View>
   );
 }
@@ -213,12 +255,11 @@ const styles = StyleSheet.create({
   scrollContent: { alignItems: 'stretch' },
   topHeaderRow: {
     width: '100%',
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 0,
     paddingTop: space('Spacing/32'),
     paddingBottom: space('Spacing/16'),
-    gap: space('Spacing/8'),
+    gap: space('Spacing/12'),
   },
   backHit: {
     minWidth: 44,
@@ -228,6 +269,7 @@ const styles = StyleSheet.create({
   },
   title: {
     flex: 1,
+    minWidth: 0,
     color: fg.primary,
   },
   bodyWrap: {
@@ -237,10 +279,11 @@ const styles = StyleSheet.create({
     gap: space('Spacing/12'),
   },
   sectionLabel: {
-    color: color('Brand/Accent'),
-    paddingTop: space('Spacing/16'),
+    color: fg.primary,
+    paddingTop: space('Spacing/24'),
     paddingBottom: space('Spacing/4'),
   },
+  deleteAction: { paddingTop: space('Spacing/16') },
   loadingRow: {
     minHeight: 70,
     alignItems: 'center',

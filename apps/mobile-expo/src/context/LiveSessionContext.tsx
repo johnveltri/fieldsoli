@@ -220,7 +220,7 @@ export function LiveSessionProvider({ children }: LiveSessionProviderProps) {
   const startLiveSession = useCallback<LiveSessionContextValue['startLiveSession']>(
     async ({ jobId, jobShortDescription }) => {
       if (!isSupabaseConfigured()) {
-        throw new Error('Supabase not configured — cannot start live session.');
+        throw new Error('Supabase not configured — cannot start live visit.');
       }
       const created = await createLiveSession(supabase, {
         jobId,

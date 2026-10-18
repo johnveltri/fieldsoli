@@ -115,7 +115,7 @@ describe('EditMaterialBottomSheet', () => {
     });
   });
 
-  it('shows the +SESSION pill when the job has sessions and fires onSessionPillPress', () => {
+  it('shows the +VISIT pill when the job has visits and fires onSessionPillPress', () => {
     const onSessionPillPress = jest.fn();
     const screen = render(
       <EditMaterialBottomSheet
@@ -125,11 +125,11 @@ describe('EditMaterialBottomSheet', () => {
       />,
     );
 
-    fireEvent.press(screen.getByLabelText('Attach to session'));
+    fireEvent.press(screen.getByLabelText('Attach to visit'));
     expect(onSessionPillPress).toHaveBeenCalled();
   });
 
-  it('hides the session pill entirely when no sessions exist and none is assigned', () => {
+  it('hides the visit pill entirely when no visits exist and none is assigned', () => {
     const screen = render(
       <EditMaterialBottomSheet
         {...baseProps}
@@ -139,11 +139,11 @@ describe('EditMaterialBottomSheet', () => {
       />,
     );
 
-    expect(screen.queryByLabelText('Attach to session')).toBeNull();
-    expect(screen.queryByLabelText('Edit session')).toBeNull();
+    expect(screen.queryByLabelText('Attach to visit')).toBeNull();
+    expect(screen.queryByLabelText('Edit visit')).toBeNull();
   });
 
-  it('renders the pencil pill when a session is already assigned and shows the session subtitle', () => {
+  it('renders the pencil pill when a visit is already assigned and shows the visit subtitle', () => {
     const screen = render(
       <EditMaterialBottomSheet
         {...baseProps}
@@ -157,9 +157,9 @@ describe('EditMaterialBottomSheet', () => {
       />,
     );
 
-    expect(screen.getByLabelText('Edit session')).toBeTruthy();
+    expect(screen.getByLabelText('Edit visit')).toBeTruthy();
     expect(
-      screen.getByText('Session: Mar 25, 2026 9:00 AM – 10:00 AM'),
+      screen.getByText('Visit: Mar 25, 2026 9:00 AM – 10:00 AM'),
     ).toBeTruthy();
   });
 

@@ -4,6 +4,8 @@ import {
   fieldsoloLoadedFonts,
 } from '@fieldsolo/design-system/expo/loadFieldSoloFonts';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useAuth } from '../context/AuthContext';
+import { useInvoicingFlag } from '../lib/featureFlags';
 import { Alert, Animated, Modal, Platform, StyleSheet, useWindowDimensions } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -91,6 +93,9 @@ export function LiveSessionOverlay({
   phase3Capture = false,
 }: LiveSessionOverlayProps) {
   const insets = useSafeAreaInsets();
+  const { session } = useAuth();
+  const { enabled: invoicingEnabled, ready: invoicingReady } = useInvoicingFlag(session?.user.id);
+  const showInvoicing = invoicingReady && invoicingEnabled;
   const { width: windowWidth } = useWindowDimensions();
   const minimizedBarMetrics = useMemo(() => contentColumnMetrics(windowWidth), [windowWidth]);
   const sheetStackWriters = useBottomSheetStackWriters();
@@ -620,7 +625,7 @@ export function LiveSessionOverlay({
         job_id: liveSession?.jobId ?? null,
         ...errorProperties(e),
       });
-      Alert.alert('End failed', formatErrorMessage(e) || 'Could not end session.');
+      Alert.alert('End failed', formatErrorMessage(e) || 'Could not end visit.');
     }
   }, [endLiveSessionNow, formatErrorMessage, liveSession, onSessionEnded]);
 
@@ -678,7 +683,7 @@ export function LiveSessionOverlay({
           job_id: liveSession?.jobId ?? null,
           ...errorProperties(e),
         });
-        Alert.alert('End failed', formatErrorMessage(e) || 'Could not end session.');
+        Alert.alert('End failed', formatErrorMessage(e) || 'Could not end visit.');
       }
     },
     [
@@ -708,7 +713,7 @@ export function LiveSessionOverlay({
         job_id: liveSession?.jobId ?? null,
         ...errorProperties(e),
       });
-      Alert.alert('Delete failed', formatErrorMessage(e) || 'Could not delete live session.');
+      Alert.alert('Delete failed', formatErrorMessage(e) || 'Could not delete live visit.');
     }
   }, [deleteLiveSessionNow, elapsedSeconds, formatErrorMessage, liveSession, onSessionEnded]);
 
@@ -724,12 +729,16 @@ export function LiveSessionOverlay({
         customerId: null,
         serviceAddress: '',
         revenue: '',
+        noLaborServicesConfirmed: false,
       };
     }
+    const moneyCents = showInvoicing
+      ? jobDetail.laborServicesCents ?? null
+      : jobDetail.earnings.revenueCents;
     const revenue =
-      jobDetail.earnings.revenueCents == null
+      moneyCents == null
         ? ''
-        : (jobDetail.earnings.revenueCents / 100).toLocaleString('en-US', {
+        : (moneyCents / 100).toLocaleString('en-US', {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2,
           });
@@ -742,8 +751,9 @@ export function LiveSessionOverlay({
       customerId: jobDetail.customerId,
       serviceAddress: jobDetail.serviceAddress,
       revenue,
+      noLaborServicesConfirmed: jobDetail.noLaborServicesConfirmed === true,
     };
-  }, [jobDetail, liveSession]);
+  }, [jobDetail, liveSession, showInvoicing]);
 
   const openEditJob = useCallback(() => {
     if (!liveSession || phase3Capture) return;
@@ -766,7 +776,9 @@ export function LiveSessionOverlay({
         customerEmail: jobDetail.customerEmail ?? '',
         customerId: jobDetail.customerId ?? null,
         serviceAddress: jobDetail.serviceAddress ?? '',
-        revenueCents: jobDetail.earnings.revenueCents ?? null,
+        revenueCents: showInvoicing
+          ? jobDetail.laborServicesCents ?? null
+          : jobDetail.earnings.revenueCents ?? null,
       };
     }
     if (!liveSession) return undefined;
@@ -780,13 +792,14 @@ export function LiveSessionOverlay({
       serviceAddress: '',
       revenueCents: null as number | null,
     };
-  }, [jobDetail, liveSession, phase3Capture]);
+  }, [jobDetail, liveSession, phase3Capture, showInvoicing]);
 
   const onPhase3JobIdentityChange = useCallback(
     async (patch: {
       shortDescription?: string;
       longDescription?: string;
       revenueCents?: number | null;
+      laborServicesCents?: number | null;
     }) => {
       if (!liveSession || !phase3Capture) return;
       const base = phase3JobIdentity ?? {
@@ -807,6 +820,9 @@ export function LiveSessionOverlay({
           shortDescription: title,
           longDescription: next.longDescription,
           revenueCents: next.revenueCents,
+          ...(patch.laborServicesCents !== undefined
+            ? { laborServicesCents: patch.laborServicesCents }
+            : {}),
         });
         if (patch.shortDescription !== undefined) {
           updateLiveSessionJobShortDescription({
@@ -895,8 +911,15 @@ export function LiveSessionOverlay({
             customerEmail: values.customerEmail.trim() || null,
             customerId: values.customerId ?? null,
             serviceAddress: values.serviceAddress.trim(),
-            revenueCents,
-            noRevenueConfirmed: jobDetail.noRevenueConfirmed,
+            revenueCents: showInvoicing ? jobDetail.earnings.revenueCents : revenueCents,
+            ...(showInvoicing
+              ? {
+                  pricingIntent: 'labor' as const,
+                  laborServicesCents: revenueCents,
+                  noLaborServicesConfirmed: values.noLaborServicesConfirmed === true,
+                }
+              : {}),
+            noRevenueConfirmed: showInvoicing ? false : jobDetail.noRevenueConfirmed,
             noMaterialsConfirmed: jobDetail.noMaterialsConfirmed,
             noOtherCostsConfirmed: jobDetail.noOtherCostsConfirmed,
           },
@@ -935,6 +958,7 @@ export function LiveSessionOverlay({
       jobSaving,
       liveSession,
       refetchJobDetail,
+      showInvoicing,
       updateLiveSessionJobShortDescription,
     ],
   );
@@ -1229,6 +1253,7 @@ export function LiveSessionOverlay({
           startedAt={liveSession.startedAt}
           attachments={liveAttachments}
           phase3Capture
+          invoicingEnabled={showInvoicing}
           jobIdentity={phase3JobIdentity}
           onJobIdentityChange={(patch) => {
             void onPhase3JobIdentityChange(patch);
@@ -1300,6 +1325,7 @@ export function LiveSessionOverlay({
           typography={typography}
           values={editJobValues}
           supabase={supabase}
+          invoicingEnabled={showInvoicing}
           visible={editJobOpen && mode === 'sheet'}
           registerInGlobalStack={false}
           onClose={closeEditJob}

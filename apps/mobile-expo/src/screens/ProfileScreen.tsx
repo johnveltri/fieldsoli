@@ -3,13 +3,10 @@ import {
   fieldsoloExpoFontAssets,
   fieldsoloLoadedFonts,
 } from '@fieldsolo/design-system/expo/loadFieldSoloFonts';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Animated,
-  Modal,
-  Platform,
-  Pressable,
   StyleSheet,
   Text,
   View,
@@ -20,23 +17,16 @@ import {
   updateCurrentUserProfile,
   type UserProfile,
 } from '@fieldsolo/api-client';
-import { color } from '@fieldsolo/design-system/lib/tokens';
 
 import { CanvasTiledBackground } from '../components/CanvasTiledBackground';
-import { shellBottomNavOuterHeight } from '../components/platform/shellDockMetrics';
+import { useInvoicingFlag } from '../lib/featureFlags';
+import { BusinessSettingsScreen, type BusinessSettingsScreenHandle } from './BusinessSettingsScreen';
 import {
   ChangePasswordBottomSheet,
-  DeleteAccountBottomSheet,
   ProfileRowsCard,
-  TradeMultiSelectBottomSheet,
-  UpdateProfileBottomSheet,
   type ProfileRowsCardRow,
   type UpdateProfileValues,
 } from '../components/ds';
-import {
-  ProfileEditPencilIcon,
-  ProfileTrashIcon,
-} from '../components/figma-icons/ProfileScreenIcons';
 import { PlatformHeaderAction } from '../components/platform/PlatformHeaderAction';
 import {
   PlatformHeaderTitle,
@@ -50,13 +40,11 @@ import { PrivacyChoicesScreen } from './PrivacyChoicesScreen';
 import { HelpScreen } from './HelpScreen';
 import { JobExportScreen } from './JobExportScreen';
 import { OverlaySlideHost } from '../navigation/OverlaySlideHost';
-import { TRADE_PRESETS, formatTradesForDisplay } from '../lib/trades';
+import { PersonalDetailsScreen, type PersonalDetailsScreenHandle } from './PersonalDetailsScreen';
 import {
   bg,
-  cardShadowRn,
   createTextStyles,
   fg,
-  radius,
   space,
 } from '../theme/nativeTokens';
 import type { TextStyles } from '../theme/nativeTokens';
@@ -89,9 +77,7 @@ function extractErrorMessage(e: unknown, fallback: string): string {
 type ProfileFlow =
   | 'closed'
   | 'editProfile'
-  | 'editProfileTrades'
-  | 'changePassword'
-  | 'deleteAccount';
+  | 'changePassword';
 
 export type ProfileScreenProps = {
   onBack: () => void;
@@ -105,6 +91,13 @@ export function ProfileScreen({ onBack, onBackToHome = onBack }: ProfileScreenPr
   const scrollY = useMemo(() => new Animated.Value(0), []);
   const [scrollContentHeight, setScrollContentHeight] = useState(0);
   const { signOut, session, updatePassword, deleteAccount } = useAuth();
+  const { enabled: invoicingEnabled, ready: invoicingReady } = useInvoicingFlag(session?.user.id);
+  const showInvoicing = invoicingReady && invoicingEnabled;
+  const [businessScreen, setBusinessScreen] = useState<null | 'business' | 'settings'>(null);
+  const [businessOpen, setBusinessOpen] = useState(false);
+  const [personalMounted, setPersonalMounted] = useState(false);
+  const businessRef = useRef<BusinessSettingsScreenHandle>(null);
+  const personalRef = useRef<PersonalDetailsScreenHandle>(null);
 
   const [fontsLoaded] = useFonts(fieldsoloExpoFontAssets);
 
@@ -115,7 +108,6 @@ export function ProfileScreen({ onBack, onBackToHome = onBack }: ProfileScreenPr
   );
 
   const headerTopPad = Math.max(insets.top - space('Spacing/12'), 0);
-  const bottomNavReservedHeight = shellBottomNavOuterHeight(insets.bottom);
 
   // --- Profile data ---
 
@@ -168,24 +160,15 @@ export function ProfileScreen({ onBack, onBackToHome = onBack }: ProfileScreenPr
    * Mount-gate so the slide-down animation can play while the parent's flow
    * has already returned to `closed`. Mirrors the JobDetail pattern.
    */
-  const [editProfileMounted, setEditProfileMounted] = useState(false);
   const [changePasswordMounted, setChangePasswordMounted] = useState(false);
-  const [deleteAccountMounted, setDeleteAccountMounted] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const profileSheetsMounted =
-    editProfileMounted || changePasswordMounted || deleteAccountMounted;
-  const shellChrome = useShellChromeOptional();
+  const setProfileSheetsMounted = useShellChromeOptional()?.setProfileSheetsMounted;
   useEffect(() => {
-    shellChrome?.setProfileSheetsMounted(profileSheetsMounted);
-    return () => shellChrome?.setProfileSheetsMounted(false);
-  }, [profileSheetsMounted, shellChrome]);
+    setProfileSheetsMounted?.(true);
+    return () => setProfileSheetsMounted?.(false);
+  }, [setProfileSheetsMounted]);
 
-  /**
-   * Parent-owned draft for the Update Profile sheet. The trade picker
-   * temporarily disables the Update Profile sheet underneath it, so the
-   * typed first/last name need to be cached here to survive the round-trip.
-   */
   const [editDraft, setEditDraft] = useState<UpdateProfileValues>({
     firstName: '',
     lastName: '',
@@ -196,14 +179,14 @@ export function ProfileScreen({ onBack, onBackToHome = onBack }: ProfileScreenPr
     // We deliberately don't early-return when `profile` is null. Users who
     // signed up before the profiles trigger existed (or when the local
     // Supabase hasn't run the migration) won't have a row yet — opening
-    // the sheet with empty defaults lets them fill it in, and the save
+    // Personal Details with empty defaults lets them fill it in, and the save
     // path upserts the row.
     setEditDraft({
       firstName: profile?.firstName ?? '',
       lastName: profile?.lastName ?? '',
       trades: profile?.trades ?? [],
     });
-    setEditProfileMounted(true);
+    setPersonalMounted(true);
     setFlow('editProfile');
     analytics.capture('profile_edit_opened', {
       first_name_present: (profile?.firstName ?? '').trim().length > 0,
@@ -215,22 +198,6 @@ export function ProfileScreen({ onBack, onBackToHome = onBack }: ProfileScreenPr
   const closeEditProfile = useCallback(() => {
     setFlow('closed');
   }, []);
-
-  const openTradePicker = useCallback((current: UpdateProfileValues) => {
-    setEditDraft(current);
-    setFlow('editProfileTrades');
-    analytics.capture('profile_trade_picker_opened', {
-      current_trade_count: current.trades.length,
-    });
-  }, []);
-
-  const returnFromTradePicker = useCallback(
-    (nextTrades: string[]) => {
-      setEditDraft((cur) => ({ ...cur, trades: nextTrades }));
-      setFlow('editProfile');
-    },
-    [],
-  );
 
   const onSaveProfile = useCallback(
     async (values: UpdateProfileValues) => {
@@ -283,7 +250,7 @@ export function ProfileScreen({ onBack, onBackToHome = onBack }: ProfileScreenPr
           trade_count: values.trades.length,
           ...errorProperties(e),
         });
-        Alert.alert('Save failed', extractErrorMessage(e, 'Could not save profile.'));
+        Alert.alert('Save failed', extractErrorMessage(e, 'Could not save personal details.'));
       } finally {
         setSaving(false);
       }
@@ -324,15 +291,7 @@ export function ProfileScreen({ onBack, onBackToHome = onBack }: ProfileScreenPr
     [saving, updatePassword],
   );
 
-  const openDeleteAccount = useCallback(() => {
-    analytics.capture('account_delete_requested', { source: 'profile' });
-    setDeleteAccountMounted(true);
-    setFlow('deleteAccount');
-  }, []);
-  const closeDeleteAccount = useCallback(() => {
-    setFlow('closed');
-  }, []);
-  const onDeleteAccountSheetSubmit = useCallback(() => {
+  const onDeleteAccountSubmit = useCallback(() => {
     Alert.alert(
       'Delete account?',
       'This permanently deletes your account and all associated data. This cannot be undone.',
@@ -356,30 +315,6 @@ export function ProfileScreen({ onBack, onBackToHome = onBack }: ProfileScreenPr
   }, [deleteAccount]);
 
   // --- Row construction ---
-
-  const personalInfoRows: ProfileRowsCardRow[] = useMemo(() => {
-    const fullName = [profile?.firstName, profile?.lastName]
-      .map((s) => (s ?? '').trim())
-      .filter((s) => s.length > 0)
-      .join(' ');
-    return [
-      {
-        kind: 'field',
-        label: 'Name',
-        value: fullName.length > 0 ? fullName : '—',
-      },
-      {
-        kind: 'field',
-        label: 'Email',
-        value: session?.user.email ?? '—',
-      },
-      {
-        kind: 'field',
-        label: 'Trade',
-        value: formatTradesForDisplay(profile?.trades ?? []),
-      },
-    ];
-  }, [profile, session?.user.email]);
 
   const openPrivacyChoices = useCallback(() => {
     setHelpOpen(false);
@@ -411,100 +346,15 @@ export function ProfileScreen({ onBack, onBackToHome = onBack }: ProfileScreenPr
       });
   }, [session?.user.id]);
 
-  const accountRows: ProfileRowsCardRow[] = useMemo(
-    () => [
-      { kind: 'link', label: 'Help', onPress: openHelp },
-      { kind: 'link', label: 'Privacy', onPress: openPrivacyChoices },
-      { kind: 'link', label: 'Change password', onPress: openChangePassword },
-      {
-        kind: 'link',
-        label: 'Log out',
-        onPress: () => void signOut(),
-        hideChevron: true,
-      },
-    ],
-    [openChangePassword, openHelp, openPrivacyChoices, signOut],
-  );
-
-  const deleteRows: ProfileRowsCardRow[] = useMemo(
-    () => [
-      {
-        kind: 'linkWithIcon',
-        label: 'Delete account',
-        icon: <ProfileTrashIcon color={color('Semantic/Status/Error/Text')} />,
-        tone: 'danger',
-        onPress: openDeleteAccount,
-      },
-    ],
-    [openDeleteAccount],
-  );
-
-  const profileSheetLayer = (
-    <>
-      {editProfileMounted ? (
-        <>
-          <UpdateProfileBottomSheet
-            typography={typography}
-            // Keep the parent sheet open underneath the trade picker. Closing
-            // one animated overlay while simultaneously reopening its sibling
-            // is unreliable with Android's elevation-based compositing and can
-            // leave the picker's footer intercepting or swallowing DONE.
-            visible={flow === 'editProfile' || flow === 'editProfileTrades'}
-            email={session?.user.email ?? null}
-            values={editDraft}
-            saving={saving}
-            interactionEnabled={flow === 'editProfile'}
-            onClose={closeEditProfile}
-            onClosed={() => {
-              if (flow === 'closed') setEditProfileMounted(false);
-            }}
-            onBack={closeEditProfile}
-            onSave={onSaveProfile}
-            onTradesPress={openTradePicker}
-          />
-          <TradeMultiSelectBottomSheet
-            typography={typography}
-            visible={flow === 'editProfileTrades'}
-            presets={TRADE_PRESETS}
-            selected={editDraft.trades}
-            onClose={closeEditProfile}
-            onClosed={() => {
-              if (flow === 'closed') setEditProfileMounted(false);
-            }}
-            onBack={() => returnFromTradePicker(editDraft.trades)}
-            onSubmit={returnFromTradePicker}
-          />
-        </>
-      ) : null}
-
-      {changePasswordMounted ? (
-        <ChangePasswordBottomSheet
-          typography={typography}
-          visible={flow === 'changePassword'}
-          saving={saving}
-          onClose={closeChangePassword}
-          onClosed={() => {
-            if (flow === 'closed') setChangePasswordMounted(false);
-          }}
-          onBack={closeChangePassword}
-          onSubmit={onSubmitNewPassword}
-        />
-      ) : null}
-
-      {deleteAccountMounted ? (
-        <DeleteAccountBottomSheet
-          typography={typography}
-          visible={flow === 'deleteAccount'}
-          onClose={closeDeleteAccount}
-          onClosed={() => {
-            if (flow === 'closed') setDeleteAccountMounted(false);
-          }}
-          onBack={closeDeleteAccount}
-          onSubmit={onDeleteAccountSheetSubmit}
-        />
-      ) : null}
-    </>
-  );
+  const accountRows: ProfileRowsCardRow[] = [
+    { kind: 'link', label: 'Personal Details', onPress: openEditProfile },
+    { kind: 'link', label: 'Change Password', onPress: openChangePassword },
+  ];
+  const helpRows: ProfileRowsCardRow[] = [
+    { kind: 'link', label: 'Help & Support', onPress: openHelp },
+    { kind: 'link', label: 'Privacy Choices', onPress: openPrivacyChoices },
+    { kind: 'link', label: 'Send Feedback', onPress: sendFeedback, hideChevron: true },
+  ];
 
   if (!fontsLoaded) {
     return (
@@ -514,15 +364,20 @@ export function ProfileScreen({ onBack, onBackToHome = onBack }: ProfileScreenPr
     );
   }
 
+  const secondaryMounted = personalMounted || businessScreen !== null
+    || helpMounted || privacyMounted || jobExportMounted || changePasswordMounted;
+
   return (
     <View style={styles.root}>
       <CanvasTiledBackground scrollY={scrollY} contentHeight={scrollContentHeight} />
       <Animated.ScrollView
+        accessibilityElementsHidden={secondaryMounted}
+        importantForAccessibility={secondaryMounted ? 'no-hide-descendants' : 'auto'}
         style={[styles.scroll, { paddingTop: headerTopPad }]}
         contentContainerStyle={[
           styles.scrollContent,
           {
-            paddingBottom: bottomNavReservedHeight + space('Spacing/20'),
+            paddingBottom: insets.bottom + space('Spacing/32'),
             flexGrow: 1,
           },
         ]}
@@ -543,68 +398,90 @@ export function ProfileScreen({ onBack, onBackToHome = onBack }: ProfileScreenPr
                 typography={typography.displayH1}
                 style={styles.profileTitle}
               >
-                PROFILE
+                ACCOUNT
               </PlatformHeaderTitle>
             </View>
           </View>
 
           <View style={styles.bodyWrap}>
-            <ProfileSectionHeader
-              typography={typography}
-              title="Personal Info"
-              actionLabel="EDIT"
-              actionIcon={
-                <ProfileEditPencilIcon color={bg.canvasWarm} />
-              }
-              onActionPress={openEditProfile}
-            />
-            <ProfileRowsCard typography={typography} rows={personalInfoRows} />
-
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Send feedback"
-              onPress={sendFeedback}
-              style={({ pressed }) => [styles.feedbackButton, pressed && styles.pressed]}
-            >
-              <Text style={[typography.bodyBold, styles.feedbackButtonLabel]}>Send feedback</Text>
-            </Pressable>
-
-            <ProfileSectionHeader typography={typography} title="Your data" />
+            <ProfileSectionHeader typography={typography} title="Business" />
             <ProfileRowsCard
               typography={typography}
-              rows={[{ kind: 'link', label: 'Export Job Summary', onPress: openJobExport }]}
+              rows={[
+                ...(showInvoicing ? [
+                  { kind: 'link' as const, label: 'Business Details', onPress: () => { setBusinessScreen('business'); setBusinessOpen(true); } },
+                  { kind: 'link' as const, label: 'Estimates & Invoices', onPress: () => { setBusinessScreen('settings'); setBusinessOpen(true); } },
+                ] : []),
+                { kind: 'link', label: 'Export Job Summary', onPress: openJobExport },
+              ]}
             />
-
             <ProfileSectionHeader typography={typography} title="Account" />
             <ProfileRowsCard typography={typography} rows={accountRows} />
+            <ProfileSectionHeader typography={typography} title="Help & Privacy" />
+            <ProfileRowsCard typography={typography} rows={helpRows} />
+            <View style={styles.footerSpacer} />
+            <ProfileRowsCard
+              typography={typography}
+              rows={[{ kind: 'link', label: 'Log Out', hideChevron: true, onPress: () => void signOut() }]}
+            />
 
-            <View style={styles.deleteSpacer} />
-            <ProfileRowsCard typography={typography} rows={deleteRows} plain framed={false} />
           </View>
         </View>
       </Animated.ScrollView>
 
-      {Platform.OS === 'android' ? (
-        profileSheetsMounted ? (
-          <Modal
-            visible
-            transparent
-            animationType="none"
-            statusBarTranslucent
-            navigationBarTranslucent
-            onRequestClose={() => {
-              if (flow === 'changePassword') closeChangePassword();
-              else if (flow === 'deleteAccount') closeDeleteAccount();
-              else closeEditProfile();
-            }}
-          >
-            <View style={styles.profileSheetModalHost}>{profileSheetLayer}</View>
-          </Modal>
-        ) : null
-      ) : (
-        profileSheetLayer
-      )}
+      {personalMounted ? (
+        <OverlaySlideHost
+          visible={flow === 'editProfile'}
+          axis="horizontal"
+          enableSwipeDismiss={false}
+          onRequestClose={() => personalRef.current?.requestBack()}
+          onExited={() => setPersonalMounted(false)}
+        >
+          <PersonalDetailsScreen
+            ref={personalRef}
+            typography={typography}
+            values={editDraft}
+            email={session?.user.email ?? null}
+            saving={saving}
+            onBack={closeEditProfile}
+            onSave={onSaveProfile}
+          />
+        </OverlaySlideHost>
+      ) : null}
+      {businessScreen ? (
+        <OverlaySlideHost
+          visible={businessOpen}
+          axis="horizontal"
+          enableSwipeDismiss={false}
+          onRequestClose={() => businessRef.current?.requestBack()}
+          onExited={() => setBusinessScreen(null)}
+        >
+          <BusinessSettingsScreen
+            ref={businessRef}
+            typography={typography}
+            mode={businessScreen}
+            onBack={() => setBusinessOpen(false)}
+          />
+        </OverlaySlideHost>
+      ) : null}
 
+      {changePasswordMounted ? (
+        <OverlaySlideHost
+          visible={flow === 'changePassword'}
+          axis="horizontal"
+          onRequestClose={closeChangePassword}
+          onExited={() => setChangePasswordMounted(false)}
+        >
+          <ChangePasswordBottomSheet
+            presentation="page"
+            typography={typography}
+            visible={flow === 'changePassword'}
+            saving={saving}
+            onBack={closeChangePassword}
+            onSubmit={onSubmitNewPassword}
+          />
+        </OverlaySlideHost>
+      ) : null}
       {helpMounted ? (
         <OverlaySlideHost
           visible={helpOpen}
@@ -626,6 +503,7 @@ export function ProfileScreen({ onBack, onBackToHome = onBack }: ProfileScreenPr
           <PrivacyChoicesScreen
             userId={session.user.id}
             onBack={() => setPrivacyChoicesOpen(false)}
+            onDeleteAccount={onDeleteAccountSubmit}
           />
         </OverlaySlideHost>
       ) : null}
@@ -644,52 +522,16 @@ export function ProfileScreen({ onBack, onBackToHome = onBack }: ProfileScreenPr
   );
 }
 
-/** Section header — title + optional pill action (Figma `1921:4617`). */
-function ProfileSectionHeader({
-  typography,
-  title,
-  actionLabel,
-  actionIcon,
-  onActionPress,
-}: {
-  typography: TextStyles;
-  title: string;
-  actionLabel?: string;
-  actionIcon?: React.ReactNode;
-  onActionPress?: () => void;
-}) {
+function ProfileSectionHeader({ typography, title }: { typography: TextStyles; title: string }) {
   return (
     <View style={styles.sectionHeader}>
-      <Text
-        style={[
-          typography.titleH3,
-          styles.sectionTitle,
-          Platform.OS === 'android' ? styles.sectionTitleAndroid : null,
-        ]}
-      >
-        {title}
-      </Text>
-      {actionLabel ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={actionLabel}
-          onPress={onActionPress}
-          disabled={!onActionPress}
-          style={({ pressed }) => [styles.actionButton, pressed && styles.pressed]}
-        >
-          {actionIcon}
-          <Text style={[typography.pillCompact, styles.actionButtonLabel]}>
-            {actionLabel}
-          </Text>
-        </Pressable>
-      ) : null}
+      <Text style={[typography.titleH3, styles.sectionTitle]}>{title}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, alignItems: 'center', backgroundColor: bg.canvasWarm },
-  profileSheetModalHost: { flex: 1, backgroundColor: 'transparent' },
   scroll: { flex: 1, width: '100%', backgroundColor: 'transparent', zIndex: 1 },
   scrollContent: {
     alignItems: 'stretch',
@@ -714,18 +556,6 @@ const styles = StyleSheet.create({
     paddingTop: space('Spacing/8'),
     gap: space('Spacing/12'),
   },
-  feedbackButton: {
-    alignItems: 'center',
-    backgroundColor: color('Brand/Primary'),
-    borderRadius: radius('Radius/12'),
-    justifyContent: 'center',
-    minHeight: 52,
-    paddingHorizontal: space('Spacing/20'),
-    width: '100%',
-  },
-  feedbackButtonLabel: {
-    color: bg.canvasWarm,
-  },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -738,32 +568,7 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
   },
-  sectionTitleAndroid: {
-    includeFontPadding: false,
-    textAlignVertical: 'center',
-    lineHeight: 20,
-    marginTop: 0,
-    marginBottom: 0,
-    paddingTop: 0,
-    paddingBottom: 0,
-  },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: space('Spacing/8'),
-    minHeight: 44,
-    minWidth: 44,
-    paddingHorizontal: space('Spacing/12'),
-    paddingVertical: space('Spacing/8'),
-    borderRadius: radius('Radius/12'),
-    backgroundColor: fg.primary,
-    ...cardShadowRn,
-  },
-  actionButtonLabel: {
-    color: bg.canvasWarm,
-  },
-  deleteSpacer: {
+  footerSpacer: {
     height: space('Spacing/4'),
   },
   pressed: { opacity: 0.75 },

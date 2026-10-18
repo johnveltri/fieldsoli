@@ -35,7 +35,7 @@ const sessions = [
 ];
 
 describe('ChooseSessionBottomSheet', () => {
-  it('hides attach-to-different header when only the current session exists', () => {
+  it('hides attach-to-different header when only the current visit exists', () => {
     render(
       <ChooseSessionBottomSheet
         typography={typography}
@@ -49,11 +49,11 @@ describe('ChooseSessionBottomSheet', () => {
       />,
     );
 
-    expect(screen.queryByText('ATTACH TO DIFFERENT SESSION')).toBeNull();
-    expect(screen.getByText('Remove From Session')).toBeTruthy();
+    expect(screen.queryByText('ATTACH TO DIFFERENT VISIT')).toBeNull();
+    expect(screen.getByText('Remove From Visit')).toBeTruthy();
   });
 
-  it('shows attach-to-different options when another session is available', () => {
+  it('shows attach-to-different options when another visit is available', () => {
     render(
       <ChooseSessionBottomSheet
         typography={typography}
@@ -67,7 +67,7 @@ describe('ChooseSessionBottomSheet', () => {
       />,
     );
 
-    expect(screen.getByText('ATTACH TO DIFFERENT SESSION')).toBeTruthy();
+    expect(screen.getByText('ATTACH TO DIFFERENT VISIT')).toBeTruthy();
     expect(screen.getByText('Mar 2, 2026')).toBeTruthy();
   });
 });

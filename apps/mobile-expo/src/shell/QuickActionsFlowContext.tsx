@@ -221,7 +221,7 @@ export function QuickActionsFlowProvider({
           recovery_result: 'refresh_requested',
           ...errorProperties(error),
         });
-        setActionError(error instanceof Error ? error.message : 'Could not start session.');
+        setActionError(error instanceof Error ? error.message : 'Could not start visit.');
       } finally {
         setStarting(false);
       }
@@ -302,7 +302,7 @@ export function QuickActionsFlowProvider({
         recovery_result: createdJobId ? 'placeholder_job_deleted' : 'no_job_created',
         ...errorProperties(error),
       });
-      setActionError(error instanceof Error ? error.message : 'Could not start session.');
+      setActionError(error instanceof Error ? error.message : 'Could not start visit.');
     } finally {
       setStarting(false);
     }
@@ -400,7 +400,7 @@ export function QuickActionsFlowProvider({
       });
       Alert.alert(
         'Start failed',
-        err instanceof Error ? err.message : 'Could not start session.',
+        err instanceof Error ? err.message : 'Could not start visit.',
       );
     } finally {
       startingRef.current = false;

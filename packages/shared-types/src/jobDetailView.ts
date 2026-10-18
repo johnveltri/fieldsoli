@@ -107,6 +107,10 @@ export type JobDetailMaterialLine = {
   quantityLabel: string;
   /** Precomputed USD display label for `total_cost_cents`. */
   priceLabel: string;
+  /** Markup captured when the material was added, in basis points. */
+  capturedMarkupBps?: number | null;
+  /** Owner override of the captured markup, in basis points. Null uses the captured rate. */
+  markupOverrideBps?: number | null;
 };
 
 export type JobDetailMaterialBucket = {
@@ -143,6 +147,8 @@ export type JobDetailOtherCostLine = {
   description: string;
   costCents: number;
   priceLabel: string;
+  /** When true, this Other Cost is included on estimates and invoices. */
+  invoiceCustomer?: boolean;
 };
 
 export type JobDetailOtherCostBucket = {
@@ -164,9 +170,21 @@ export type JobDetailViewModel = {
   /** Linked reusable customer identity when present. */
   customerId: string | null;
   serviceAddress: string;
+  revenueInvoice?: {
+    id: string;
+    documentNumber: number;
+    documentType: 'invoice';
+  } | null;
   jobType: string;
   lastWorkedLabel: string;
   workStatus: JobDetailWorkStatus;
+  /**
+   * Customer labor charge. Null means Labor is unknown. Omitted on callers
+   * that have not loaded component pricing.
+   */
+  laborServicesCents?: number | null;
+  pricingMode?: 'legacy' | 'component';
+  pricingNeedsReview?: boolean;
   earnings: {
     /** Null means revenue has not been captured; zero is an explicit value. */
     revenueCents: number | null;
@@ -195,6 +213,8 @@ export type JobDetailViewModel = {
    * completeness leg until positive revenue is entered.
    */
   noRevenueConfirmed: boolean;
+  /** Explicit confirmation of zero Labor & Services; billable charges may remain. */
+  noLaborServicesConfirmed?: boolean;
   /**
    * User confirmed there were no materials for this job; satisfies the materials
    * leg of financial completeness until a material row is added.

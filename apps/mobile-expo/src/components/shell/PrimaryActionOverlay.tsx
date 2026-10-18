@@ -13,6 +13,7 @@ import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useHasLiveSession } from '../../context/LiveSessionContext';
+import { useShellOverlays } from '../../shell/ShellOverlayContext';
 import { useShellChromeOptional } from '../../shell/ShellChromeContext';
 import { useQuickActionsFlow } from '../../shell/QuickActionsFlowContext';
 import { contentColumnMetrics } from '../../theme/nativeTokens';
@@ -50,7 +51,8 @@ export function PrimaryActionOverlay({ blurTargetRef }: PrimaryActionOverlayProp
   const { creatingJob, handlePrimaryAction } = useQuickActionsFlow();
   const hasLiveSession = useHasLiveSession();
   const hideBottomChrome = useShellChromeOptional()?.hideBottomChrome ?? false;
-  const hidePrimaryAction = hasLiveSession || hideBottomChrome;
+  const profileOpen = useShellOverlays()?.profileOpen ?? false;
+  const hidePrimaryAction = hasLiveSession || hideBottomChrome || profileOpen;
 
   const [menuOpen, setMenuOpen] = useState(false);
   const closeMenu = useCallback(() => setMenuOpen(false), []);

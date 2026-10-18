@@ -113,6 +113,11 @@ Deno.serve(async (req) => {
     }
   }
 
+  const { error: documentLinkErr } = await userClient.rpc('revoke_owner_document_links');
+  if (documentLinkErr) {
+    return jsonResponse({ error: 'export_cleanup_failed' }, 500);
+  }
+
   const { error: deleteErr } = await adminClient.auth.admin.deleteUser(userId);
   if (deleteErr) {
     return jsonResponse(

@@ -326,6 +326,60 @@ describe('CaptureComposerSheet', () => {
       });
     });
 
+    it.each([
+      ['Total cost', '-5'],
+      ['Total cost', '\u22125'],
+      ['Unit price', '-5'],
+      ['Quantity', '-2'],
+    ])('blocks signed %s input %s until corrected', async (label, invalid) => {
+      const onSaveMaterial = jest.fn();
+      const screen = render(
+        <CaptureComposerSheet
+          typography={typography}
+          visible
+          kind="material"
+          onClose={() => undefined}
+          onSaveMaterial={onSaveMaterial}
+        />,
+      );
+      fireEvent.changeText(screen.getByLabelText('Material'), 'Replacement washer');
+      fireEvent.changeText(screen.getByLabelText('Total cost'), '8');
+      fireEvent.changeText(screen.getByLabelText(label), invalid);
+      fireEvent(screen.getByLabelText(label), 'blur');
+      expect(screen.getByLabelText(label).props.value).toBe(invalid);
+      fireEvent.press(screen.getByLabelText('Save material to inbox'));
+      expect(onSaveMaterial).not.toHaveBeenCalled();
+      fireEvent.changeText(screen.getByLabelText(label), '5');
+      fireEvent.press(screen.getByLabelText('Save material to inbox'));
+      await waitFor(() => expect(onSaveMaterial).toHaveBeenCalledTimes(1));
+    });
+
+    it('blocks assigning an edited material with a negative total', () => {
+      const onAddToJobMaterial = jest.fn();
+      const onSaveMaterial = jest.fn();
+      const screen = render(
+        <CaptureComposerSheet
+          typography={typography}
+          visible
+          kind="material-edit"
+          onClose={() => undefined}
+          onSaveMaterial={onSaveMaterial}
+          onAddToJobMaterial={onAddToJobMaterial}
+          initialMaterial={{ description: 'Washer', totalCostCents: 800,
+            unitCostCents: 800, quantity: 1, unit: 'ea',
+            quantityExplicit: false, unitCostExplicit: false }}
+        />,
+      );
+      fireEvent.changeText(screen.getByLabelText('Total cost'), '-5');
+      fireEvent.press(screen.getByLabelText('Save material'));
+      fireEvent.press(screen.getByLabelText('Add to job'));
+      expect(onSaveMaterial).not.toHaveBeenCalled();
+      expect(onAddToJobMaterial).not.toHaveBeenCalled();
+      fireEvent.changeText(screen.getByLabelText('Total cost'), '8');
+      fireEvent.press(screen.getByLabelText('Add to job'));
+      expect(onAddToJobMaterial).toHaveBeenCalledWith(expect.objectContaining({ totalCostCents: 800 }));
+    });
+
     it('uses quantity × unit price when both are filled', async () => {
       const onSaveMaterial = jest.fn();
       const screen = render(

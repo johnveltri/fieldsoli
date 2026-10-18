@@ -7,6 +7,30 @@ function makeClient(rpc: ReturnType<typeof vi.fn>) {
 }
 
 describe('applyJobDetailEdit', () => {
+  it('sends zero-labor confirmation separately from aggregate no-revenue confirmation', async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: { status: 'ok' }, error: null });
+    await applyJobDetailEdit(makeClient(rpc), 'job-1', {
+      job: {
+        shortDescription: 'Materials only', longDescription: '', customerName: 'Customer',
+        customerPhone: null, customerEmail: null, customerId: null, serviceAddress: '',
+        revenueCents: 2000, pricingIntent: 'labor', laborServicesCents: 0,
+        noLaborServicesConfirmed: true, noRevenueConfirmed: false,
+        noMaterialsConfirmed: false, noOtherCostsConfirmed: true,
+      },
+      sessions: { create: [], update: [], deleteIds: [] },
+      notes: { create: [], update: [], deleteIds: [] },
+      materials: { create: [], update: [], deleteIds: [] },
+      otherCosts: { create: [], update: [], deleteIds: [] },
+    });
+    expect(rpc).toHaveBeenCalledWith('apply_job_detail_edit_with_invoice_preferences', {
+      p_job_id: 'job-1',
+      p_payload: expect.objectContaining({ job: expect.objectContaining({
+        pricingIntent: 'labor', laborServicesCents: 0,
+        noLaborServicesConfirmed: true, noRevenueConfirmed: false,
+      }) }),
+    });
+  });
+
   it('maps ok response', async () => {
     const rpc = vi.fn().mockResolvedValue({ data: { status: 'ok' }, error: null });
     await expect(
@@ -28,9 +52,15 @@ describe('applyJobDetailEdit', () => {
         notes: { create: [], update: [], deleteIds: [] },
         materials: { create: [], update: [], deleteIds: [] },
         otherCosts: { create: [], update: [], deleteIds: [] },
+        invoicePreferences: {
+          revenueDocumentId: 'invoice-2',
+          expectedRevenueDocumentId: 'invoice-1',
+          confirmedPaidTotalCents: 12500,
+          controls: [],
+        },
       }),
     ).resolves.toBeUndefined();
-    expect(rpc).toHaveBeenCalledWith('apply_job_detail_edit_atomic', {
+    expect(rpc).toHaveBeenCalledWith('apply_job_detail_edit_with_invoice_preferences', {
       p_job_id: 'job-1',
       p_payload: expect.objectContaining({
         job: expect.objectContaining({
@@ -38,6 +68,12 @@ describe('applyJobDetailEdit', () => {
           noMaterialsConfirmed: true,
           noOtherCostsConfirmed: false,
         }),
+        invoicePreferences: {
+          revenueDocumentId: 'invoice-2',
+          expectedRevenueDocumentId: 'invoice-1',
+          confirmedPaidTotalCents: 12500,
+          controls: [],
+        },
       }),
     });
   });

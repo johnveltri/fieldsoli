@@ -8,6 +8,8 @@ import {
 
 export type JobFinancialCompletenessContext = {
   job: JobDetailViewModel;
+  /** Feature rollout state; false preserves the legacy Revenue gate. */
+  invoicingEnabled?: boolean;
 };
 
 export type FinancialCompletenessGap = 'revenue' | 'session' | 'materials' | 'otherCosts';
@@ -39,17 +41,38 @@ function hasOtherCostsComplete(job: JobDetailViewModel): boolean {
 function hasRevenueComplete(job: {
   revenueCents?: number | null;
   noRevenueConfirmed: boolean;
-}): boolean {
+  laborServicesCents?: number | null;
+  pricingMode?: 'legacy' | 'component';
+  noLaborServicesConfirmed?: boolean;
+  revenueInvoice?: { id: string } | null;
+}, invoicingEnabled = true): boolean {
+  // A selected immutable invoice is the authoritative Revenue source even if
+  // the editable Labor & Services proposal has not been reviewed yet.
+  if (job.revenueInvoice?.id) return true;
+  if (invoicingEnabled && job.pricingMode === 'component') {
+    // Null means Labor is still unknown. Zero requires the distinct
+    // no-Labor confirmation; billable charges may still make Revenue positive.
+    if (job.laborServicesCents == null) return false;
+    if (job.laborServicesCents === 0) {
+      return job.noLaborServicesConfirmed === true ||
+        ((job.revenueCents ?? 0) === 0 && job.noRevenueConfirmed);
+    }
+  }
   return (job.revenueCents ?? 0) > 0 || job.noRevenueConfirmed;
 }
 
 export function isJobFinanciallyComplete(ctx: JobFinancialCompletenessContext): boolean {
   const { job } = ctx;
+  const invoicingEnabled = ctx.invoicingEnabled !== false;
   return (
     hasRevenueComplete({
       revenueCents: job.earnings.revenueCents,
       noRevenueConfirmed: job.noRevenueConfirmed,
-    }) &&
+      laborServicesCents: job.laborServicesCents,
+      pricingMode: job.pricingMode,
+      noLaborServicesConfirmed: job.noLaborServicesConfirmed,
+      revenueInvoice: job.revenueInvoice,
+    }, invoicingEnabled) &&
     hasUsableSession(job) &&
     hasMaterialsComplete(job) &&
     hasOtherCostsComplete(job)
@@ -61,12 +84,17 @@ export function financialCompletenessGaps(
   ctx: JobFinancialCompletenessContext,
 ): FinancialCompletenessGap[] {
   const { job } = ctx;
+  const invoicingEnabled = ctx.invoicingEnabled !== false;
   const gaps: FinancialCompletenessGap[] = [];
   if (
     !hasRevenueComplete({
       revenueCents: job.earnings.revenueCents,
       noRevenueConfirmed: job.noRevenueConfirmed,
-    })
+      laborServicesCents: job.laborServicesCents,
+      pricingMode: job.pricingMode,
+      noLaborServicesConfirmed: job.noLaborServicesConfirmed,
+      revenueInvoice: job.revenueInvoice,
+    }, invoicingEnabled)
   ) {
     gaps.push('revenue');
   }
@@ -82,17 +110,24 @@ export function financialCompletenessGaps(
   return gaps;
 }
 
-export function incompletePillsForJobDetail(job: JobDetailViewModel): string[] {
+export function incompletePillsForJobDetail(
+  job: JobDetailViewModel,
+  invoicingEnabled = true,
+): string[] {
   const pills: string[] = [];
   if (
     !hasRevenueComplete({
       revenueCents: job.earnings.revenueCents,
       noRevenueConfirmed: job.noRevenueConfirmed,
-    })
+      laborServicesCents: job.laborServicesCents,
+      pricingMode: job.pricingMode,
+      noLaborServicesConfirmed: job.noLaborServicesConfirmed,
+      revenueInvoice: job.revenueInvoice,
+    }, invoicingEnabled)
   ) {
     pills.push('revenue');
   }
-  if (!hasUsableSession(job)) pills.push('sessions');
+  if (!hasUsableSession(job)) pills.push('visits');
   if (!hasMaterialsComplete(job)) pills.push('materials');
   if (!hasOtherCostsComplete(job)) pills.push('costs');
   return pills;
@@ -110,7 +145,7 @@ export function incompletePillsForListJob(job: {
 }): string[] {
   const pills: string[] = [];
   if (!hasRevenueComplete(job)) pills.push('revenue');
-  if (!job.hasSessions) pills.push('sessions');
+  if (!job.hasSessions) pills.push('visits');
   if (!job.hasMaterials && !job.noMaterialsConfirmed) pills.push('materials');
   if (!job.hasOtherCosts && !job.noOtherCostsConfirmed) pills.push('costs');
   return pills;

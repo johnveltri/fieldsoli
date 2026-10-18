@@ -6,6 +6,7 @@ module.exports = {
   testMatch: ['<rootDir>/**/*.test.ts', '<rootDir>/**/*.test.tsx'],
   moduleNameMapper: {
     '^@fieldsolo/api-client$': '<rootDir>/../../packages/api-client/src/index.ts',
+    '^@fieldsolo/document-renderer$': '<rootDir>/../../packages/document-renderer/src/index.ts',
     '^@fieldsolo/shared-types$': '<rootDir>/../../packages/shared-types/src/index.ts',
     '^@fieldsolo/design-system/(.*)$': '<rootDir>/../../packages/design-system/$1',
     '^@fieldsolo/design-system$': '<rootDir>/../../packages/design-system/src/index.ts',

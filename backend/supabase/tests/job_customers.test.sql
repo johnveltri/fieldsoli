@@ -2,6 +2,19 @@
 
 begin;
 
+create function pg_temp.create_legacy_customer_test_job(
+  p_user_id uuid, p_short_description text, p_revenue_cents bigint
+)
+returns uuid
+language sql
+security definer
+set search_path = ''
+as $$
+  insert into public.jobs (user_id, short_description, revenue_cents, revenue_invoice_required)
+  values (p_user_id, p_short_description, p_revenue_cents, false)
+  returning id;
+$$;
+
 create or replace function pg_temp.login_as(uid uuid)
 returns void
 language plpgsql
@@ -47,8 +60,8 @@ begin
     (user_a, 'cust-a-' || user_a || '@example.com'),
     (user_b, 'cust-b-' || user_b || '@example.com');
 
-  insert into public.jobs (user_id, short_description, customer_name, service_address, revenue_cents)
-  values (user_a, 'Legacy job', 'Legacy Pat', '9 Old St', 1000)
+  insert into public.jobs (user_id, short_description, customer_name, service_address, revenue_cents, revenue_invoice_required)
+  values (user_a, 'Legacy job', 'Legacy Pat', '9 Old St', 1000, false)
   returning id into job_legacy;
 
   -- TEST-01: legacy rows unchanged by migration semantics
@@ -86,9 +99,7 @@ begin
     raise exception 'TEST-01 failed: legacy edit created customers';
   end if;
 
-  insert into public.jobs (user_id, short_description, revenue_cents)
-  values (user_a, 'Customer job A', 2000)
-  returning id into job_a;
+  select pg_temp.create_legacy_customer_test_job(user_a, 'Customer job A', 2000) into job_a;
 
   -- TEST-03/04: eligible save creates customer and writes snapshot
   result := public.save_job_customer(job_a, jsonb_build_object(
@@ -131,9 +142,7 @@ begin
   end if;
 
   -- TEST-03: ineligible snapshot saves job but stays unlinked
-  insert into public.jobs (user_id, short_description, revenue_cents)
-  values (user_a, 'Ineligible job', 500)
-  returning id into job_b;
+  select pg_temp.create_legacy_customer_test_job(user_a, 'Ineligible job', 500) into job_b;
 
   result := public.save_job_customer(job_b, jsonb_build_object(
     'customerName', 'Name Only',
@@ -149,9 +158,7 @@ begin
   end if;
 
   -- TEST-05: conservative matching links exact identifiers and rejects name-only
-  insert into public.jobs (user_id, short_description, revenue_cents)
-  values (user_a, 'Match job', 500)
-  returning id into job_c;
+  select pg_temp.create_legacy_customer_test_job(user_a, 'Match job', 500) into job_c;
 
   result := public.save_job_customer(job_c, jsonb_build_object(
     'customerName', 'Jordan Lee',
@@ -163,9 +170,7 @@ begin
     raise exception 'TEST-05 failed: exact match did not link existing customer';
   end if;
 
-  insert into public.jobs (user_id, short_description, revenue_cents)
-  values (user_a, 'Name only job', 500)
-  returning id into job_b;
+  select pg_temp.create_legacy_customer_test_job(user_a, 'Name only job', 500) into job_b;
 
   result := public.save_job_customer(job_b, jsonb_build_object(
     'customerName', 'Taylor Smith',
@@ -192,9 +197,7 @@ begin
   -- TEST-06: delete recomputes; restore reactivates
   update public.jobs set deleted_at = now() where id = job_c;
 
-  insert into public.jobs (user_id, short_description, revenue_cents)
-  values (user_a, 'Second linked job', 3000)
-  returning id into job_b;
+  select pg_temp.create_legacy_customer_test_job(user_a, 'Second linked job', 3000) into job_b;
 
   result := public.save_job_customer(job_b, jsonb_build_object(
     'customerId', customer_1::text,
@@ -246,9 +249,7 @@ begin
   end if;
 
   -- TEST-06: reassignment recomputes both the old and new Customer.
-  insert into public.jobs (user_id, short_description, revenue_cents)
-  values (user_a, 'Remaining old-customer job', 3500)
-  returning id into job_d;
+  select pg_temp.create_legacy_customer_test_job(user_a, 'Remaining old-customer job', 3500) into job_d;
   result := public.save_job_customer(job_d, jsonb_build_object(
     'customerId', customer_1::text,
     'customerName', 'Jordan Lee',
@@ -260,9 +261,7 @@ begin
     raise exception 'TEST-06 reassignment setup failed: %', result;
   end if;
 
-  insert into public.jobs (user_id, short_description, revenue_cents)
-  values (user_a, 'Other customer job', 4500)
-  returning id into job_e;
+  select pg_temp.create_legacy_customer_test_job(user_a, 'Other customer job', 4500) into job_e;
   result := public.save_job_customer(job_e, jsonb_build_object(
     'customerName', 'Casey Lane',
     'customerPhone', '(847) 555-0134',
@@ -333,8 +332,8 @@ begin
       select 1 from public.customers
       where id = customer_2
         and deleted_at is null
-        and last_service_address = '32 Cedar Ave'
-    ) then
+    )
+    or (select count(*) from public.jobs where customer_id = customer_2 and deleted_at is null) <> 2 then
     raise exception 'TEST-06 failed: explicit unlink did not preserve remaining Customer links';
   end if;
 

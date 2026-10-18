@@ -31,7 +31,7 @@ describe('PrivacyChoicesScreen', () => {
 
   it('loads consent state and renders the analytics toggle off when withdrawn', async () => {
     const screen = render(
-      <PrivacyChoicesScreen userId="user-1" onBack={jest.fn()} />,
+      <PrivacyChoicesScreen userId="user-1" onBack={jest.fn()} onDeleteAccount={jest.fn()} />,
     );
 
     await waitFor(() => {
@@ -42,7 +42,7 @@ describe('PrivacyChoicesScreen', () => {
 
   it('grants analytics when the toggle is turned on', async () => {
     const screen = render(
-      <PrivacyChoicesScreen userId="user-1" onBack={jest.fn()} />,
+      <PrivacyChoicesScreen userId="user-1" onBack={jest.fn()} onDeleteAccount={jest.fn()} />,
     );
 
     await waitFor(() => {
@@ -59,7 +59,7 @@ describe('PrivacyChoicesScreen', () => {
   it('withdraws analytics when the toggle is turned off', async () => {
     mockResolve.mockResolvedValueOnce('granted');
     const screen = render(
-      <PrivacyChoicesScreen userId="user-1" onBack={jest.fn()} />,
+      <PrivacyChoicesScreen userId="user-1" onBack={jest.fn()} onDeleteAccount={jest.fn()} />,
     );
 
     await waitFor(() => {
@@ -75,14 +75,34 @@ describe('PrivacyChoicesScreen', () => {
 
   it('shows legal document links', async () => {
     const screen = render(
-      <PrivacyChoicesScreen userId="user-1" onBack={jest.fn()} />,
+      <PrivacyChoicesScreen userId="user-1" onBack={jest.fn()} onDeleteAccount={jest.fn()} />,
     );
 
     await waitFor(() => {
       expect(screen.getByText('Privacy Policy')).toBeTruthy();
       expect(screen.getByText('Terms')).toBeTruthy();
     });
-    expect(screen.queryByText('Delete account')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Delete Account' })).toBeTruthy();
+    expect(screen.getByRole('header', { name: 'Analytics' })).toBeTruthy();
+    expect(screen.getByRole('header', { name: 'Legal' })).toBeTruthy();
+  });
+
+  it('returns from Delete Account to Privacy Choices without leaving or changing consent', async () => {
+    mockResolve.mockResolvedValueOnce('granted');
+    const onBack = jest.fn();
+    const onDeleteAccount = jest.fn();
+    const screen = render(<PrivacyChoicesScreen userId="user-1" onBack={onBack} onDeleteAccount={onDeleteAccount} />);
+    await screen.findByRole('switch');
+    fireEvent.press(screen.getByRole('button', { name: 'Delete Account' }));
+    expect(screen.queryByRole('header', { name: 'Privacy Choices' })).toBeNull();
+    expect(screen.getByRole('header', { name: 'Delete Account' })).toBeTruthy();
+    fireEvent.press(screen.getByLabelText('Back'));
+    await waitFor(() => expect(screen.getByRole('header', { name: 'Privacy Choices' })).toBeTruthy());
+    expect(screen.getByRole('switch').props.value).toBe(true);
+    expect(onBack).not.toHaveBeenCalled();
+    expect(onDeleteAccount).not.toHaveBeenCalled();
+    expect(mockGrant).not.toHaveBeenCalled();
+    expect(mockWithdraw).not.toHaveBeenCalled();
   });
 
   it('reverts the toggle when saving fails', async () => {
@@ -91,7 +111,7 @@ describe('PrivacyChoicesScreen', () => {
     jest.spyOn(Alert, 'alert').mockImplementation(() => {});
 
     const screen = render(
-      <PrivacyChoicesScreen userId="user-1" onBack={jest.fn()} />,
+      <PrivacyChoicesScreen userId="user-1" onBack={jest.fn()} onDeleteAccount={jest.fn()} />,
     );
 
     await waitFor(() => {

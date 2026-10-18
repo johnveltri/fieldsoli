@@ -47,22 +47,22 @@ export function NewSessionBottomSheet({
         </Pressable>
 
         <Text {...screenHeaderA11y()} style={[typography.titleH3, styles.title, { color: fg.primary }]}>
-          New Session
+          New Visit
         </Text>
 
         <View style={styles.rows}>
           <RowCardTile
             typography={typography}
             variant="primary"
-            title="Live Session"
+            title="Live Visit"
             subtitle="Start a timer now"
             onPress={onLiveSessionPress}
           />
           <RowCardTile
             typography={typography}
             variant="neutral"
-            title="Log Past Session"
-            subtitle="Log a completed session manually"
+            title="Log Past Visit"
+            subtitle="Log a completed visit manually"
             onPress={onLogPastPress}
           />
         </View>

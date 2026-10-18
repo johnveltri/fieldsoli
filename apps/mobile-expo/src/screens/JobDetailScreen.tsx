@@ -76,6 +76,8 @@ import {
 import { EditIconPerson } from '../components/ds/edit-mode/EditModeIcons';
 import { buildCustomerContactActions } from '@fieldsolo/api-client';
 import { showCustomerContactMenu } from '../lib/customerContactMenu';
+import { formatUsdCombined } from '../lib/formatUsd';
+import { useInvoicingFlag } from '../lib/featureFlags';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { color, colorWithAlpha, radius } from '@fieldsolo/design-system/lib/tokens';
 import {
@@ -143,6 +145,9 @@ import type { TextStyles } from '../theme/nativeTokens';
 import { useContentColumn } from '../theme/useContentColumn';
 import type { EditJobBottomSheetValues } from '../components/ds/EditJobBottomSheet';
 import { useJobDetailFullscreenEditFlag } from '../lib/featureFlags';
+import { shellDockRowHeight } from '../components/platform/shellDockMetrics';
+import { JobDocumentFab } from '../components/invoicing/JobDocumentFab';
+import { InvoicingJobControls, type InvoicingJobControlsHandle } from '../components/invoicing/InvoicingJobControls';
 import { JobDetailEditMode } from './jobDetailEdit/JobDetailEditMode';
 import type {
   JobDetailEditFocusTarget,
@@ -179,12 +184,12 @@ function supabaseApiHostLabel(): string {
   }
 }
 
-function jobFinancialContext(job: JobDetailViewModel) {
-  return { job };
+function jobFinancialContext(job: JobDetailViewModel, invoicingEnabled = true) {
+  return { job, invoicingEnabled };
 }
 
-function jobDetailIsFinanciallyComplete(job: JobDetailViewModel): boolean {
-  return isJobFinanciallyComplete(jobFinancialContext(job));
+function jobDetailIsFinanciallyComplete(job: JobDetailViewModel, invoicingEnabled = true): boolean {
+  return isJobFinanciallyComplete(jobFinancialContext(job, invoicingEnabled));
 }
 
 export type JobDetailCloseOptions = {
@@ -386,17 +391,24 @@ export function JobDetailScreen({
   const [editSheetMounted, setEditSheetMounted] = useState(false);
   const [editSheetVisible, setEditSheetVisible] = useState(false);
   type DetailMode = 'view' | 'edit';
+  const documentControlsRef = useRef<InvoicingJobControlsHandle>(null);
+  const editDocumentControlsRef = useRef<InvoicingJobControlsHandle>(null);
   const [detailMode, setDetailMode] = useState<DetailMode>('view');
+  const [pendingWizardFinalization, setPendingWizardFinalization] = useState<'completed' | 'paid' | null>(null);
   const [editSaving, setEditSaving] = useState(false);
   // State updates are asynchronous; this ref closes the small double-tap /
   // navigation window before the Saving render reaches the edit controls.
   const editSavingRef = useRef(false);
-  const editApi = useJobEditDraft(job);
+  const { enabled: fullscreenEditEnabled, ready: fullscreenEditReady } =
+    useJobDetailFullscreenEditFlag(sessionUserId);
+  const { enabled: invoicingEnabled, ready: invoicingReady } = useInvoicingFlag(sessionUserId);
+  // Fail closed while the remote flag is loading, so legacy Revenue controls
+  // remain available without briefly exposing the rollout UI.
+  const showInvoicing = invoicingReady && invoicingEnabled;
+  const editApi = useJobEditDraft(job, { invoicingEnabled: showInvoicing });
   useEffect(() => {
     jobRef.current = job;
   }, [job]);
-  const { enabled: fullscreenEditEnabled, ready: fullscreenEditReady } =
-    useJobDetailFullscreenEditFlag(sessionUserId);
   const useFullscreenEdit = fullscreenEditReady && fullscreenEditEnabled;
   const { reduceMotion } = usePlatformGlass();
   const [editFocusTarget, setEditFocusTarget] = useState<JobDetailEditFocusTarget | null>(null);
@@ -502,8 +514,8 @@ export function JobDetailScreen({
   }, [setCompleteWizardActive]);
 
   const financialCompletenessCtx = useMemo(
-    () => (job ? jobFinancialContext(job) : null),
-    [job],
+    () => (job ? jobFinancialContext(job, showInvoicing) : null),
+    [job, showInvoicing],
   );
 
   const costTypeOptions = useMemo<DropdownBottomSheetOption[]>(
@@ -595,7 +607,7 @@ export function JobDetailScreen({
             source: entrySource,
             job_id: j.id,
             job_status: j.workStatus,
-            financially_complete: jobDetailIsFinanciallyComplete(j),
+            financially_complete: jobDetailIsFinanciallyComplete(j, showInvoicing),
             has_sessions: j.displaySessions.length > 0,
             has_materials: j.materialBuckets.some((b) => b.items.length > 0),
             has_notes: j.noteBuckets.some((b) => b.notes.length > 0),
@@ -626,7 +638,7 @@ export function JobDetailScreen({
     return () => {
       cancelled = true;
     };
-  }, [entrySource, initialEditOpen, supabaseReady, sessionUserId, loadKey, jobId]);
+  }, [entrySource, initialEditOpen, showInvoicing, supabaseReady, sessionUserId, loadKey, jobId]);
 
   const onClose = useCallback(() => {
     if (closingFromSwipeRef.current) return;
@@ -646,13 +658,13 @@ export function JobDetailScreen({
       analytics.capture('job_edit_opened', {
         source,
         job_id: job.id,
-        existing_completeness: jobDetailIsFinanciallyComplete(job)
+        existing_completeness: jobDetailIsFinanciallyComplete(job, showInvoicing)
           ? 'complete'
           : 'incomplete',
         job_status: job.workStatus,
       });
     },
-    [job],
+    [job, showInvoicing],
   );
 
   const openEditFromView = useCallback(
@@ -662,7 +674,18 @@ export function JobDetailScreen({
       jobSeed?: JobDetailViewModel,
     ) => {
       const seed = jobSeed ?? jobRef.current ?? job;
-      if (!seed || !useFullscreenEdit) return;
+      if (!seed) return;
+      if (!useFullscreenEdit) {
+        // The legacy edit sheet remains the entry point when the redesigned
+        // editor is disabled. In particular, tapping Revenue must still work
+        // when invoicing and fullscreen edit flags are independently enabled.
+        if (focusTarget === 'revenue') {
+          captureJobEditOpened(source);
+          setEditSheetMounted(true);
+          setEditSheetVisible(true);
+        }
+        return;
+      }
       captureJobEditOpened(source);
       editApi.resetFromJob(seed);
       setEditFocusTarget(focusTarget);
@@ -707,9 +730,10 @@ export function JobDetailScreen({
   );
 
   const toEditValues = useCallback((j: JobDetailViewModel): EditJobBottomSheetValues => {
-    const revenue = j.earnings.revenueCents == null
+    const cents = showInvoicing ? j.laborServicesCents ?? null : j.earnings.revenueCents;
+    const revenue = cents == null
       ? ''
-      : (j.earnings.revenueCents / 100).toLocaleString('en-US', {
+      : (cents / 100).toLocaleString('en-US', {
           minimumFractionDigits: 2,
           maximumFractionDigits: 2,
         });
@@ -722,15 +746,18 @@ export function JobDetailScreen({
       customerId: j.customerId,
       serviceAddress: j.serviceAddress,
       revenue,
+      noLaborServicesConfirmed: j.noLaborServicesConfirmed === true,
     };
-  }, []);
+  }, [showInvoicing]);
 
   const onSaveJobSheet = useCallback(
     async (values: EditJobBottomSheetValues) => {
       if (!job) return;
       const trimmedRevenue = values.revenue.trim().replace(/[$,\s]/g, '');
-      const revenueCents =
+      const enteredRevenueCents =
         trimmedRevenue.length === 0 ? null : Math.round(Number(trimmedRevenue) * 100);
+      const revenueCents =
+        showInvoicing && values.noLaborServicesConfirmed ? 0 : enteredRevenueCents;
 
       setJobSaving(true);
       try {
@@ -744,8 +771,15 @@ export function JobDetailScreen({
             customerEmail: values.customerEmail.trim() || null,
             customerId: values.customerId ?? null,
             serviceAddress: values.serviceAddress.trim(),
-            revenueCents,
-            noRevenueConfirmed: job.noRevenueConfirmed,
+            revenueCents: showInvoicing ? job.earnings.revenueCents : revenueCents,
+            ...(showInvoicing
+              ? {
+                  pricingIntent: 'labor' as const,
+                  laborServicesCents: revenueCents,
+                  noLaborServicesConfirmed: values.noLaborServicesConfirmed,
+                }
+              : {}),
+            noRevenueConfirmed: showInvoicing ? false : job.noRevenueConfirmed,
             noMaterialsConfirmed: job.noMaterialsConfirmed,
             noOtherCostsConfirmed: job.noOtherCostsConfirmed,
           },
@@ -765,12 +799,12 @@ export function JobDetailScreen({
         analytics.capture('job_saved', {
           job_id: job.id,
           changed_fields: changedFields(before, values),
-          completeness_before: jobDetailIsFinanciallyComplete(job)
+          completeness_before: jobDetailIsFinanciallyComplete(job, showInvoicing)
             ? 'complete'
             : 'incomplete',
           completeness_after:
             refreshed &&
-            jobDetailIsFinanciallyComplete(refreshed)
+            jobDetailIsFinanciallyComplete(refreshed, showInvoicing)
               ? 'complete'
               : 'incomplete',
           revenue_bucket: moneyBucket(revenueCents),
@@ -795,7 +829,7 @@ export function JobDetailScreen({
         setJobSaving(false);
       }
     },
-    [invalidateJobsList, job, onCloseEditSheet, toEditValues],
+    [invalidateJobsList, job, onCloseEditSheet, showInvoicing, toEditValues],
   );
 
   // --- Session add/edit flow ---
@@ -902,7 +936,7 @@ export function JobDetailScreen({
           ? errorObj.message
           : err instanceof Error
             ? err.message
-            : 'Could not start live session.';
+            : 'Could not start live visit.';
 
       // Stale JWT (typically after a `supabase db reset` wiped auth.users
       // while the device still holds the old token): the LiveSessionContext
@@ -950,8 +984,8 @@ export function JobDetailScreen({
           ...errorProperties(err),
         });
         Alert.alert(
-          'Could not start live session',
-          'A previous in-progress session for this job is still open in the database (likely a stale row). Open it and end it before starting a new one, or contact support.',
+          'Could not start live visit',
+          'A previous in-progress visit for this job is still open in the database (likely a stale row). Open it and end it before starting a new one, or contact support.',
         );
         return;
       }
@@ -960,7 +994,7 @@ export function JobDetailScreen({
         .filter((s): s is string => typeof s === 'string' && s.length > 0)
         .join('\n');
       Alert.alert(
-        'Could not start live session',
+        'Could not start live visit',
         detail.length > 0 ? detail : 'Unknown error.',
       );
       analytics.capture('live_session_start_failed', {
@@ -1015,7 +1049,13 @@ export function JobDetailScreen({
     return refreshed ?? undefined;
   }, [job]);
 
+  const onRevenueInvoiceChanged = useCallback(() => {
+    void refetchJob().catch(() => undefined);
+    invalidateJobsList();
+  }, [invalidateJobsList, refetchJob]);
+
   const financialCompleteSnapshotRef = useRef<boolean | null>(null);
+  const financialCompletenessModeRef = useRef(showInvoicing);
   const demoteStatusInFlightRef = useRef(false);
 
   useEffect(() => {
@@ -1059,8 +1099,8 @@ export function JobDetailScreen({
       return refreshed ?? job;
     } catch (e) {
       Alert.alert(
-        'Could not end session',
-        formatErrorMessage(e) || 'Could not end the live session.',
+        'Could not end visit',
+        formatErrorMessage(e) || 'Could not end the live visit.',
       );
       return undefined;
     }
@@ -1069,7 +1109,7 @@ export function JobDetailScreen({
   const onDeleteSessionFromView = useCallback(
     (sessionId: string) => {
       if (!job) return;
-      Alert.alert('Delete this session?', 'This cannot be undone.', [
+      Alert.alert('Delete this visit?', 'This cannot be undone.', [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Delete',
@@ -1092,7 +1132,7 @@ export function JobDetailScreen({
                   source: 'job_detail_view',
                   ...errorProperties(e),
                 });
-                Alert.alert('Delete failed', formatErrorMessage(e) || 'Could not delete session.');
+                Alert.alert('Delete failed', formatErrorMessage(e) || 'Could not delete visit.');
               }
             })();
           },
@@ -1210,7 +1250,15 @@ export function JobDetailScreen({
   useEffect(() => {
     if (!job || jobLoading || !supabaseReady) return;
 
-    const nowComplete = jobDetailIsFinanciallyComplete(job);
+    const nowComplete = jobDetailIsFinanciallyComplete(job, showInvoicing);
+    if (financialCompletenessModeRef.current !== showInvoicing) {
+      // Resolving or changing the rollout flag changes which completeness
+      // contract applies. Adopt the new baseline without changing job status;
+      // later edits under that same mode still use the normal demotion check.
+      financialCompletenessModeRef.current = showInvoicing;
+      financialCompleteSnapshotRef.current = nowComplete;
+      return;
+    }
     const previousComplete = financialCompleteSnapshotRef.current;
     const shouldDemote = shouldDemoteCompletedOrPaidForIncompleteFinancials({
       previousFinanciallyComplete: previousComplete,
@@ -1241,7 +1289,7 @@ export function JobDetailScreen({
         const refreshed = await fetchJobDetail(supabase, job.id);
         if (refreshed) {
           setJob(refreshed);
-          financialCompleteSnapshotRef.current = jobDetailIsFinanciallyComplete(refreshed);
+          financialCompleteSnapshotRef.current = jobDetailIsFinanciallyComplete(refreshed, showInvoicing);
         }
         analytics.capture('job_status_changed', {
           job_id: job.id,
@@ -1270,6 +1318,7 @@ export function JobDetailScreen({
     invalidateJobsList,
     job,
     jobLoading,
+    showInvoicing,
     statusActionPending,
     supabaseReady,
   ]);
@@ -1346,7 +1395,7 @@ export function JobDetailScreen({
         setStatusActionPending(false);
         return 'stopped';
       }
-      if (!isJobFinanciallyComplete(jobFinancialContext(prepared))) {
+      if (!isJobFinanciallyComplete(jobFinancialContext(prepared, showInvoicing))) {
         setStatusActionPending(false);
         pendingStatusAfterWizardRef.current = next;
         setMinimumInfoGateMounted(true);
@@ -1355,19 +1404,74 @@ export function JobDetailScreen({
       }
       return 'proceed';
     },
-    [endLiveSessionBeforeMarkComplete],
+    [endLiveSessionBeforeMarkComplete, showInvoicing],
   );
+
+  const openFinancialFinalization = useCallback((status: 'completed' | 'paid') => {
+    const handle = detailMode === 'edit'
+      ? editDocumentControlsRef.current
+      : documentControlsRef.current;
+    if (!handle) {
+      setStatusActionPending(false);
+      Alert.alert('Invoice review is unavailable. Try again.');
+      return;
+    }
+    handle.openFinalization(status);
+  }, [detailMode]);
+
+  useEffect(() => {
+    if (!pendingWizardFinalization || detailMode !== 'view') return;
+    // Focused wizard editors omit Documents. Wait for View and its controller
+    // to commit before opening review, rather than using the old Edit render.
+    setPendingWizardFinalization(null);
+    openFinancialFinalization(pendingWizardFinalization);
+  }, [detailMode, openFinancialFinalization, pendingWizardFinalization]);
+
+  const onInvoiceFinalized = useCallback(async (status: 'completed' | 'paid') => {
+    const previousStatus = jobRef.current?.workStatus ?? job?.workStatus;
+    await refetchJob();
+    invalidateJobsList();
+    analytics.capture('job_status_changed', {
+      job_id: job?.id,
+      from_status: previousStatus,
+      to_status: status,
+      source: 'invoice_finalization',
+    });
+    if (previousStatus !== 'completed' && previousStatus !== 'paid') {
+      void maybeShowCompletionFeedbackPrompt();
+    }
+    pendingStatusAfterWizardRef.current = 'completed';
+    setStatusActionPending(false);
+    setCompleteWizardActive(false);
+    setMaterialWizardMode(false);
+    setMaterialWizardError(undefined);
+    setOtherCostWizardMode(false);
+    setOtherCostWizardError(undefined);
+    setEditJobRevenueError(undefined);
+    setSessionWizardBanner(undefined);
+  }, [invalidateJobsList, job?.id, job?.workStatus, maybeShowCompletionFeedbackPrompt, refetchJob]);
+
+  const onFinalizationClosed = useCallback(() => {
+    setStatusActionPending(false);
+    if (completeWizardActiveRef.current) setCompleteWizardActive(false);
+    pendingStatusAfterWizardRef.current = 'completed';
+  }, [setCompleteWizardActive]);
 
   const onPrimaryStatusCta = useCallback(async () => {
     if (!job || statusActionPending) return;
     const next = nextStatusAfterPrimaryAction(job.workStatus);
-    if (isCompletedOrPaidWorkStatus(next)) {
+    const markUnpaid = job.workStatus === 'paid' && next === 'completed';
+    if (isCompletedOrPaidWorkStatus(next) && !markUnpaid) {
       const prepared = await prepareCompletenessGatedStatus(next);
       if (prepared === 'stopped') return;
     } else {
       setStatusActionPending(true);
     }
     const writeStatus = resolveStatusWriteTarget(next, job.noRevenueConfirmed, job.workStatus);
+    if (showInvoicing && isCompletedOrPaidWorkStatus(writeStatus) && !markUnpaid) {
+      openFinancialFinalization(writeStatus);
+      return;
+    }
     try {
       await updateJobStatusById(supabase, job.id, writeStatus);
       await refetchJob();
@@ -1403,8 +1507,10 @@ export function JobDetailScreen({
     formatErrorMessage,
     job,
     maybeShowCompletionFeedbackPrompt,
+    openFinancialFinalization,
     prepareCompletenessGatedStatus,
     refetchJob,
+    showInvoicing,
     statusActionPending,
   ]);
 
@@ -1413,7 +1519,8 @@ export function JobDetailScreen({
       if (!job || statusActionPending) return;
       if (!isJobDetailWorkStatus(value)) return;
       const next = value;
-      if (isCompletedOrPaidWorkStatus(next)) {
+      const markUnpaid = job.workStatus === 'paid' && next === 'completed';
+      if (isCompletedOrPaidWorkStatus(next) && !markUnpaid) {
         const prepared = await prepareCompletenessGatedStatus(next);
         if (prepared === 'stopped') {
           closeStatusSheet();
@@ -1422,22 +1529,22 @@ export function JobDetailScreen({
       } else {
         setStatusActionPending(true);
       }
+      const writeStatus = resolveStatusWriteTarget(next, job.noRevenueConfirmed, job.workStatus);
+      if (showInvoicing && isCompletedOrPaidWorkStatus(writeStatus) && !markUnpaid) {
+        closeStatusSheet();
+        openFinancialFinalization(writeStatus);
+        return;
+      }
       try {
-        await updateJobStatusById(supabase, job.id, next);
+        await updateJobStatusById(supabase, job.id, writeStatus);
         await refetchJob();
         closeStatusSheet();
         analytics.capture('job_status_changed', {
           job_id: job.id,
           from_status: job.workStatus,
-          to_status: next,
+          to_status: writeStatus,
           source: 'status_sheet',
         });
-        if (job.workStatus !== 'completed' && next === 'completed') {
-          void maybeShowCompletionFeedbackPrompt();
-        }
-        if (job.workStatus !== 'completed' && job.workStatus !== 'paid' && next === 'paid') {
-          void maybeShowCompletionFeedbackPrompt();
-        }
       } catch (e) {
         analytics.capture('job_status_change_failed', {
           job_id: job.id,
@@ -1459,8 +1566,10 @@ export function JobDetailScreen({
       formatErrorMessage,
       job,
       maybeShowCompletionFeedbackPrompt,
+      openFinancialFinalization,
       prepareCompletenessGatedStatus,
       refetchJob,
+      showInvoicing,
       statusActionPending,
     ],
   );
@@ -1493,7 +1602,7 @@ export function JobDetailScreen({
           job_id: job.id,
           ...errorProperties(e),
         });
-        Alert.alert('Save failed', formatErrorMessage(e) || 'Could not save session.');
+        Alert.alert('Save failed', formatErrorMessage(e) || 'Could not save visit.');
       } finally {
         setSessionSaving(false);
       }
@@ -1536,7 +1645,7 @@ export function JobDetailScreen({
           job_id: job?.id ?? null,
           ...errorProperties(e),
         });
-        Alert.alert('Save failed', formatErrorMessage(e) || 'Could not save session.');
+        Alert.alert('Save failed', formatErrorMessage(e) || 'Could not save visit.');
       } finally {
         setSessionSaving(false);
       }
@@ -1570,7 +1679,7 @@ export function JobDetailScreen({
         job_id: job?.id ?? null,
         ...errorProperties(e),
       });
-      Alert.alert('Delete failed', formatErrorMessage(e) || 'Could not delete session.');
+      Alert.alert('Delete failed', formatErrorMessage(e) || 'Could not delete visit.');
     } finally {
       setSessionSaving(false);
     }
@@ -2104,54 +2213,58 @@ export function JobDetailScreen({
     supabaseReady,
   ]);
 
-  const performMarkJobCompleted = useCallback(async () => {
-    if (!job) return;
+  const performMarkJobCompleted = useCallback(async (completedJob?: JobDetailViewModel) => {
+    const currentJob = completedJob ?? jobRef.current ?? job;
+    if (!currentJob) return;
     const toStatus = resolveStatusWriteTarget(
       pendingStatusAfterWizardRef.current,
-      job.noRevenueConfirmed,
-      job.workStatus,
+      currentJob.noRevenueConfirmed,
+      currentJob.workStatus,
     );
+    if (!isCompletedOrPaidWorkStatus(toStatus)) return;
     setStatusActionPending(true);
+    if (showInvoicing) {
+      setDetailMode('view');
+      setEditFocusTarget(null);
+      setPendingWizardFinalization(toStatus);
+      return;
+    }
     try {
-      const fromStatus = job.workStatus;
-      await updateJobStatusById(supabase, job.id, toStatus);
+      await updateJobStatusById(supabase, currentJob.id, toStatus);
       await refetchJob();
+      invalidateJobsList();
       analytics.capture('job_status_changed', {
-        job_id: job.id,
-        from_status: fromStatus,
+        job_id: currentJob.id,
+        from_status: currentJob.workStatus,
         to_status: toStatus,
-        source: 'primary_cta',
+        source: 'mark_complete_wizard',
       });
-      if (
-        fromStatus !== 'completed' &&
-        fromStatus !== 'paid' &&
-        isCompletedOrPaidWorkStatus(toStatus)
-      ) {
+      if (!isCompletedOrPaidWorkStatus(currentJob.workStatus)) {
         void maybeShowCompletionFeedbackPrompt();
       }
-    } catch (e) {
+    } catch (error) {
       analytics.capture('job_status_change_failed', {
-        job_id: job.id,
-        from_status: job.workStatus,
+        job_id: currentJob.id,
+        from_status: currentJob.workStatus,
         attempted_status: toStatus,
         source: 'mark_complete_wizard',
-        ...errorProperties(e),
+        ...errorProperties(error),
       });
       Alert.alert(
-        'Update failed',
-        formatErrorMessage(e) || 'Could not update job status.',
+        'Status update failed',
+        formatErrorMessage(error) || 'Could not update job status.',
       );
     } finally {
-      pendingStatusAfterWizardRef.current = 'completed';
       setStatusActionPending(false);
-      setMaterialWizardMode(false);
-      setMaterialWizardError(undefined);
-      setOtherCostWizardMode(false);
-      setOtherCostWizardError(undefined);
-      setEditJobRevenueError(undefined);
-      setSessionWizardBanner(undefined);
     }
-  }, [formatErrorMessage, job, maybeShowCompletionFeedbackPrompt, refetchJob]);
+  }, [
+    formatErrorMessage,
+    invalidateJobsList,
+    job,
+    maybeShowCompletionFeedbackPrompt,
+    refetchJob,
+    showInvoicing,
+  ]);
 
   const openMarkCompleteGap = useCallback(
     (gap: FinancialCompletenessGap, jobSeed?: JobDetailViewModel) => {
@@ -2179,7 +2292,7 @@ export function JobDetailScreen({
           setEditSheetVisible(true);
           break;
         case 'session':
-          setSessionWizardBanner('Missing Session');
+          setSessionWizardBanner('Missing Visit');
           setSessionSheetMounted(true);
           setSessionFlow('addForm');
           setEditingSessionId(null);
@@ -2215,16 +2328,16 @@ export function JobDetailScreen({
   const advanceMarkCompleteWizard = useCallback(
     (refreshedJob: JobDetailViewModel) => {
       if (!completeWizardActiveRef.current) return;
-      const ctx = jobFinancialContext(refreshedJob);
+      const ctx = jobFinancialContext(refreshedJob, showInvoicing);
       const gaps = financialCompletenessGaps(ctx);
       if (gaps.length === 0) {
         setCompleteWizardActive(false);
-        void performMarkJobCompleted();
+        void performMarkJobCompleted(refreshedJob);
         return;
       }
       openMarkCompleteGap(gaps[0], refreshedJob);
     },
-    [openMarkCompleteGap, performMarkJobCompleted, setCompleteWizardActive],
+    [openMarkCompleteGap, performMarkJobCompleted, setCompleteWizardActive, showInvoicing],
   );
 
   useEffect(() => {
@@ -2635,6 +2748,7 @@ export function JobDetailScreen({
 
   const leaveEditMode = useCallback(() => {
     Keyboard.dismiss();
+    editDocumentControlsRef.current?.discardPendingControls();
     setDetailMode('view');
     setEditFocusTarget(null);
   }, []);
@@ -2677,10 +2791,63 @@ export function JobDetailScreen({
     return () => onAndroidHardwareBackHandlerChange(null);
   }, [detailMode, editApi, onAndroidHardwareBackHandlerChange, onBackFromEdit]);
 
+  const saveEditDraft = useCallback(async (leave: boolean) => {
+    if (!job || editSavingRef.current) return false;
+    const payload = editApi.buildPayload();
+    if (!payload) return false;
+    editSavingRef.current = true;
+    setEditSaving(true);
+    try {
+      await applyJobDetailEdit(supabase, job.id, payload);
+      const refreshed = await fetchJobDetail(supabase, job.id);
+      if (refreshed) {
+        jobRef.current = refreshed;
+        setJob(refreshed);
+        editApi.resetFromJob(refreshed);
+      }
+      if (leave) leaveEditMode();
+      invalidateJobsList();
+      return true;
+    } catch {
+      Alert.alert("Couldn't save this job. Try again.");
+      return false;
+    } finally {
+      editSavingRef.current = false;
+      setEditSaving(false);
+    }
+  }, [editApi, invalidateJobsList, job, leaveEditMode]);
+
   const onDoneFromEdit = useCallback(async () => {
     if (!job || editSavingRef.current) return;
     const payload = editApi.buildPayload();
     if (!payload) return;
+    const invoicePreferences = editDocumentControlsRef.current?.getPendingPreferences();
+    if (invoicePreferences) {
+      const changesPaidAmount = job.workStatus === 'paid' &&
+        invoicePreferences.revenueDocumentId !== invoicePreferences.expectedRevenueDocumentId &&
+        invoicePreferences.currentTotalCents !== invoicePreferences.confirmedPaidTotalCents;
+      if (changesPaidAmount) {
+        const confirmed = await new Promise<boolean>((resolve) => {
+          Alert.alert(
+            'Confirm payment',
+            `Confirm ${formatUsdCombined(invoicePreferences.confirmedPaidTotalCents ?? 0)} paid?`,
+            [
+              { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+              { text: 'Confirm', onPress: () => resolve(true) },
+            ],
+          );
+        });
+        if (!confirmed) return;
+      }
+      payload.invoicePreferences = {
+        revenueDocumentId: invoicePreferences.revenueDocumentId,
+        expectedRevenueDocumentId: invoicePreferences.expectedRevenueDocumentId,
+        controls: invoicePreferences.controls,
+        confirmedPaidTotalCents: changesPaidAmount
+          ? invoicePreferences.confirmedPaidTotalCents
+          : null,
+      };
+    }
     editSavingRef.current = true;
     setEditSaving(true);
     try {
@@ -2699,9 +2866,9 @@ export function JobDetailScreen({
       analytics.capture('job_saved', {
         job_id: job.id,
         changed_fields: ['job_detail_edit'],
-        completeness_before: jobDetailIsFinanciallyComplete(job) ? 'complete' : 'incomplete',
+        completeness_before: jobDetailIsFinanciallyComplete(job, showInvoicing) ? 'complete' : 'incomplete',
         completeness_after:
-          refreshed && jobDetailIsFinanciallyComplete(refreshed) ? 'complete' : 'incomplete',
+          refreshed && jobDetailIsFinanciallyComplete(refreshed, showInvoicing) ? 'complete' : 'incomplete',
         revenue_bucket: moneyBucket(refreshed?.earnings.revenueCents ?? null),
       });
     } catch {
@@ -2714,7 +2881,7 @@ export function JobDetailScreen({
       editSavingRef.current = false;
       setEditSaving(false);
     }
-  }, [advanceMarkCompleteWizard, editApi, invalidateJobsList, job, leaveEditMode]);
+  }, [advanceMarkCompleteWizard, editApi, invalidateJobsList, job, leaveEditMode, showInvoicing]);
 
   const onDeleteJobFromEdit = useCallback(async () => {
     if (!job || editSavingRef.current) return;
@@ -2819,7 +2986,7 @@ export function JobDetailScreen({
   /** Match tab screens: minimal inset under the status bar (modal — no double padding). */
   const headerTopPad = Math.max(insets.top - space('Spacing/8'), 0);
   const simplifiedView = useFullscreenEdit;
-  const incompletePills = incompletePillsForJobDetail(job);
+  const incompletePills = incompletePillsForJobDetail(job, showInvoicing);
   const viewBodyOpacity = simplifiedView
     ? modeProgress.interpolate({ inputRange: [0, 1], outputRange: [1, 0] })
     : 1;
@@ -2961,6 +3128,7 @@ export function JobDetailScreen({
           earnings={job.earnings}
           typography={typography}
           noRevenueConfirmed={job.noRevenueConfirmed}
+          isInvoiced={!!job.revenueInvoice}
           onPress={simplifiedView ? () => openEditFromView('metrics', 'view_row') : undefined}
         />
         <JobDetailCtaRow
@@ -2986,8 +3154,29 @@ export function JobDetailScreen({
         />
       </View>
 
+      {showInvoicing ? (
+        <>
+          <SectionHeaderFigma
+            title="Labor & Services"
+            typography={typography}
+            showAdd={false}
+          />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Edit Labor & Services"
+            onPress={() => openEditFromView('revenue', 'view_row')}
+            style={({ pressed }) => [styles.viewCardBorder, styles.laborServicesRow, pressed && styles.pressed]}
+          >
+            <Text style={[typography.body, { color: fg.primary }]}>Labor</Text>
+            <Text style={[typography.metric, { color: fg.primary, textTransform: 'none', textAlign: 'right' }]}>
+              {job.laborServicesCents == null ? '—' : formatUsdCombined(job.laborServicesCents)}
+            </Text>
+          </Pressable>
+        </>
+      ) : null}
+
       <SectionHeaderFigma
-        title="Sessions"
+        title="Visits"
         typography={typography}
         showAdd={!simplifiedView}
         onAddPress={openSessionChooser}
@@ -3005,7 +3194,7 @@ export function JobDetailScreen({
       <View style={styles.sessionList}>
         {visibleSessions.length === 0 ? (
           <SectionEmptyStateCard
-            message="No sessions recorded"
+            message="No visits recorded"
             typography={typography}
             onPress={
               simplifiedView
@@ -3169,6 +3358,26 @@ export function JobDetailScreen({
           showNoteIcon={false}
         />
       )}
+      {showInvoicing ? (
+        <InvoicingJobControls
+          ref={documentControlsRef}
+          client={supabase}
+          jobId={job.id}
+          ownerId={sessionUserId ?? ''}
+          workStatus={job.workStatus}
+          typography={typography}
+          mode="view"
+          active={detailMode === 'view'}
+          onEditDetails={onEdit}
+          onManageDocs={() => {
+            if (useFullscreenEdit) openEditFromView('docs', 'view_row');
+            else onEdit();
+          }}
+          onFinalized={onInvoiceFinalized}
+          onFinalizationClosed={onFinalizationClosed}
+          onRevenueInvoiceChanged={onRevenueInvoiceChanged}
+        />
+      ) : null}
     </View>
   );
 
@@ -3186,7 +3395,7 @@ export function JobDetailScreen({
       contentContainerStyle={{
         width: '100%',
         paddingTop: viewScrollPaddingTop,
-        paddingBottom: space('Spacing/20') + bottomInset,
+        paddingBottom: space('Spacing/20') + bottomInset + (showInvoicing ? shellDockRowHeight() + space('Spacing/16') : 0),
         alignItems: 'stretch',
       }}
       keyboardShouldPersistTaps="handled"
@@ -3271,6 +3480,26 @@ export function JobDetailScreen({
                 }}
                 editApi={editApi}
                 supabase={supabase}
+                invoicingEnabled={showInvoicing}
+                footer={
+                  showInvoicing ? (
+                    <InvoicingJobControls
+                      ref={editDocumentControlsRef}
+                      client={supabase}
+                      jobId={job.id}
+                      ownerId={sessionUserId ?? ''}
+                      workStatus={job.workStatus}
+                      typography={typography}
+                      mode="edit"
+                      active={detailMode === 'edit'}
+                      onEditDetails={() => undefined}
+                      beforeOpen={() => saveEditDraft(false)}
+                      onFinalized={onInvoiceFinalized}
+                      onFinalizationClosed={onFinalizationClosed}
+                      onRevenueInvoiceChanged={onRevenueInvoiceChanged}
+                    />
+                  ) : null
+                }
               />
             </Animated.View>
           </View>
@@ -3292,10 +3521,34 @@ export function JobDetailScreen({
           }}
           editApi={editApi}
           supabase={supabase}
+          invoicingEnabled={showInvoicing}
+          footer={
+            showInvoicing ? (
+              <InvoicingJobControls
+                ref={editDocumentControlsRef}
+                client={supabase}
+                jobId={job.id}
+                ownerId={sessionUserId ?? ''}
+                workStatus={job.workStatus}
+                typography={typography}
+                mode="edit"
+                active={detailMode === 'edit'}
+                onEditDetails={() => undefined}
+                beforeOpen={() => saveEditDraft(false)}
+                onFinalized={onInvoiceFinalized}
+                onFinalizationClosed={onFinalizationClosed}
+                onRevenueInvoiceChanged={onRevenueInvoiceChanged}
+              />
+            ) : null
+          }
         />
       ) : (
         viewScroll
       )}
+
+      {showInvoicing && detailMode === 'view' ? (
+        <JobDocumentFab bottomInset={bottomInset} onShare={() => documentControlsRef.current?.openPreview()} />
+      ) : null}
 
       {editSheetMounted ? (
         <EditJobBottomSheet
@@ -3306,6 +3559,7 @@ export function JobDetailScreen({
           visible={editSheetVisible}
           onClose={onCloseEditSheet}
           onClosed={() => setEditSheetMounted(false)}
+          invoicingEnabled={showInvoicing}
           onSavePress={onSaveJobSheet}
           onDeletePress={() => {
             void onDeleteJobSheet();
@@ -3507,8 +3761,8 @@ export function JobDetailScreen({
             // Derive mode from editingSessionId (not sessionFlow) so the title /
             // primary label stay stable during the slide-down close animation,
             // where sessionFlow has already flipped to 'closed'.
-            title={editingSessionId ? 'Edit Session' : 'Add Session'}
-            primaryLabel={editingSessionId ? 'SAVE CHANGES' : 'SAVE NEW SESSION'}
+            title={editingSessionId ? 'Edit Visit' : 'Add Visit'}
+            primaryLabel={editingSessionId ? 'SAVE CHANGES' : 'SAVE NEW VISIT'}
             sessionError={sessionWizardBanner}
             values={
               editingSessionId && editingSession
@@ -3945,7 +4199,7 @@ const styles = StyleSheet.create({
   },
   topHeaderRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 0,
     paddingBottom: space('Spacing/4'),
@@ -4083,6 +4337,14 @@ const styles = StyleSheet.create({
   },
 
   sectionEmptyCardPad: {
+    paddingVertical: space('Spacing/20'),
+    paddingHorizontal: space('Spacing/16'),
+    alignItems: 'center',
+  },
+  laborServicesRow: {
+    width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     paddingVertical: space('Spacing/20'),
     paddingHorizontal: space('Spacing/16'),
     alignItems: 'center',

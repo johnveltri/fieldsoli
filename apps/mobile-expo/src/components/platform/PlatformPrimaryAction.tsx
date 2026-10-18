@@ -3,7 +3,7 @@ import {
   fieldsoloExpoFontAssets,
   fieldsoloLoadedFonts,
 } from '@fieldsolo/design-system/expo/loadFieldSoloFonts';
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, type ReactNode } from 'react';
 import {
   Animated,
   Easing,
@@ -67,7 +67,7 @@ const MENU_ITEMS: {
   },
   {
     id: 'live_session',
-    label: 'Live Session',
+    label: 'Live Visit',
     icon: (c) => <QuickCaptureStartSessionIcon color={c} />,
   },
   {
@@ -161,6 +161,9 @@ type PlatformPrimaryActionProps = {
   onSelectMenuItem: (id: PrimaryActionMenuItemId) => void;
   /** Diameter of the circular FAB. */
   size: number;
+  accessibilityLabel?: string;
+  /** Optional icon for a contextual FAB; the Home FAB keeps its default plus. */
+  icon?: (color: string, size: number) => ReactNode;
 };
 
 export function PlatformPrimaryAction({
@@ -170,6 +173,8 @@ export function PlatformPrimaryAction({
   onClose,
   onSelectMenuItem,
   size,
+  accessibilityLabel = 'Primary action',
+  icon,
 }: PlatformPrimaryActionProps) {
   const iconSize = Math.max(22, Math.round(size * 0.4));
   const lastPressAt = useRef(0);
@@ -198,7 +203,7 @@ export function PlatformPrimaryAction({
       ) : null}
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={open ? 'Close primary actions' : 'Primary action'}
+        accessibilityLabel={open ? 'Close primary actions' : accessibilityLabel}
         accessibilityState={{ expanded: open }}
         android_ripple={{
           color: 'rgba(255, 255, 255, 0.22)',
@@ -218,7 +223,11 @@ export function PlatformPrimaryAction({
             {open ? (
               <PrimaryActionCloseIcon color={fabIconColor} size={iconSize} />
             ) : (
-              <JobsFabPlusIcon color={fabIconColor} size={iconSize} />
+              icon ? (
+                icon(fabIconColor, iconSize)
+              ) : (
+                <JobsFabPlusIcon color={fabIconColor} size={iconSize} />
+              )
             )}
           </View>
         </PlatformFloatingSurface>

@@ -59,7 +59,7 @@ export function ChooseSessionBottomSheet({
   onRemove,
   registerInGlobalStack = true,
 }: ChooseSessionBottomSheetProps) {
-  const title = mode === 'edit' ? 'Edit Session' : 'Add to Session';
+  const title = mode === 'edit' ? 'Edit Visit' : 'Add to Visit';
   const list =
     mode === 'edit' && currentSessionId
       ? sessions.filter((s) => s.id !== currentSessionId)
@@ -107,7 +107,7 @@ export function ChooseSessionBottomSheet({
             <RemoveFromSessionRow typography={typography} onPress={onRemove} />
           ) : null}
           {mode === 'edit' && list.length > 0 ? (
-            <DividerWithLabel label="ATTACH TO DIFFERENT SESSION" typography={typography} />
+            <DividerWithLabel label="ATTACH TO DIFFERENT VISIT" typography={typography} />
           ) : null}
           {list.map((s) => (
             <SessionRow
@@ -165,12 +165,12 @@ function RemoveFromSessionRow({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel="Remove from session"
+      accessibilityLabel="Remove from visit"
       onPress={onPress}
       disabled={!onPress}
       style={({ pressed }) => [styles.row, pressed && onPress ? styles.pressed : null]}
     >
-      <Text style={[typography.bodyBold, { color: errorText }]}>Remove From Session</Text>
+      <Text style={[typography.bodyBold, { color: errorText }]}>Remove From Visit</Text>
     </Pressable>
   );
 }

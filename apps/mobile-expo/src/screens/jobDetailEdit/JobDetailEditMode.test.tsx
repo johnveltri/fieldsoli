@@ -1,3 +1,4 @@
+import { Text } from 'react-native';
 import React, { useEffect } from 'react';
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
 import type { JobDetailViewModel } from '@fieldsolo/shared-types';
@@ -42,8 +43,8 @@ const job = {
   noOtherCostsConfirmed: false,
 } as unknown as JobDetailViewModel;
 
-function Harness({ onDirtyBack }: { onDirtyBack: (dirty: boolean) => void }) {
-  const editApi = useJobEditDraft(job);
+function Harness({ onDirtyBack, docsOnly = false, invoicingEnabled = false, revenueOnly = false }: { onDirtyBack: (dirty: boolean) => void; docsOnly?: boolean; invoicingEnabled?: boolean; revenueOnly?: boolean }) {
+  const editApi = useJobEditDraft(job, { invoicingEnabled });
 
   useEffect(() => {
     editApi.resetFromJob(job);
@@ -57,7 +58,9 @@ function Harness({ onDirtyBack }: { onDirtyBack: (dirty: boolean) => void }) {
       bottomInset={0}
       columnStyle={{}}
       saving={false}
-      focusTarget="materials"
+      invoicingEnabled={invoicingEnabled}
+      focusTarget={docsOnly ? 'docs' : revenueOnly ? 'revenue' : 'materials'}
+      footer={<Text>Docs management</Text>}
       onBack={() => {
         onDirtyBack(editApi.isDirty());
         editApi.discardDraft();
@@ -70,6 +73,34 @@ function Harness({ onDirtyBack }: { onDirtyBack: (dirty: boolean) => void }) {
 }
 
 describe('JobDetailEditMode buffered numeric fields', () => {
+  it('closes untouched Documents editing without marking hidden pricing dirty', async () => {
+    const onDirtyBack = jest.fn();
+    const screen = render(<Harness docsOnly invoicingEnabled onDirtyBack={onDirtyBack} />);
+    await screen.findByText('Docs management');
+    fireEvent.press(screen.getByLabelText('Close'));
+    await waitFor(() => expect(onDirtyBack).toHaveBeenCalledWith(false));
+  });
+
+  it('opens Docs management without unrelated edit fields for a Docs entry', async () => {
+    const screen = render(<Harness docsOnly onDirtyBack={() => {}} />);
+    await screen.findByText('Docs management');
+    expect(screen.queryByLabelText('Job title')).toBeNull();
+    expect(screen.queryByLabelText('Unit price')).toBeNull();
+  });
+
+  it('confirms zero Labor & Services separately from zero Revenue', async () => {
+    const screen = render(
+      <Harness revenueOnly invoicingEnabled onDirtyBack={() => {}} />,
+    );
+    const confirm = await screen.findByLabelText('Confirm no Labor & Services');
+    expect(confirm.props.accessibilityRole).toBe('checkbox');
+    fireEvent.press(confirm);
+    await waitFor(() => {
+      expect(screen.getByLabelText('No Labor & Services confirmed').props.accessibilityState)
+        .toMatchObject({ checked: true });
+    });
+    expect(screen.queryByLabelText('Confirm no Revenue')).toBeNull();
+  });
   it('flushes a focused value before Back checks dirty and restores it after discard', async () => {
     const onDirtyBack = jest.fn();
     const screen = render(<Harness onDirtyBack={onDirtyBack} />);

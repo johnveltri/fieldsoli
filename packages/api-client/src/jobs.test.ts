@@ -1385,6 +1385,10 @@ describe('jobs api client', () => {
         ],
         notes: [notesBuilder],
       },
+      rpcResult: {
+        data: { id: 'invoice-1', documentType: 'invoice', documentNumber: 7 },
+        error: null,
+      },
     });
 
     const [listRows, detail] = await Promise.all([
@@ -1411,6 +1415,11 @@ describe('jobs api client', () => {
     expect(listRow.isFinanciallyComplete).toBe(true);
     expect(listRow.hasMaterials).toBe(true);
     expect(listRow.hasSessions).toBe(true);
+    expect(jobDetail.revenueInvoice).toEqual({
+      id: 'invoice-1',
+      documentNumber: 7,
+      documentType: 'invoice',
+    });
   });
 
   it('fetchJobDetail includes only ended sessions in the sessions list', async () => {
@@ -1429,6 +1438,7 @@ describe('jobs api client', () => {
                 job_work_status: 'in_progress',
                 job_payment_state: 'unpaid',
                 revenue_cents: 150000,
+                no_labor_services_confirmed_at: '2026-04-17T10:00:00.000Z',
                 collected_cents: 0,
                 updated_at: '2026-04-17T10:00:00.000Z',
                 last_worked_at: '2026-04-17T09:00:00.000Z',
@@ -1474,6 +1484,7 @@ describe('jobs api client', () => {
     expect(detail?.displaySessions.map((s) => s.id)).toEqual(['sess-ended']);
     expect(detail?.noMaterialsConfirmed).toBe(false);
     expect(detail?.noRevenueConfirmed).toBe(false);
+    expect(detail?.noLaborServicesConfirmed).toBe(true);
   });
 
   it('fetchJobDetail distinguishes zero duration from short positive sessions', async () => {

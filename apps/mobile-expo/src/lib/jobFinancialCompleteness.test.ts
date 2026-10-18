@@ -148,7 +148,7 @@ describe('usable rows for financial completeness', () => {
     expect(incompletePillsForJobDetail(job)).toEqual([]);
   });
 
-  it('ignores sessions missing date or duration', () => {
+  it('ignores visits missing date or duration', () => {
     const job = baseJob({
       displaySessions: [
         {
@@ -169,7 +169,7 @@ describe('usable rows for financial completeness', () => {
     });
     expect(isJobFinanciallyComplete({ job })).toBe(false);
     expect(financialCompletenessGaps({ job })).toContain('session');
-    expect(incompletePillsForJobDetail(job)).toContain('sessions');
+    expect(incompletePillsForJobDetail(job)).toContain('visits');
   });
 
   it('ignores materials missing description or total', () => {
@@ -283,7 +283,7 @@ describe('usable rows for financial completeness', () => {
     expect(incompletePillsForJobDetail(job)).toEqual([]);
   });
 
-  it('counts a live in-progress session when displaySessions are empty or unusable', () => {
+  it('counts a live in-progress visit when displaySessions are empty or unusable', () => {
     const liveSession = {
       id: 'sess-live',
       startedAt: '2026-04-17T14:00:00.000Z',
@@ -303,7 +303,7 @@ describe('usable rows for financial completeness', () => {
     });
     expect(isJobFinanciallyComplete({ job })).toBe(true);
     expect(financialCompletenessGaps({ job })).not.toContain('session');
-    expect(incompletePillsForJobDetail(job)).not.toContain('sessions');
+    expect(incompletePillsForJobDetail(job)).not.toContain('visits');
 
     const unusableEnded = baseJob({
       displaySessions: [
@@ -322,7 +322,7 @@ describe('usable rows for financial completeness', () => {
     expect(financialCompletenessGaps({ job: unusableEnded })).not.toContain('session');
   });
 
-  it('fails session completeness for unusable ended-only sessions', () => {
+  it('fails visit completeness for unusable ended-only visits', () => {
     const job = baseJob({
       displaySessions: [
         {
@@ -344,6 +344,54 @@ describe('usable rows for financial completeness', () => {
     });
     expect(isJobFinanciallyComplete({ job })).toBe(false);
     expect(financialCompletenessGaps({ job })).toContain('session');
-    expect(incompletePillsForJobDetail(job)).toContain('sessions');
+    expect(incompletePillsForJobDetail(job)).toContain('visits');
+  });
+
+  it('keeps unknown Labor incomplete, requires its own confirmation, and accepts billable charges with zero Labor', () => {
+    const unknownLabor = baseJob({
+      pricingMode: 'component',
+      laborServicesCents: null,
+      earnings: { ...baseJob().earnings, revenueCents: 1500 },
+      noRevenueConfirmed: false,
+    });
+    expect(isJobFinanciallyComplete({ job: unknownLabor })).toBe(false);
+
+    const explicitZero = baseJob({
+      pricingMode: 'component',
+      laborServicesCents: 0,
+      noRevenueConfirmed: false,
+      noLaborServicesConfirmed: false,
+      earnings: { ...baseJob().earnings, revenueCents: 1500 },
+    });
+    expect(financialCompletenessGaps({ job: explicitZero })).toContain('revenue');
+
+    const confirmedZeroWithBillables = {
+      ...explicitZero,
+      noLaborServicesConfirmed: true,
+    };
+    expect(isJobFinanciallyComplete({ job: confirmedZeroWithBillables })).toBe(true);
+    expect(financialCompletenessGaps({ job: confirmedZeroWithBillables })).not.toContain('revenue');
+  });
+
+  it('treats selected invoice Revenue as complete while proposed Labor is unknown', () => {
+    const job = baseJob({
+      pricingMode: 'component',
+      laborServicesCents: null,
+      earnings: { ...baseJob().earnings, revenueCents: 1500 },
+      revenueInvoice: { id: 'invoice-1' } as JobDetailViewModel['revenueInvoice'],
+    });
+    expect(isJobFinanciallyComplete({ job })).toBe(true);
+    expect(financialCompletenessGaps({ job })).not.toContain('revenue');
+  });
+
+  it('preserves legacy Revenue completeness while invoicing is disabled', () => {
+    const job = baseJob({
+      pricingMode: 'component',
+      laborServicesCents: null,
+      earnings: { ...baseJob().earnings, revenueCents: 1500 },
+    });
+    expect(isJobFinanciallyComplete({ job, invoicingEnabled: false })).toBe(true);
+    expect(financialCompletenessGaps({ job, invoicingEnabled: false })).not.toContain('revenue');
+    expect(incompletePillsForJobDetail(job, false)).not.toContain('revenue');
   });
 });

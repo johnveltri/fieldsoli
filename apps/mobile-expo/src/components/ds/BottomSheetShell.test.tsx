@@ -82,8 +82,8 @@ describe('BottomSheetShell accessibility', () => {
       iosView.unmount();
 
       const iosFullbleed = render(
-        <BottomSheetShell visible variant="fullbleedDark" stickyFooter={<Text>END SESSION</Text>}>
-          <Text>Live session</Text>
+        <BottomSheetShell visible variant="fullbleedDark" stickyFooter={<Text>END VISIT</Text>}>
+          <Text>Live visit</Text>
         </BottomSheetShell>,
       );
       expect(iosFullbleed.UNSAFE_getByType(KeyboardAvoidingView).props.behavior).toBeUndefined();
@@ -240,10 +240,10 @@ describe('BottomSheetShell accessibility', () => {
         <BottomSheetShell
           visible
           variant="fullbleedDark"
-          stickyFooter={<Text>END SESSION</Text>}
+          stickyFooter={<Text>END VISIT</Text>}
           onClose={jest.fn()}
         >
-          <Text>Live session</Text>
+          <Text>Live visit</Text>
         </BottomSheetShell>,
       );
 
@@ -302,10 +302,10 @@ describe('BottomSheetShell accessibility', () => {
         <BottomSheetShell
           visible
           variant="fullbleedDark"
-          stickyFooter={<Text>END SESSION</Text>}
+          stickyFooter={<Text>END VISIT</Text>}
           onClose={jest.fn()}
         >
-          <Text>Live session</Text>
+          <Text>Live visit</Text>
         </BottomSheetShell>,
       );
 
@@ -335,10 +335,10 @@ describe('BottomSheetShell accessibility', () => {
     }
   });
 
-  it('presents a fullbleed live session as a full-page overlay', () => {
+  it('presents a fullbleed live visit as a full-page overlay', () => {
     render(
       <BottomSheetShell visible variant="fullbleedDark">
-        <Text>Live session</Text>
+        <Text>Live visit</Text>
       </BottomSheetShell>,
     );
 
@@ -404,7 +404,7 @@ describe('BottomSheetShell accessibility', () => {
   it('fills the live-session bottom inset with the sheet surface', () => {
     render(
       <BottomSheetShell visible variant="fullbleedDark" onClose={jest.fn()}>
-        <Text>Live session sheet</Text>
+        <Text>Live visit sheet</Text>
       </BottomSheetShell>,
     );
 

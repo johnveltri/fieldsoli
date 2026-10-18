@@ -7,8 +7,14 @@ module.exports = ({ config }) => {
   // build configuration before native build or Metro bundling begins.
   validateReleaseEnvironment(process.env);
 
+  const app = require('./app.json').expo;
   return {
-    ...require('./app.json').expo,
+    ...app,
     ...config,
+    plugins: [
+      ...(app.plugins ?? []),
+      'expo-mail-composer',
+      ['expo-sharing', { ios: { enabled: false }, android: { enabled: false } }],
+    ],
   };
 };

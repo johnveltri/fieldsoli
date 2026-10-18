@@ -88,6 +88,8 @@ export type UpdateLiveSessionJobIdentityInput = {
   shortDescription: string;
   longDescription: string;
   revenueCents: number | null;
+  /** When set, this write is Labor & Services and Revenue is derived. */
+  laborServicesCents?: number | null;
 };
 
 export type ListJobsForCurrentUserItem = {
@@ -1145,13 +1147,24 @@ export async function updateLiveSessionJobIdentityById(
   ) {
     throw new Error('Revenue must be a non-negative dollar amount.');
   }
+  if (
+    input.laborServicesCents != null &&
+    (!Number.isInteger(input.laborServicesCents) || input.laborServicesCents < 0)
+  ) {
+    throw new Error('Labor & Services must be a non-negative dollar amount.');
+  }
+
+  const pricingPatch =
+    input.laborServicesCents !== undefined
+      ? { labor_services_cents: input.laborServicesCents }
+      : { revenue_cents: input.revenueCents };
 
   const { data, error } = await client
     .from('jobs')
     .update({
       short_description: shortDescription,
       long_description: input.longDescription.trim() || null,
-      revenue_cents: input.revenueCents,
+      ...pricingPatch,
     })
     .eq('id', id)
     .is('deleted_at', null)

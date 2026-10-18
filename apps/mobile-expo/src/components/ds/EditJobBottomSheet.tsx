@@ -32,6 +32,7 @@ export type EditJobBottomSheetValues = {
   customerId: string | null;
   serviceAddress: string;
   revenue: string;
+  noLaborServicesConfirmed?: boolean;
 };
 
 type EditJobBottomSheetProps = {
@@ -44,6 +45,7 @@ type EditJobBottomSheetProps = {
   onClose?: () => void;
   onClosed?: () => void;
   onSavePress?: (values: EditJobBottomSheetValues) => void;
+  invoicingEnabled?: boolean;
   onDeletePress?: () => void;
   /** @default true */
   registerInGlobalStack?: boolean;
@@ -56,6 +58,13 @@ function revenueTextIsZero(text: string): boolean {
   return Number.isFinite(n) && n === 0;
 }
 
+function revenueTextIsPositive(text: string): boolean {
+  const trimmed = text.trim().replace(/[$,\s]/g, '');
+  if (trimmed.length === 0) return false;
+  const n = Number(trimmed);
+  return Number.isFinite(n) && n > 0;
+}
+
 const DEFAULT_VALUES: EditJobBottomSheetValues = {
   shortDescription: 'Bathroom Remodel Phase 1',
   longDescription: '',
@@ -65,6 +74,7 @@ const DEFAULT_VALUES: EditJobBottomSheetValues = {
   customerId: null,
   serviceAddress: '123 Main Street, Perrysburg, OH 43551',
   revenue: '5,678.87',
+  noLaborServicesConfirmed: false,
 };
 
 function BackIcon() {
@@ -114,12 +124,16 @@ export function EditJobBottomSheet({
   onSavePress,
   onDeletePress,
   registerInGlobalStack = true,
+  invoicingEnabled = false,
 }: EditJobBottomSheetProps) {
   const v = { ...DEFAULT_VALUES, ...values };
   const [shortDescription, setShortDescription] = useState(v.shortDescription);
   const [longDescription, setLongDescription] = useState(v.longDescription);
   const [customerDraft, setCustomerDraft] = useState<CustomerDraft>(valuesToCustomerDraft(v));
   const [revenue, setRevenue] = useState(v.revenue);
+  const [noLaborServicesConfirmed, setNoLaborServicesConfirmed] = useState(
+    v.noLaborServicesConfirmed === true,
+  );
   const shortDescriptionRef = useRef<TextInput>(null);
   const revenueRef = useRef<TextInput>(null);
 
@@ -128,6 +142,7 @@ export function EditJobBottomSheet({
     setLongDescription(v.longDescription);
     setCustomerDraft(valuesToCustomerDraft(v));
     setRevenue(v.revenue);
+    setNoLaborServicesConfirmed(v.noLaborServicesConfirmed === true);
   }, [
     v.customerEmail,
     v.customerId,
@@ -136,6 +151,7 @@ export function EditJobBottomSheet({
     v.shortDescription,
     v.longDescription,
     v.revenue,
+    v.noLaborServicesConfirmed,
     v.serviceAddress,
     visible,
   ]);
@@ -149,6 +165,7 @@ export function EditJobBottomSheet({
     customerId: customerDraft.customerId,
     serviceAddress: customerDraft.serviceAddress,
     revenue,
+    noLaborServicesConfirmed,
   });
 
   return (
@@ -229,13 +246,17 @@ export function EditJobBottomSheet({
               <DsTextInput
                 ref={revenueRef}
                 value={revenue}
-                onChangeText={setRevenue}
+                onChangeText={(next) => {
+                  setRevenue(next);
+                  if (revenueTextIsPositive(next)) setNoLaborServicesConfirmed(false);
+                }}
                 onFocus={() => {
                   if (revenueTextIsZero(revenue)) {
                     setRevenue('');
                   }
                 }}
-                placeholder="Revenue"
+                placeholder={invoicingEnabled ? 'Labor & Services' : 'Revenue'}
+                accessibilityLabel={invoicingEnabled ? 'Labor & Services' : 'Revenue'}
                 placeholderTextColor={fg.secondary}
                 keyboardType="numeric"
                 editable
@@ -244,6 +265,28 @@ export function EditJobBottomSheet({
               />
             </View>
           </InputShell>
+          {invoicingEnabled && (revenue.trim() === '' || revenueTextIsZero(revenue)) ? (
+            <Pressable
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: noLaborServicesConfirmed }}
+              accessibilityLabel={noLaborServicesConfirmed
+                ? 'No Labor & Services confirmed'
+                : 'Confirm no Labor & Services'}
+              onPress={() => {
+                const nextConfirmed = !noLaborServicesConfirmed;
+                setNoLaborServicesConfirmed(nextConfirmed);
+                if (nextConfirmed) setRevenue('0');
+                else setRevenue('');
+              }}
+              style={styles.noLaborConfirmation}
+            >
+              <Text style={[typography.bodyBold, { color: fg.primary }]}>
+                {noLaborServicesConfirmed
+                  ? 'No Labor & Services confirmed'
+                  : 'Confirm no Labor & Services'}
+              </Text>
+            </Pressable>
+          ) : null}
           {revenueError ? (
             <Text style={[typography.bodySmall, { color: color('Semantic/Status/Error/Text') }]}>
               {revenueError}
@@ -327,6 +370,10 @@ const styles = StyleSheet.create({
   },
   revenueInput: {
     flex: 1,
+  },
+  noLaborConfirmation: {
+    alignSelf: 'flex-start',
+    paddingVertical: space('Spacing/4'),
   },
   pressed: {
     opacity: 0.7,

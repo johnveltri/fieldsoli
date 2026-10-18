@@ -18,6 +18,31 @@ const nextConfig: NextConfig = {
 
     return [
       {
+        source: "/share/:token*",
+        headers: [
+          { key: "Cache-Control", value: "private, no-store" },
+          { key: "Referrer-Policy", value: "no-referrer" },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "X-Robots-Tag", value: "noindex, nofollow, noarchive" },
+          {
+            key: "Content-Security-Policy",
+            value: [
+              "default-src 'none'",
+              "base-uri 'none'",
+              "form-action 'none'",
+              "frame-ancestors 'none'",
+              "img-src 'self'",
+              "style-src 'unsafe-inline'",
+              "script-src 'self' 'unsafe-inline'",
+              "connect-src 'none'",
+              "font-src 'none'",
+              "object-src 'none'",
+              "worker-src 'none'",
+            ].join("; "),
+          },
+        ],
+      },
+      {
         source: "/exports/download",
         headers: [
           { key: "Cache-Control", value: "private, no-store" },

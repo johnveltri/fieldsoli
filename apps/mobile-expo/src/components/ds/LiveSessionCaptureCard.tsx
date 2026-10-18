@@ -52,7 +52,7 @@ export function LiveSessionCaptureCard({
     <View style={styles.card}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`${expanded ? 'Collapse' : 'Expand'} live session ${dateLabel}`}
+        accessibilityLabel={`${expanded ? 'Collapse' : 'Expand'} live visit ${dateLabel}`}
         accessibilityState={{ expanded }}
         onPress={onToggle}
         style={styles.headerPressable}
@@ -77,7 +77,7 @@ export function LiveSessionCaptureCard({
           <View style={styles.editRow}>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Edit live session"
+              accessibilityLabel="Edit live visit"
               onPress={onEditPress}
               style={({ pressed }) => [styles.editButton, pressed && styles.pressed]}
             >

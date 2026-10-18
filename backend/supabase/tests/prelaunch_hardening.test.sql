@@ -68,12 +68,12 @@ begin
     (user_a, 'hardening-a-' || user_a || '@example.com'),
     (user_b, 'hardening-b-' || user_b || '@example.com');
 
-  insert into public.jobs (user_id, short_description, revenue_cents, materials_reviewed_at, other_costs_reviewed_at)
-  values (user_a, 'First owned job', 10000, now(), now()) returning id into job_a;
-  insert into public.jobs (user_id, short_description, revenue_cents, materials_reviewed_at, other_costs_reviewed_at)
-  values (user_a, 'Second owned job', 20000, now(), now()) returning id into job_a_2;
-  insert into public.jobs (user_id, short_description)
-  values (user_b, 'Other owner job') returning id into job_b;
+  insert into public.jobs (user_id, short_description, revenue_cents, materials_reviewed_at, other_costs_reviewed_at, revenue_invoice_required)
+  values (user_a, 'First owned job', 10000, now(), now(), false) returning id into job_a;
+  insert into public.jobs (user_id, short_description, revenue_cents, materials_reviewed_at, other_costs_reviewed_at, revenue_invoice_required)
+  values (user_a, 'Second owned job', 20000, now(), now(), false) returning id into job_a_2;
+  insert into public.jobs (user_id, short_description, revenue_invoice_required)
+  values (user_b, 'Other owner job', false) returning id into job_b;
 
   insert into public.sessions
     (job_id, user_id, entry_mode, session_status, started_at, ended_at)

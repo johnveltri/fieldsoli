@@ -14,6 +14,10 @@ const mockEndLiveSessionNow = jest.fn<(...args: unknown[]) => Promise<unknown>>(
 const mockRefreshLiveSession = jest.fn<(...args: unknown[]) => Promise<unknown>>();
 const mockUpdateLiveSessionJobShortDescription = jest.fn();
 let mockFullscreenEditFlagState = { enabled: true, ready: true };
+const mockOpenDocumentPreview = jest.fn();
+const mockOpenDocument = jest.fn();
+const mockOpenFinalization = jest.fn();
+let mockInvoicingFlagState = { enabled: false, ready: true };
 let mockLiveSession: { id: string; jobId: string } | null = null;
 
 jest.mock('../lib/feedback', () => ({
@@ -100,9 +104,14 @@ jest.mock('../components/ds', () => ({
     intended === 'completed' && noRevenueConfirmed && current === 'inProgress'
       ? 'paid'
       : intended,
-  EditJobBottomSheet: ({ visible }: { visible: boolean }) => {
+  EditJobBottomSheet: ({ visible, invoicingEnabled }: { visible: boolean; invoicingEnabled?: boolean }) => {
     const { Text } = require('react-native');
-    return visible ? <Text accessibilityLabel="Legacy edit">Legacy Edit Job</Text> : null;
+    return visible ? (
+      <>
+        <Text accessibilityLabel="Legacy edit">Legacy Edit Job</Text>
+        {invoicingEnabled ? <Text accessibilityLabel="Legacy labor field">Labor &amp; Services</Text> : null}
+      </>
+    ) : null;
   },
   ConfirmMinimumInfoBottomSheet: ({
     visible,
@@ -254,7 +263,7 @@ jest.mock('../components/ds', () => ({
             ? `Material assigned ${assignedSession.id}`
             : 'Material unassigned'}
         </Text>
-        <Text onPress={() => onSessionPillPress?.(values)}>Open Material Session Picker</Text>
+        <Text onPress={() => onSessionPillPress?.(values)}>Open Material Visit Picker</Text>
         <Text onPress={() => onUnitPress?.(values)}>Open Unit Picker</Text>
         <Text onPress={() => onUnitPress?.(typedDraft)}>
           Type Draft and Open Unit Picker
@@ -295,8 +304,8 @@ jest.mock('../components/ds', () => ({
     return visible ? (
       <View>
         <Text>new-session-sheet</Text>
-        <Text onPress={() => onLiveSessionPress?.()}>Live Session</Text>
-        <Text onPress={() => onLogPastPress?.()}>Log Past Session</Text>
+        <Text onPress={() => onLiveSessionPress?.()}>Live Visit</Text>
+        <Text onPress={() => onLogPastPress?.()}>Log Past Visit</Text>
       </View>
     ) : null;
   },
@@ -323,9 +332,9 @@ jest.mock('../components/ds', () => ({
             })
           }
         >
-          Save Session
+          Save Visit
         </Text>
-        <Text onPress={() => onDeletePress?.()}>Delete Session</Text>
+        <Text onPress={() => onDeletePress?.()}>Delete Visit</Text>
       </View>
     ) : null;
   },
@@ -352,7 +361,7 @@ jest.mock('../components/ds', () => ({
         <Text>{title}</Text>
         <Text>{assignedSession ? `Assigned ${assignedSession.id}` : 'Unassigned'}</Text>
         <Text onPress={() => onSessionPillPress?.({ body: 'Saved note body' })}>
-          Open Session Picker
+          Open Visit Picker
         </Text>
         <Text onPress={() => onSavePress?.({ body: 'Saved note body' })}>Save Note</Text>
         <Text onPress={() => onDeletePress?.()}>Delete Note</Text>
@@ -376,7 +385,7 @@ jest.mock('../components/ds', () => ({
         {sessions.map((s) => (
           <Text key={s.id} onPress={() => onSelect(s.id)}>{`Pick ${s.id}`}</Text>
         ))}
-        <Text onPress={() => onRemove?.()}>Remove Session</Text>
+        <Text onPress={() => onRemove?.()}>Remove Visit</Text>
       </View>
     ) : null;
   },
@@ -479,7 +488,7 @@ jest.mock('../components/ds', () => ({
     const { sessionViewTimeLabel } = require('../lib/jobDetailRowHealth');
     return (
       <View>
-        {onCardPress ? <Text onPress={onCardPress}>Edit sessions</Text> : null}
+        {onCardPress ? <Text onPress={onCardPress}>Edit visits</Text> : null}
         {sessions.map((s) => {
           const timeLabel = sessionViewTimeLabel(s);
           return (
@@ -528,15 +537,15 @@ jest.mock('../components/ds', () => ({
         <Text>{session.dateLabel}</Text>
         {missingLine ? <Text>{missingLine}</Text> : null}
         {flatView && onRowBodyPress ? (
-          <Text onPress={onRowBodyPress}>{`Open session ${session.id}`}</Text>
+          <Text onPress={onRowBodyPress}>{`Open visit ${session.id}`}</Text>
         ) : (
-          <Text onPress={onEditPress}>{`Edit session ${session.id}`}</Text>
+          <Text onPress={onEditPress}>{`Edit visit ${session.id}`}</Text>
         )}
         {!flatView && onAddNote ? (
-          <Text onPress={onAddNote}>{`Add note to session ${session.id}`}</Text>
+          <Text onPress={onAddNote}>{`Add note to visit ${session.id}`}</Text>
         ) : null}
         {!flatView && onAddMaterial ? (
-          <Text onPress={onAddMaterial}>{`Add material to session ${session.id}`}</Text>
+          <Text onPress={onAddMaterial}>{`Add material to visit ${session.id}`}</Text>
         ) : null}
         {!flatView &&
           session.attachments?.map((item) => (
@@ -561,7 +570,7 @@ jest.mock('../components/ds', () => ({
     return (
       <Text
         accessibilityRole="button"
-        accessibilityLabel="Start live session"
+        accessibilityLabel="Start live visit"
         onPress={disabled ? undefined : onPress}
       >
         LIVE
@@ -572,7 +581,27 @@ jest.mock('../components/ds', () => ({
 
 jest.mock('../lib/featureFlags', () => ({
   useJobDetailFullscreenEditFlag: () => mockFullscreenEditFlagState,
+  useInvoicingFlag: () => mockInvoicingFlagState,
 }));
+
+jest.mock('../components/invoicing/InvoicingJobControls', () => {
+  const React = require('react');
+  const { Text, View } = require('react-native');
+  return {
+    InvoicingJobControls: React.forwardRef(({ mode, onManageDocs }: { mode: string; onManageDocs?: () => void }, ref: unknown) => {
+      React.useImperativeHandle(ref, () => ({
+        openPreview: mockOpenDocumentPreview,
+        openDocument: mockOpenDocument,
+        openFinalization: mockOpenFinalization,
+        getPendingPreferences: () => null,
+        discardPendingControls: jest.fn(),
+      }));
+      return React.createElement(View, null,
+        React.createElement(Text, null, 'Docs'),
+        React.createElement(Text, { accessibilityLabel: mode === 'view' ? 'Manage documents' : 'Generate new', onPress: onManageDocs }, mode === 'view' ? 'Saved document' : 'Generate new'));
+    }),
+  };
+});
 
 jest.mock('./jobDetailEdit/JobDetailEditMode', () => ({
   JobDetailEditMode: ({
@@ -583,6 +612,7 @@ jest.mock('./jobDetailEdit/JobDetailEditMode', () => ({
     hideHeader,
     focusTarget,
     editApi,
+    footer,
   }: {
     onBack: () => void;
     onDone: () => void;
@@ -590,6 +620,7 @@ jest.mock('./jobDetailEdit/JobDetailEditMode', () => ({
     saving: boolean;
     hideHeader?: boolean;
     focusTarget?: unknown;
+    footer?: React.ReactNode;
     editApi?: {
       draft: {
         noMaterialsConfirmed?: boolean;
@@ -664,6 +695,7 @@ jest.mock('./jobDetailEdit/JobDetailEditMode', () => ({
         <Pressable accessibilityRole="button" accessibilityLabel="Delete job" disabled={saving} onPress={onDeleteJob}>
           <Text>Delete job</Text>
         </Pressable>
+        {focusTarget == null || focusTarget === 'docs' ? footer : null}
       </View>
     );
   },
@@ -758,7 +790,7 @@ function setupDefaultApiMocks(apiClient: {
   mockOpenFeedbackEmail.mockResolvedValue(undefined);
 }
 
-describe('JobDetailScreen manual session and note flows', () => {
+describe('JobDetailScreen manual visit and note flows', () => {
   const apiClient = jest.requireMock('@fieldsolo/api-client') as any;
 
   const baseJob: JobDetailViewModel = {
@@ -838,11 +870,13 @@ describe('JobDetailScreen manual session and note flows', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockFullscreenEditFlagState = { enabled: false, ready: true };
+    mockInvoicingFlagState = { enabled: false, ready: true };
     setupDefaultApiMocks(apiClient);
     apiClient.fetchJobDetail.mockResolvedValue(baseJob);
   });
 
-  it('offers feedback after the first completed job', async () => {
+  it('gates completion behind invoice finalization', async () => {
+    mockInvoicingFlagState = { enabled: true, ready: true };
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     mockClaimFeedbackPromptMilestone.mockResolvedValueOnce(1);
     let jobState: JobDetailViewModel = {
@@ -866,28 +900,24 @@ describe('JobDetailScreen manual session and note flows', () => {
     await waitFor(() => expect(screen.getByText('Primary status action')).toBeTruthy());
     fireEvent.press(screen.getByText('Primary status action'));
 
-    await waitFor(() => {
-      expect(apiClient.countCompletedJobsForCurrentUser).toHaveBeenCalledWith({});
-      expect(mockClaimFeedbackPromptMilestone).toHaveBeenCalledWith('user-1', 1);
-      expect(alertSpy).toHaveBeenCalledWith(
-        "How's FieldSoli working for you?",
-        'You just completed your first job. What felt confusing or missing?',
-        expect.any(Array),
-      );
-    });
+    await waitFor(() => expect(mockOpenFinalization).toHaveBeenCalledWith('completed'));
+    expect(apiClient.updateJobStatusById).not.toHaveBeenCalledWith({}, 'job-1', 'completed');
+    expect(apiClient.countCompletedJobsForCurrentUser).not.toHaveBeenCalled();
+    expect(mockClaimFeedbackPromptMilestone).not.toHaveBeenCalled();
+    expect(alertSpy).not.toHaveBeenCalled();
     alertSpy.mockRestore();
   });
 
-  it('creates a manual session from add flow', async () => {
+  it('creates a manual visit from add flow', async () => {
     const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
 
     await waitFor(() => {
       expect(apiClient.fetchJobDetail).toHaveBeenCalledWith({}, 'job-1');
     });
 
-    fireEvent.press(screen.getByLabelText('Add Sessions'));
-    fireEvent.press(screen.getByText('Log Past Session'));
-    fireEvent.press(screen.getByText('Save Session'));
+    fireEvent.press(screen.getByLabelText('Add Visits'));
+    fireEvent.press(screen.getByText('Log Past Visit'));
+    fireEvent.press(screen.getByText('Save Visit'));
 
     await waitFor(() => {
       expect(apiClient.createManualSession).toHaveBeenCalledWith({}, {
@@ -898,7 +928,7 @@ describe('JobDetailScreen manual session and note flows', () => {
     });
   });
 
-  it('closes job detail after starting a live session', async () => {
+  it('closes job detail after starting a live visit', async () => {
     const onRequestClose = jest.fn();
     const screen = render(
       <JobDetailScreen
@@ -909,11 +939,11 @@ describe('JobDetailScreen manual session and note flows', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByLabelText('Add Sessions')).toBeTruthy();
+      expect(screen.getByLabelText('Add Visits')).toBeTruthy();
     });
 
-    fireEvent.press(screen.getByLabelText('Add Sessions'));
-    fireEvent.press(screen.getByText('Live Session'));
+    fireEvent.press(screen.getByLabelText('Add Visits'));
+    fireEvent.press(screen.getByText('Live Visit'));
 
     await waitFor(() => {
       expect(mockStartLiveSession).toHaveBeenCalledWith({
@@ -924,15 +954,15 @@ describe('JobDetailScreen manual session and note flows', () => {
     });
   });
 
-  it('updates an existing session from edit flow', async () => {
+  it('updates an existing visit from edit flow', async () => {
     const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
 
     await waitFor(() => {
-      expect(screen.getByText('Edit session sess-1')).toBeTruthy();
+      expect(screen.getByText('Edit visit sess-1')).toBeTruthy();
     });
 
-    fireEvent.press(screen.getByText('Edit session sess-1'));
-    fireEvent.press(screen.getByText('Save Session'));
+    fireEvent.press(screen.getByText('Edit visit sess-1'));
+    fireEvent.press(screen.getByText('Save Visit'));
 
     await waitFor(() => {
       expect(apiClient.updateSessionTimes).toHaveBeenCalledWith({}, 'sess-1', {
@@ -942,22 +972,22 @@ describe('JobDetailScreen manual session and note flows', () => {
     });
   });
 
-  it('deletes a session from edit flow', async () => {
+  it('deletes a visit from edit flow', async () => {
     const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
 
     await waitFor(() => {
-      expect(screen.getByText('Edit session sess-1')).toBeTruthy();
+      expect(screen.getByText('Edit visit sess-1')).toBeTruthy();
     });
 
-    fireEvent.press(screen.getByText('Edit session sess-1'));
-    fireEvent.press(screen.getByText('Delete Session'));
+    fireEvent.press(screen.getByText('Edit visit sess-1'));
+    fireEvent.press(screen.getByText('Delete Visit'));
 
     await waitFor(() => {
       expect(apiClient.deleteSession).toHaveBeenCalledWith({}, 'sess-1');
     });
   });
 
-  it('creates a note without session assignment', async () => {
+  it('creates a note without visit assignment', async () => {
     const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
 
     await waitFor(() => {
@@ -976,7 +1006,7 @@ describe('JobDetailScreen manual session and note flows', () => {
     });
   });
 
-  it('creates a note assigned to a selected session', async () => {
+  it('creates a note assigned to a selected visit', async () => {
     const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
 
     await waitFor(() => {
@@ -984,7 +1014,7 @@ describe('JobDetailScreen manual session and note flows', () => {
     });
 
     fireEvent.press(screen.getByLabelText('Add Notes'));
-    fireEvent.press(screen.getByText('Open Session Picker'));
+    fireEvent.press(screen.getByText('Open Visit Picker'));
     fireEvent.press(screen.getByText('Pick sess-1'));
     fireEvent.press(screen.getByText('Save Note'));
 
@@ -997,14 +1027,14 @@ describe('JobDetailScreen manual session and note flows', () => {
     });
   });
 
-  it('creates a note from a session card add action', async () => {
+  it('creates a note from a visit card add action', async () => {
     const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
 
     await waitFor(() => {
-      expect(screen.getByText('Add note to session sess-1')).toBeTruthy();
+      expect(screen.getByText('Add note to visit sess-1')).toBeTruthy();
     });
 
-    fireEvent.press(screen.getByText('Add note to session sess-1'));
+    fireEvent.press(screen.getByText('Add note to visit sess-1'));
     expect(screen.getByText('Assigned sess-1')).toBeTruthy();
     fireEvent.press(screen.getByText('Save Note'));
 
@@ -1051,7 +1081,7 @@ describe('JobDetailScreen manual session and note flows', () => {
     });
   });
 
-  it('hides in-progress sessions from session cards but lists them in the session picker', async () => {
+  it('hides in-progress visits from visit cards but lists them in the visit picker', async () => {
     apiClient.fetchJobDetail.mockResolvedValueOnce({
       ...baseJob,
       displaySessions: [
@@ -1089,12 +1119,12 @@ describe('JobDetailScreen manual session and note flows', () => {
     const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
 
     await waitFor(() => {
-      expect(screen.getByText('Edit session sess-1')).toBeTruthy();
+      expect(screen.getByText('Edit visit sess-1')).toBeTruthy();
     });
-    expect(screen.queryByText('Edit session sess-progress')).toBeNull();
+    expect(screen.queryByText('Edit visit sess-progress')).toBeNull();
 
     fireEvent.press(screen.getByLabelText('Add Notes'));
-    fireEvent.press(screen.getByText('Open Session Picker'));
+    fireEvent.press(screen.getByText('Open Visit Picker'));
     expect(screen.getByText('Pick sess-1')).toBeTruthy();
     expect(screen.getByText('Pick sess-progress')).toBeTruthy();
   });
@@ -1126,7 +1156,7 @@ describe('JobDetailScreen manual session and note flows', () => {
     ],
   };
 
-  it('creates a material without session assignment', async () => {
+  it('creates a material without visit assignment', async () => {
     const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
 
     await waitFor(() => {
@@ -1148,7 +1178,7 @@ describe('JobDetailScreen manual session and note flows', () => {
     });
   });
 
-  it('creates a material assigned to a selected session', async () => {
+  it('creates a material assigned to a selected visit', async () => {
     const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
 
     await waitFor(() => {
@@ -1156,7 +1186,7 @@ describe('JobDetailScreen manual session and note flows', () => {
     });
 
     fireEvent.press(screen.getByLabelText('Add Materials'));
-    fireEvent.press(screen.getByText('Open Material Session Picker'));
+    fireEvent.press(screen.getByText('Open Material Visit Picker'));
     fireEvent.press(screen.getByText('Pick sess-1'));
     fireEvent.press(screen.getByText('Save Material'));
 
@@ -1172,14 +1202,14 @@ describe('JobDetailScreen manual session and note flows', () => {
     });
   });
 
-  it('creates a material from a session card add action', async () => {
+  it('creates a material from a visit card add action', async () => {
     const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
 
     await waitFor(() => {
-      expect(screen.getByText('Add material to session sess-1')).toBeTruthy();
+      expect(screen.getByText('Add material to visit sess-1')).toBeTruthy();
     });
 
-    fireEvent.press(screen.getByText('Add material to session sess-1'));
+    fireEvent.press(screen.getByText('Add material to visit sess-1'));
     expect(screen.getByText('Material assigned sess-1')).toBeTruthy();
     fireEvent.press(screen.getByText('Save Material'));
 
@@ -1386,6 +1416,7 @@ describe('JobDetailScreen edit mode', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockFullscreenEditFlagState = { enabled: true, ready: true };
+    mockInvoicingFlagState = { enabled: false, ready: true };
     setupDefaultApiMocks(apiClient);
     apiClient.fetchJobDetail.mockResolvedValue(baseJob);
   });
@@ -1396,6 +1427,36 @@ describe('JobDetailScreen edit mode', () => {
     fireEvent.press(screen.getByLabelText('Edit job'));
     expect(screen.getByLabelText('Done')).toBeTruthy();
     expect(screen.getByLabelText('Close')).toBeTruthy();
+  });
+
+  it('completes a financially complete job directly when invoicing is disabled', async () => {
+    apiClient.fetchJobDetail.mockResolvedValue({
+      ...baseJob,
+      displaySessions: [
+        {
+          id: 'sess-usable',
+          startedAt: '2026-04-17T14:00:00.000Z',
+          endedAt: '2026-04-17T15:00:00.000Z',
+          dateLabel: 'Apr 17, 2026',
+          timeRangeLabel: '9:00 AM – 10:00 AM',
+          durationLabel: '1.0h',
+          clockTimesExplicit: true,
+          clockStartExplicit: true,
+          clockEndExplicit: true,
+          calendarDateExplicit: true,
+          attachments: [],
+        },
+      ],
+      noMaterialsConfirmed: true,
+      noOtherCostsConfirmed: true,
+    });
+    const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
+    await waitFor(() => expect(screen.getByText('Primary status action')).toBeTruthy());
+    fireEvent.press(screen.getByText('Primary status action'));
+    await waitFor(() =>
+      expect(apiClient.updateJobStatusById).toHaveBeenCalledWith({}, 'job-1', 'completed'),
+    );
+    expect(mockOpenFinalization).not.toHaveBeenCalled();
   });
 
   it('opens the legacy edit sheet from the header when fullscreen editing is disabled', async () => {
@@ -1520,7 +1581,7 @@ describe('JobDetailScreen simplified view (flag on)', () => {
         id: 'sess-partial',
         startedAt: '2026-04-17T14:00:00.000Z',
         endedAt: '2026-04-17T15:00:00.000Z',
-        dateLabel: 'No Session Date',
+        dateLabel: 'No Visit Date',
         timeRangeLabel: '',
         durationLabel: 'No duration',
         clockTimesExplicit: false,
@@ -1543,30 +1604,65 @@ describe('JobDetailScreen simplified view (flag on)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockFullscreenEditFlagState = { enabled: true, ready: true };
+    mockInvoicingFlagState = { enabled: true, ready: true };
     setupDefaultApiMocks(apiClient);
     apiClient.fetchJobDetail.mockResolvedValue(incompleteJob);
   });
 
   it('TEST-V01 hides section ADD pills', async () => {
     const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
-    await waitFor(() => expect(screen.getByText('Sessions')).toBeTruthy());
-    expect(screen.queryByLabelText('Add Sessions')).toBeNull();
+    await waitFor(() => expect(screen.getByText('Visits')).toBeTruthy());
+    expect(screen.queryByLabelText('Add Visits')).toBeNull();
     expect(screen.queryByLabelText('Add Materials')).toBeNull();
+  });
+
+  it('opens invoice review after the final focused wizard editor returns to View', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const lastGapJob: JobDetailViewModel = {
+      ...incompleteJob,
+      shortDescription: 'QA door repair',
+      earnings: { ...incompleteJob.earnings, revenueCents: 12000 },
+      noMaterialsConfirmed: true,
+      displaySessions: [{
+        ...incompleteJob.displaySessions[0],
+        dateLabel: 'Apr 17, 2026',
+        durationLabel: '1.0h',
+        calendarDateExplicit: true,
+      }],
+    };
+    apiClient.fetchJobDetail.mockImplementation(async () => ({
+      ...lastGapJob,
+      noOtherCostsConfirmed: apiClient.applyJobDetailEdit.mock.calls.length > 0,
+    }));
+    const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
+    await waitFor(() => expect(screen.getByText('Primary status action')).toBeTruthy());
+    fireEvent.press(screen.getByText('Primary status action'));
+    await waitFor(() => expect(screen.getByText('Confirm Info')).toBeTruthy());
+    fireEvent.press(screen.getByText('Confirm Info'));
+    await waitFor(() => expect(screen.getByTestId('edit-focus-target')).toHaveTextContent('"otherCosts"'));
+    expect(screen.queryByLabelText('Generate new')).toBeNull();
+    fireEvent.press(screen.getByLabelText('Confirm no other costs'));
+    fireEvent.press(screen.getByLabelText('Done'));
+    await waitFor(() => expect(mockOpenFinalization).toHaveBeenCalledWith('completed'));
+    expect(mockOpenFinalization).toHaveBeenCalledTimes(1);
+    expect(apiClient.updateJobStatusById).not.toHaveBeenCalled();
+    expect(alertSpy).not.toHaveBeenCalled();
+    alertSpy.mockRestore();
   });
 
   it('TEST-V14 shows Missing line for incomplete jobs', async () => {
     const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
     await waitFor(() =>
-      expect(screen.getByText('Missing: revenue, sessions, materials, costs')).toBeTruthy(),
+      expect(screen.getByText('Missing: revenue, visits, materials, costs')).toBeTruthy(),
     );
     expect(screen.queryByText(/description/)).toBeNull();
   });
 
-  it('TEST-V15 shows critical session empty placeholders without a duplicate missing line', async () => {
+  it('TEST-V15 shows critical visit empty placeholders without a duplicate missing line', async () => {
     const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
-    await waitFor(() => expect(screen.getByText('No Session Date')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('No Visit Date')).toBeTruthy());
     expect(screen.getByText('No duration')).toBeTruthy();
-    expect(screen.queryByText('No Session Date · No duration')).toBeNull();
+    expect(screen.queryByText('No Visit Date · No duration')).toBeNull();
   });
 
   it('shows start time on View when end clock is missing', async () => {
@@ -1616,7 +1712,7 @@ describe('JobDetailScreen simplified view (flag on)', () => {
     expect(screen.queryByText('No other costs recorded')).toBeNull();
   });
 
-  it('keeps No sessions recorded for an empty job while a live session is in progress', async () => {
+  it('keeps No visits recorded for an empty job while a live visit is in progress', async () => {
     apiClient.fetchJobDetail.mockResolvedValue({
       ...incompleteJob,
       displaySessions: [],
@@ -1635,8 +1731,41 @@ describe('JobDetailScreen simplified view (flag on)', () => {
       },
     });
     const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
-    await waitFor(() => expect(screen.getByText('No sessions recorded')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('No visits recorded')).toBeTruthy());
   });
+
+  it.each(['completed', 'paid'] as const)(
+    'does not demote a %s job only because the invoicing flag resolves on',
+    async (workStatus) => {
+      mockInvoicingFlagState = { enabled: false, ready: true };
+      apiClient.fetchJobDetail.mockResolvedValue({
+        ...incompleteJob,
+        workStatus,
+        pricingMode: 'component',
+        laborServicesCents: null,
+        noLaborServicesConfirmed: false,
+        earnings: {
+          ...incompleteJob.earnings,
+          revenueCents: 40000,
+        },
+        noMaterialsConfirmed: true,
+        noOtherCostsConfirmed: true,
+      });
+
+      const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
+      await waitFor(() => expect(screen.getByText('No Visit Date')).toBeTruthy());
+
+      mockInvoicingFlagState = { enabled: true, ready: true };
+      screen.rerender(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
+
+      await waitFor(() => expect(apiClient.fetchJobDetail).toHaveBeenCalled());
+      expect(apiClient.updateJobStatusById).not.toHaveBeenCalledWith(
+        {},
+        'job-1',
+        'inProgress',
+      );
+    },
+  );
 
   it('blocks Paid from the status sheet until financial completeness is met', async () => {
     const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
@@ -1680,9 +1809,8 @@ describe('JobDetailScreen simplified view (flag on)', () => {
     await waitFor(() => expect(screen.getByText('Open status sheet')).toBeTruthy());
     fireEvent.press(screen.getByText('Open status sheet'));
     fireEvent.press(screen.getByText('Pick unit paid'));
-    await waitFor(() =>
-      expect(apiClient.updateJobStatusById).toHaveBeenCalledWith({}, 'job-1', 'paid'),
-    );
+    await waitFor(() => expect(mockOpenFinalization).toHaveBeenCalledWith('paid'));
+    expect(apiClient.updateJobStatusById).not.toHaveBeenCalled();
   });
 
   it('TEST-V05 opens edit from title, customer and earnings taps', async () => {
@@ -1751,10 +1879,10 @@ describe('JobDetailScreen simplified view (flag on)', () => {
     );
   });
 
-  it('TEST-V10 passes focusTarget when opening edit from a sessions card', async () => {
+  it('TEST-V10 passes focusTarget when opening edit from a visits card', async () => {
     const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
-    await waitFor(() => expect(screen.getByText('Edit sessions')).toBeTruthy());
-    fireEvent.press(screen.getByText('Edit sessions'));
+    await waitFor(() => expect(screen.getByText('Edit visits')).toBeTruthy());
+    fireEvent.press(screen.getByText('Edit visits'));
     await waitFor(() =>
       expect(screen.getByTestId('edit-focus-target')).toHaveTextContent('"sessions"'),
     );
@@ -1770,11 +1898,11 @@ describe('JobDetailScreen simplified view (flag on)', () => {
     expect(screen.getByLabelText('Close')).toBeTruthy();
   });
 
-  it('TEST-V02 hides session expand chrome when view mode is on', async () => {
+  it('TEST-V02 hides visit expand chrome when view mode is on', async () => {
     const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
-    await waitFor(() => expect(screen.getByText('Edit sessions')).toBeTruthy());
-    expect(screen.queryByText('Add note to session sess-partial')).toBeNull();
-    expect(screen.queryByText('Edit session sess-partial')).toBeNull();
+    await waitFor(() => expect(screen.getByText('Edit visits')).toBeTruthy());
+    expect(screen.queryByText('Add note to visit sess-partial')).toBeNull();
+    expect(screen.queryByText('Edit visit sess-partial')).toBeNull();
   });
 
   it('TEST-V04 does not open item sheets from view taps', async () => {
@@ -1981,9 +2109,7 @@ describe('JobDetailScreen simplified view (flag on)', () => {
         }),
       ),
     );
-    await waitFor(() =>
-      expect(apiClient.updateJobStatusById).toHaveBeenCalledWith({}, 'job-1', 'paid'),
-    );
+    await waitFor(() => expect(mockOpenFinalization).toHaveBeenCalledWith('paid'));
     expect(screen.queryByTestId('edit-focus-target')).toBeNull();
   });
 
@@ -2049,9 +2175,7 @@ describe('JobDetailScreen simplified view (flag on)', () => {
     const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
     await waitFor(() => expect(screen.getByText('Primary status action')).toBeTruthy());
     fireEvent.press(screen.getByText('Primary status action'));
-    await waitFor(() =>
-      expect(apiClient.updateJobStatusById).toHaveBeenCalledWith({}, 'job-1', 'paid'),
-    );
+    await waitFor(() => expect(mockOpenFinalization).toHaveBeenCalledWith('paid'));
   });
 
   it('TEST-V08 materials confirm-none checkbox in Edit advances completeness gap', async () => {
@@ -2100,7 +2224,7 @@ describe('JobDetailScreen simplified view (flag on)', () => {
     expect(apiClient.updateJobCostsReviewed).not.toHaveBeenCalled();
   });
 
-  it('ends the live session before opening the mark-complete gate', async () => {
+  it('ends the live visit before opening the mark-complete gate', async () => {
     mockLiveSession = { id: 'sess-live-1', jobId: 'job-1' };
     mockEndLiveSessionNow.mockResolvedValue({ id: 'sess-live-1', jobId: 'job-1' });
     apiClient.fetchJobDetail.mockResolvedValue({
@@ -2132,6 +2256,43 @@ describe('JobDetailScreen simplified view (flag on)', () => {
     expect(apiClient.updateJobStatusById).not.toHaveBeenCalledWith({}, 'job-1', 'completed');
   });
 
+  it('keeps invoicing UI hidden when the feature flag is off', async () => {
+    mockInvoicingFlagState = { enabled: false, ready: true };
+    const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
+    await waitFor(() => expect(screen.getByLabelText('Edit job')).toBeTruthy());
+    expect(screen.queryByLabelText('Share job document')).toBeNull();
+    expect(screen.queryByLabelText('Manage documents')).toBeNull();
+  });
+
+  it('shows Share when invoicing is ready and enabled', async () => {
+    mockInvoicingFlagState = { enabled: true, ready: true };
+    const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
+    await waitFor(() => expect(screen.getByLabelText('Share job document')).toBeTruthy());
+    fireEvent.press(screen.getByLabelText('Share job document'));
+    expect(mockOpenDocumentPreview).toHaveBeenCalledTimes(1);
+    fireEvent.press(screen.getByLabelText('Manage documents'));
+    await waitFor(() => expect(screen.getByTestId('edit-focus-target').props.children).toBe('\"docs\"'));
+  });
+
+  it('fails closed while the invoicing flag is loading', async () => {
+    mockInvoicingFlagState = { enabled: true, ready: false };
+    const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
+    await waitFor(() => expect(screen.getByLabelText('Edit job')).toBeTruthy());
+    expect(screen.queryByLabelText('Share job document')).toBeNull();
+    mockInvoicingFlagState = { enabled: true, ready: true };
+    screen.rerender(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
+    await waitFor(() => expect(screen.getByLabelText('Share job document')).toBeTruthy());
+  });
+
+  it('keeps Revenue reachable when invoicing is on and fullscreen edit is off', async () => {
+    mockFullscreenEditFlagState = { enabled: false, ready: true };
+    mockInvoicingFlagState = { enabled: true, ready: true };
+    const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
+    await waitFor(() => expect(screen.getByLabelText('Share job document')).toBeTruthy());
+    fireEvent.press(screen.getByLabelText('Edit job'));
+    await waitFor(() => expect(screen.getByLabelText('Legacy labor field')).toBeTruthy());
+  });
+
   it('TEST-V09 flag off keeps ADD pills and confirm cards', async () => {
     mockFullscreenEditFlagState = { enabled: false, ready: true };
     const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
@@ -2150,32 +2311,32 @@ describe('JobDetailScreen simplified view (flag on)', () => {
     );
   });
 
-  it('TEST-L01 shows + LIVE in Sessions header when no live session', async () => {
+  it('TEST-L01 shows + LIVE in Visits header when no live visit', async () => {
     apiClient.fetchJobDetail.mockResolvedValue({
       ...incompleteJob,
       displaySessions: [],
     });
     const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
     await waitFor(() =>
-      expect(screen.getByLabelText('Start live session')).toBeTruthy(),
+      expect(screen.getByLabelText('Start live visit')).toBeTruthy(),
     );
     expect(screen.getByText('LIVE')).toBeTruthy();
-    expect(screen.getByText('No sessions recorded')).toBeTruthy();
+    expect(screen.getByText('No visits recorded')).toBeTruthy();
   });
 
-  it('TEST-L02 hides + LIVE when a live session exists elsewhere', async () => {
+  it('TEST-L02 hides + LIVE when a live visit exists elsewhere', async () => {
     mockLiveSession = { id: 'sess-live-other', jobId: 'job-other' };
     apiClient.fetchJobDetail.mockResolvedValue({
       ...incompleteJob,
       displaySessions: [],
     });
     const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
-    await waitFor(() => expect(screen.getByText('Sessions')).toBeTruthy());
-    expect(screen.queryByLabelText('Start live session')).toBeNull();
-    expect(screen.getByText('No sessions recorded')).toBeTruthy();
+    await waitFor(() => expect(screen.getByText('Visits')).toBeTruthy());
+    expect(screen.queryByLabelText('Start live visit')).toBeNull();
+    expect(screen.getByText('No visits recorded')).toBeTruthy();
   });
 
-  it('TEST-L03 starts live session from + LIVE and closes job detail', async () => {
+  it('TEST-L03 starts live visit from + LIVE and closes job detail', async () => {
     apiClient.fetchJobDetail.mockResolvedValue({
       ...incompleteJob,
       displaySessions: [],
@@ -2189,9 +2350,9 @@ describe('JobDetailScreen simplified view (flag on)', () => {
       />,
     );
     await waitFor(() =>
-      expect(screen.getByLabelText('Start live session')).toBeTruthy(),
+      expect(screen.getByLabelText('Start live visit')).toBeTruthy(),
     );
-    fireEvent.press(screen.getByLabelText('Start live session'));
+    fireEvent.press(screen.getByLabelText('Start live visit'));
     await waitFor(() => {
       expect(mockStartLiveSession).toHaveBeenCalledWith({
         jobId: 'job-1',

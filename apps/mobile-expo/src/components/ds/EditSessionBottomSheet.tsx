@@ -222,7 +222,7 @@ export function EditSessionBottomSheet({
             value={dateFmt.format(date)}
             active={activePicker === 'date'}
             onPress={() => openPicker('date')}
-            accessibilityLabel="Session date"
+            accessibilityLabel="Visit date"
           />
           <Text style={[typography.bodySmall, styles.fieldLabel]}>Start Time</Text>
           <FieldShell

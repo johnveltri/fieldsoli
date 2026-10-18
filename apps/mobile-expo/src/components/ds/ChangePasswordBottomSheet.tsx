@@ -7,6 +7,7 @@ import { bg, border, cardShadowRn, fg } from '../../theme/nativeTokens';
 import type { TextStyles } from '../../theme/nativeTokens';
 import { SessionSheetBackIcon } from '../figma-icons/JobDetailScreenIcons';
 import { ProfileAccountIcon } from '../figma-icons/ProfileScreenIcons';
+import { AccountFormPage } from './AccountFormPage';
 import { BottomSheetShell } from './BottomSheetShell';
 import { screenHeaderA11y } from '../../lib/accessibility';
 import {
@@ -17,6 +18,7 @@ import {
 type ChangePasswordBottomSheetProps = {
   typography: TextStyles;
   visible: boolean;
+  presentation?: 'sheet' | 'page';
   /** Disables the CTA + inputs while the auth call is in flight. */
   saving?: boolean;
   onClose?: () => void;
@@ -51,6 +53,7 @@ type ChangePasswordBottomSheetProps = {
 export function ChangePasswordBottomSheet({
   typography,
   visible,
+  presentation = 'sheet',
   saving = false,
   onClose,
   onClosed,
@@ -76,6 +79,99 @@ export function ChangePasswordBottomSheet({
   const accent = color('Brand/Primary');
   const errorText = color('Semantic/Status/Error/Text');
 
+  const content = (
+    <View style={styles.body}>
+      {presentation === 'sheet' ? (
+        <>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Back"
+            onPress={onBack ?? onClose}
+            style={({ pressed }) => [styles.back, pressed && styles.pressed]}
+          >
+            <SessionSheetBackIcon color={fg.secondary} />
+            <Text style={[typography.bodyBold, { color: fg.secondary }]}>Back</Text>
+          </Pressable>
+
+          <View style={styles.header}>
+            <View style={styles.headerIcon}>
+              <ProfileAccountIcon color={color('Brand/Accent')} />
+            </View>
+            <Text {...screenHeaderA11y()}
+              style={[typography.titleH3, styles.headerTitle, { color: fg.primary }]}
+            >
+              Change Password
+            </Text>
+          </View>
+
+        </>
+      ) : null}
+
+      <View style={styles.fields}>
+        <View style={styles.inputShell}>
+          <DsTextInput
+            value={next}
+            onChangeText={setNext}
+            placeholder="New Password"
+            placeholderTextColor={fg.secondary}
+            secureTextEntry
+            autoCapitalize="none"
+            autoCorrect={false}
+            editable={!saving}
+            style={[typography.body, styles.inputText]}
+          />
+        </View>
+        <Text style={[typography.bodySmall, styles.requirement, { color: fg.secondary }]}>
+          {NEW_PASSWORD_REQUIREMENT}
+        </Text>
+        <View style={styles.inputShell}>
+          <DsTextInput
+            value={confirm}
+            onChangeText={setConfirm}
+            placeholder="Repeat Password"
+            placeholderTextColor={fg.secondary}
+            secureTextEntry
+            autoCapitalize="none"
+            autoCorrect={false}
+            editable={!saving}
+            style={[typography.body, styles.inputText]}
+          />
+        </View>
+        {showMismatch ? (
+          <Text style={[typography.bodySmall, styles.error, { color: errorText }]}>
+            Password does not match
+          </Text>
+        ) : null}
+      </View>
+
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="SAVE NEW PASSWORD"
+        accessibilityState={{ disabled: !canSubmit }}
+        onPress={canSubmit ? () => onSubmit(next) : undefined}
+        disabled={!canSubmit}
+        style={({ pressed }) => [
+          styles.primary,
+          { backgroundColor: accent, shadowColor: accent },
+          !canSubmit && styles.primaryDisabled,
+          pressed && canSubmit && styles.pressed,
+        ]}
+      >
+        <Text style={[typography.ctaPrimaryLabel, styles.primaryLabel]}>
+          SAVE NEW PASSWORD
+        </Text>
+      </Pressable>
+    </View>
+  );
+
+  if (presentation === 'page') {
+    return (
+      <AccountFormPage title="Change Password" typography={typography} onBack={onBack ?? onClose}>
+        {content}
+      </AccountFormPage>
+    );
+  }
+
   return (
     <BottomSheetShell
       visible={visible}
@@ -84,83 +180,7 @@ export function ChangePasswordBottomSheet({
       registerInGlobalStack={registerInGlobalStack}
       bottomPaddingExtra={space('Spacing/4')}
     >
-      <View style={styles.body}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Back"
-          onPress={onBack ?? onClose}
-          style={({ pressed }) => [styles.back, pressed && styles.pressed]}
-        >
-          <SessionSheetBackIcon color={fg.secondary} />
-          <Text style={[typography.bodyBold, { color: fg.secondary }]}>Back</Text>
-        </Pressable>
-
-        <View style={styles.header}>
-          <View style={styles.headerIcon}>
-            <ProfileAccountIcon color={color('Brand/Accent')} />
-          </View>
-          <Text {...screenHeaderA11y()}
-            style={[typography.titleH3, styles.headerTitle, { color: fg.primary }]}
-          >
-            Change Password
-          </Text>
-        </View>
-
-        <View style={styles.fields}>
-          <View style={styles.inputShell}>
-            <DsTextInput
-              value={next}
-              onChangeText={setNext}
-              placeholder="New Password"
-              placeholderTextColor={fg.secondary}
-              secureTextEntry
-              autoCapitalize="none"
-              autoCorrect={false}
-              editable={!saving}
-              style={[typography.body, styles.inputText]}
-            />
-          </View>
-          <Text style={[typography.bodySmall, styles.requirement, { color: fg.secondary }]}>
-            {NEW_PASSWORD_REQUIREMENT}
-          </Text>
-          <View style={styles.inputShell}>
-            <DsTextInput
-              value={confirm}
-              onChangeText={setConfirm}
-              placeholder="Repeat Password"
-              placeholderTextColor={fg.secondary}
-              secureTextEntry
-              autoCapitalize="none"
-              autoCorrect={false}
-              editable={!saving}
-              style={[typography.body, styles.inputText]}
-            />
-          </View>
-          {showMismatch ? (
-            <Text style={[typography.bodySmall, styles.error, { color: errorText }]}>
-              Password does not match
-            </Text>
-          ) : null}
-        </View>
-
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="SAVE NEW PASSWORD"
-          accessibilityState={{ disabled: !canSubmit }}
-          onPress={canSubmit ? () => onSubmit(next) : undefined}
-          disabled={!canSubmit}
-          style={({ pressed }) => [
-            styles.primary,
-            { backgroundColor: accent, shadowColor: accent },
-            !canSubmit && styles.primaryDisabled,
-            pressed && canSubmit && styles.pressed,
-          ]}
-        >
-          <Text style={[typography.ctaPrimaryLabel, styles.primaryLabel]}>
-            SAVE NEW PASSWORD
-          </Text>
-        </Pressable>
-      </View>
+      {content}
     </BottomSheetShell>
   );
 }

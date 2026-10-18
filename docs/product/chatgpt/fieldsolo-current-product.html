@@ -56,7 +56,7 @@
   <header>
     <p class="kicker">Canonical product source · shipped behavior only</p>
     <h1>FieldSoli current product</h1>
-    <p>Reviewed 2026-07-21 at source commit <code>50822e52f3c1b1e3ba758e02a875d624d2983024</code>.</p>
+    <p>Reviewed 2026-07-21 at source commit <code>50822e52f3c1b1e3ba758e02a875d624d2983024</code>. Estimates and invoices are recorded under approved but not shipped and are not current functionality.</p>
     <nav aria-label="Document sections">
       <a href="#purpose">Purpose</a>
       <a href="#navigation">Navigation</a>
@@ -93,7 +93,7 @@
         <div class="panel">
           <h3>Current non-goals</h3>
           <ul>
-            <li>No quoting, estimates, invoices, payment processing, dispatch, scheduling, routing, team management, or customer portal.</li>
+            <li>No payment processing, dispatch, scheduling, routing, team management, or customer portal. Estimates and invoices exist only as a fail-closed, flag-gated build and are not current functionality.</li>
             <li>No promise of offline-first synchronization.</li>
             <li>No claim that exploring Figma experiments are available in the app.</li>
           </ul>
@@ -108,8 +108,8 @@
         <li>Authenticated users must pass the <a href="#state-legal-reacceptance">legal-version gate</a> and, when unresolved, the <a href="#state-analytics-consent">analytics choice</a>.</li>
         <li>The persistent main shell contains <a href="#screen-home">Home</a>, <a href="#screen-jobs">Jobs</a>, and <a href="#screen-earnings">Earnings</a>.</li>
         <li><a href="#screen-job-detail">Job Detail</a> and <a href="#state-inbox-notes">Inbox</a> cover the shell but preserve the selected destination tab.</li>
-        <li><a href="#screen-profile">Profile</a> stacks over Home; <a href="#state-help">Help</a> and <a href="#state-privacy">Privacy</a> are secondary Profile screens.</li>
-        <li>An active live session is represented globally by <a href="#state-live-session">Live Session</a> UI.</li>
+        <li><a href="#screen-profile">Account</a> opens from the Dashboard settings icon and hides the main tab bar; <a href="#state-help">Help</a> and <a href="#state-privacy">Privacy</a> are secondary Account screens.</li>
+        <li>An active live visit is represented globally by <a href="#state-live-session">Live Visit</a> UI.</li>
       </ol>
     </section>
 
@@ -125,7 +125,7 @@
         <article id="screen-home" data-screen-id="home" data-status="shipped">
           <p class="kicker">Main tab</p>
           <h3>Home</h3>
-          <dl><dt>Purpose</dt><dd>Fast capture, current work, and attention queue.</dd><dt>Actions</dt><dd>Open Profile, Earnings, or Job Detail; start a live session; quick-capture a note or material to Inbox or a selected job.</dd><dt>States</dt><dd>Weekly net snapshot with zero-earnings guidance, recent jobs, incomplete jobs, work needing completion review, pending payment, loading, error, and a full-page first-job state.</dd></dl>
+          <dl><dt>Purpose</dt><dd>Fast capture, current work, and attention queue.</dd><dt>Actions</dt><dd>Open Account, Earnings, or Job Detail; start a live visit; quick-capture a note or material to Inbox or a selected job.</dd><dt>States</dt><dd>Weekly net snapshot with zero-earnings guidance, recent jobs, incomplete jobs, work needing completion review, pending payment, loading, error, and a full-page first-job state.</dd></dl>
           <p><a href="https://github.com/johnveltri/fieldsoli/blob/main/apps/mobile-expo/src/screens/HomeScreen.tsx">Source</a> · <a href="https://www.figma.com/design/TdvsllfeXrnkvBqR4qb3fn/Fieldsolo-App---gig-work-for-skilled-trade?node-id=2025-19">Figma node 2025:19</a></p>
         </article>
         <article id="screen-jobs" data-screen-id="jobs" data-status="shipped">
@@ -143,13 +143,13 @@
         <article id="screen-job-detail" data-screen-id="job-detail" data-status="shipped">
           <p class="kicker">Shell-covering screen</p>
           <h3>Job Detail</h3>
-          <dl><dt>Data</dt><dd>Job identity, customer, address, category, work/payment status, earnings, time, sessions, notes, and materials.</dd><dt>Actions</dt><dd>Edit job; change work status; create/edit/delete sessions, notes, and materials; assign items to sessions; start or manage live work; delete job.</dd><dt>Constraints</dt><dd>Material rows require description and nonzero quantity; units support presets and custom values.</dd></dl>
+          <dl><dt>Data</dt><dd>Job identity, customer, address, category, work/payment status, earnings, time, visits, notes, and materials.</dd><dt>Actions</dt><dd>Edit job; change work status; create/edit/delete visits, notes, and materials; assign items to visits; start or manage live work; delete job.</dd><dt>Constraints</dt><dd>Material rows require description and nonzero quantity; units support presets and custom values.</dd></dl>
           <p><a href="https://github.com/johnveltri/fieldsoli/blob/main/apps/mobile-expo/src/screens/JobDetailScreen.tsx">Source</a> · <a href="https://www.figma.com/design/TdvsllfeXrnkvBqR4qb3fn/Fieldsolo-App---gig-work-for-skilled-trade?node-id=2025-561">Figma node 2025:561</a></p>
         </article>
         <article id="screen-profile" data-screen-id="profile" data-status="shipped">
           <p class="kicker">Home overlay</p>
-          <h3>Profile</h3>
-          <dl><dt>Data</dt><dd>Name, email, and trade selections.</dd><dt>Actions</dt><dd>Send feedback from the primary button between Personal Info and Your data; edit profile/trades; change password; open Privacy or Help; log out; or begin permanent account deletion.</dd><dt>Nested screens</dt><dd>Privacy and Help replace Profile until Back is selected.</dd></dl>
+          <h3>Account</h3>
+          <dl><dt>Sections</dt><dd>Business: Business Details, Estimates &amp; Invoices, Export Job Summary. Account: Personal Details, Change Password. Help &amp; Privacy: Help &amp; Support, Privacy Choices, Send Feedback. Log Out appears below the sections. The standalone Delete Account action is on Privacy Choices, after Legal.</dd><dt>Editing</dt><dd>Personal Details and Business Details use icon input rows and a floating Save Changes action. Trades are inline checkboxes, including custom trades; edits save together, and Back offers to discard unsaved changes. Export Job Summary uses the shared Payment terms single-select card for Year, standard section headings, plain informational delivery email and included-data text, and a floating Request Export action.</dd><dt>Navigation</dt><dd>Account and its child screens hide the main tab bar until Account closes. Change Password and Delete Account are full secondary pages with the existing password validation, deletion phrase, and final system confirmation. Delete Account opens from Privacy Choices and returns there with Back; Analytics and Legal use the standard Account section-title typography. Secondary pages slide horizontally in and out using the same transition as Dashboard to Account; editable forms retain their discard checks before returning. Menu rows have no leading icons or secondary descriptions; the Delete Account action keeps its standalone destructive treatment.</dd></dl>
           <p><a href="https://github.com/johnveltri/fieldsoli/blob/main/apps/mobile-expo/src/screens/ProfileScreen.tsx">Source</a> · <a href="https://www.figma.com/design/TdvsllfeXrnkvBqR4qb3fn/Fieldsolo-App---gig-work-for-skilled-trade?node-id=2025-958">Figma node 2025:958</a></p>
         </article>
       </div>
@@ -166,7 +166,7 @@
         <article id="state-analytics-consent" data-state-id="analytics-consent" data-status="shipped"><h4>Analytics consent</h4><p>Blocks the authenticated shell until the user chooses Allow analytics or No thanks. <a href="https://www.figma.com/design/TdvsllfeXrnkvBqR4qb3fn/Fieldsolo-App---gig-work-for-skilled-trade?node-id=2028-1596">Figma 2028:1596</a></p></article>
         <article id="state-legal-reacceptance" data-state-id="legal-reacceptance" data-status="shipped"><h4>Legal reacceptance</h4><p>Fails closed when current Privacy/Terms acceptance cannot be verified and records acceptance before continuing. <a href="https://www.figma.com/design/TdvsllfeXrnkvBqR4qb3fn/Fieldsolo-App---gig-work-for-skilled-trade?node-id=2028-1606">Figma 2028:1606</a></p></article>
         <article id="state-delete-account" data-state-id="delete-account" data-status="shipped"><h4>Delete account</h4><p class="danger">Requires the exact confirmation phrase, then a system confirmation, before permanent account deletion. <a href="https://www.figma.com/design/TdvsllfeXrnkvBqR4qb3fn/Fieldsolo-App---gig-work-for-skilled-trade?node-id=2028-1614">Figma 2028:1614</a></p></article>
-        <article id="state-live-session" data-state-id="live-session" data-status="shipped"><h4>Active live session</h4><p>Global minimized bar and editing flow for an in-progress session. The feature-flagged expanded overlay persists time and job details inline; ending a session opens that job's detail view in either state. <a href="https://www.figma.com/design/TdvsllfeXrnkvBqR4qb3fn/Fieldsolo-App---gig-work-for-skilled-trade?node-id=2028-1625">Figma 2028:1625</a></p></article>
+        <article id="state-live-session" data-state-id="live-session" data-status="shipped"><h4>Active live visit</h4><p>Global minimized bar and editing flow for an in-progress visit. The feature-flagged expanded overlay persists time and job details inline; ending a visit opens that job's detail view in either state. <a href="https://www.figma.com/design/TdvsllfeXrnkvBqR4qb3fn/Fieldsolo-App---gig-work-for-skilled-trade?node-id=2028-1625">Figma 2028:1625</a></p></article>
       </div>
     </section>
 
@@ -181,19 +181,19 @@
           <tr data-capability-id="analytics.choose" data-status="shipped"><td>Choose analytics</td><td>First authenticated run or Privacy</td><td>Grants or withdraws optional analytics and updates client activation.</td><td>Analytics are off before consent; failed writes revert UI.</td></tr>
           <tr data-capability-id="home.review" data-status="shipped"><td>Review current work</td><td>Home</td><td>Loads weekly net, recent work, incomplete jobs, completion review, and pending payment.</td><td>Paginated attention data; loading/error/empty states.</td></tr>
           <tr data-capability-id="capture.quick" data-status="shipped"><td>Quick capture</td><td>Home quick actions</td><td>Creates a note or material in Inbox; assignment happens later through explicit Add to job.</td><td>Material supports a description and authoritative total without requiring a breakdown.</td></tr>
-          <tr data-capability-id="session.live" data-status="shipped"><td>Live session</td><td>Home / global overlay</td><td>Creates an in-progress session, maintains a timer, and opens the job detail view after ending.</td><td>The feature-flagged expanded overlay supports inline adjustments; failed start cleans up a placeholder job unless refresh confirms success.</td></tr>
+          <tr data-capability-id="session.live" data-status="shipped"><td>Live visit</td><td>Home / global overlay</td><td>Creates an in-progress visit, maintains a timer, and opens the job detail view after ending.</td><td>The feature-flagged expanded overlay supports inline adjustments; failed start cleans up a placeholder job unless refresh confirms success.</td></tr>
           <tr data-capability-id="jobs.browse" data-status="shipped"><td>Browse/search jobs</td><td>Jobs</td><td>Loads paginated All/Open/Paid lists and debounced search.</td><td>Search hides tabs while focused; explicit empty/error/loading states.</td></tr>
-          <tr data-capability-id="jobs.create" data-status="shipped"><td>Create job</td><td>Jobs FAB</td><td>Creates a blank job and opens Job Detail with edit sheet.</td><td>FAB is suppressed when the live-session bar occupies its slot.</td></tr>
+          <tr data-capability-id="jobs.create" data-status="shipped"><td>Create job</td><td>Jobs FAB</td><td>Creates a blank job and opens Job Detail with edit sheet.</td><td>FAB is suppressed when the live-visit bar occupies its slot.</td></tr>
           <tr data-capability-id="jobs.update" data-status="shipped"><td>Edit job and status</td><td>Job Detail</td><td>Updates identity/economic fields, no-materials confirmation, and work status.</td><td>Work and payment status are separate.</td></tr>
           <tr data-capability-id="jobs.delete" data-status="shipped"><td>Delete job</td><td>Job Detail</td><td>Deletes the job after confirmation and returns to the shell.</td><td>Destructive and explicitly confirmed.</td></tr>
-          <tr data-capability-id="sessions.manage" data-status="shipped"><td>Manage sessions</td><td>Job Detail</td><td>Create manual sessions; edit times; delete; attach notes/materials.</td><td>In-progress sessions are excluded from completed cards but available to assignment.</td></tr>
-          <tr data-capability-id="notes.manage" data-status="shipped"><td>Manage notes</td><td>Job Detail / Home / Inbox</td><td>Create, update, soft-delete, and attach notes to jobs/sessions.</td><td>Unassigned notes remain in Inbox.</td></tr>
+          <tr data-capability-id="sessions.manage" data-status="shipped"><td>Manage visits</td><td>Job Detail</td><td>Create manual visits; edit times; delete; attach notes/materials.</td><td>In-progress visits are excluded from completed cards but available to assignment.</td></tr>
+          <tr data-capability-id="notes.manage" data-status="shipped"><td>Manage notes</td><td>Job Detail / Home / Inbox</td><td>Create, update, soft-delete, and attach notes to jobs/visits.</td><td>Unassigned notes remain in Inbox.</td></tr>
           <tr data-capability-id="materials.manage" data-status="shipped"><td>Manage materials</td><td>Job Detail / Home / Inbox</td><td>Create, update, soft-delete, price, quantify, and attach materials.</td><td>Description and total are sufficient; quantity, unit, and unit price remain optional explicit details.</td></tr>
           <tr data-capability-id="inbox.assign" data-status="shipped"><td>Assign Inbox item</td><td>Inbox item</td><td>Updates an unassigned note/material with a selected job and removes it from Inbox.</td><td>Notes and materials have separate tabs.</td></tr>
           <tr data-capability-id="earnings.review" data-status="shipped"><td>Review earnings</td><td>Earnings</td><td>Aggregates job economics for 7/30/365-day windows and lists ranked jobs.</td><td>Only completed, financially complete jobs in the selected work window contribute; Home's weekly snapshot uses the same rule.</td></tr>
-          <tr data-capability-id="profile.manage" data-status="shipped"><td>Manage profile/account</td><td>Profile</td><td>Edit name/trades, change password, log out, open Help/Privacy.</td><td>Profile save upserts when an older user lacks a profile row.</td></tr>
-          <tr data-capability-id="feedback.send" data-status="shipped"><td>Send feedback</td><td>Profile / job completion prompt</td><td>Opens a prefilled email to FieldSoli support with short feedback questions and device context.</td><td>Completion prompts are user-scoped and limited to the first and third completed-job milestones; sending feedback suppresses later prompts on that device.</td></tr>
-          <tr data-capability-id="account.delete" data-status="shipped"><td>Delete account</td><td>Profile</td><td>Calls the delete-account Edge Function, clears the session, and reports failures.</td><td>Exact phrase plus system confirmation; permanent.</td></tr>
+          <tr data-capability-id="profile.manage" data-status="shipped"><td>Manage profile/account</td><td>Account</td><td>Edit name/trades, change password, log out, open Help/Privacy.</td><td>Profile save upserts when an older user lacks a profile row.</td></tr>
+          <tr data-capability-id="feedback.send" data-status="shipped"><td>Send feedback</td><td>Account / job completion prompt</td><td>Opens a prefilled email to FieldSoli support with short feedback questions and device context.</td><td>Completion prompts are user-scoped and limited to the first and third completed-job milestones; sending feedback suppresses later prompts on that device.</td></tr>
+          <tr data-capability-id="account.delete" data-status="shipped"><td>Delete account</td><td>Account</td><td>Calls the delete-account Edge Function, clears the session, and reports failures.</td><td>Exact phrase plus system confirmation; permanent.</td></tr>
         </tbody>
       </table>
     </section>
@@ -221,7 +221,7 @@
         <div class="panel"><h3>Authentication</h3><p>Supabase email/password authentication controls access. Local migration preserves prior Fieldbook auth storage only when the fieldsolo.* auth key does not already exist. Every new authenticated session enters on Home rather than restoring the screen or overlay that was open before sign-out.</p></div>
         <div class="panel"><h3>Legal acceptance</h3><p>Signup and reacceptance persist versioned Privacy/Terms acceptance. A current server record is authoritative; a current user/version-specific cache can bridge temporary server failure.</p></div>
         <div class="panel"><h3>Analytics</h3><p>Optional analytics do not activate before consent. Granting activates identify/events; withdrawal clears the persisted anonymous identifier and stops events.</p></div>
-        <div class="panel"><h3>Permanent account deletion</h3><p class="danger">Profile requires the phrase <code>delete account</code>, then a system confirmation. The delete-account Edge Function permanently removes the account and associated data.</p></div>
+        <div class="panel"><h3>Permanent account deletion</h3><p class="danger">Account requires the phrase <code>delete account</code>, then a system confirmation. The delete-account Edge Function permanently removes the account and associated data.</p></div>
         <div class="panel"><h3>Record deletion</h3><p>Job, session, note, and material deletion require explicit user action. Notes and materials use soft deletion; the active live-session delete path deletes the session record.</p></div>
         <div class="panel"><h3>Release constraints</h3><p>Production validation rejects a local backend and rich analytics debugging. Analytics provider configuration does not override the consent gate.</p></div>
       </div>
@@ -242,7 +242,20 @@
 
     <section id="status-approved" data-status="approved-not-shipped">
       <h2>Approved but not shipped</h2>
-      <aside class="notice">No approved-but-unshipped capabilities are recorded in this product source as of 2026-07-21. An approved experiment is not current functionality until implementation and this source are updated together.</aside>
+      <aside class="notice">Invoice-backed Job Revenue is approved and being implemented, but is not shipped current functionality. The client flow remains behind the invoicing PostHog flag; deploy the additive backend migrations before enabling it. New and existing unadopted Jobs retain legacy completion behavior while the flag is disabled. No production rollout or store release is included here. Historical Jobs, amounts, documents, and links remain unchanged until explicit adoption.</aside>
+      <article id="capability-invoicing" data-status="approved-not-shipped">
+        <h3>Estimates, invoices, and sharing</h3>
+        <ul>
+          <li>Account stores business defaults. Documents appears after Notes on Job Detail, and Job Edit stages document controls alongside Labor &amp; Services, material markup, and whether an Other Cost is billed to the customer. Historical Jobs keep their existing Revenue until the user adopts an Invoice.</li>
+          <li>A Job has one selected Invoice as its Revenue source. Revenue uses that saved Invoice’s pretax subtotal; current actual costs and tracked time continue to update Net earnings and Net/hour. Invoice snapshots remain immutable. Explicitly confirming no Labor &amp; Services still permits billable materials and Other Costs.</li>
+          <li>Complete and Paid finish through financial review. If no revenue Invoice exists, the flow creates one without requiring the user to share it. Replacing an Invoice is explicit; cost corrections alone do not replace it. On a Paid Job, a different replacement total requires confirmation of the new amount.</li>
+          <li>When an unsaved Estimate or Invoice preview lacks required details, Business Details and Job Details action cards list the missing fields in red and open the matching edit screen. The incomplete document remains visible below the cards.</li>
+          <li>Job Edit can select an Invoice for Job Revenue and stage archive/link controls until Done. A selected Invoice can remain archived; only the selected Invoice follows later Job Paid/Unpaid changes, while previous Invoices retain their last status.</li>
+          <li>Sharing hands off a bearer link or an on-device PDF after a fresh document/status read. Unresolved creation requests retain their original key across app restart and reconcile before another creation. The app does not collect or prove payment.</li>
+          <li>A shared link opens a no-store page on fieldsoli.com. Disabling the link, deleting the job, or deleting the account makes that link unavailable. The page does not say why.</li>
+          <li>Only the selected Invoice’s payment wording follows the Job’s Paid/Unpaid state. It reflects recorded status, not a receipt or a payment-processor result.</li>
+        </ul>
+      </article>
     </section>
 
     <section id="status-exploring" data-status="exploring">

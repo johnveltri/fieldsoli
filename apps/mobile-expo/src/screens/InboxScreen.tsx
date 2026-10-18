@@ -14,7 +14,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { color, radius } from '@fieldsolo/design-system/lib/tokens';
+import { color } from '@fieldsolo/design-system/lib/tokens';
 
 import { PlatformHeaderAction } from '../components/platform/PlatformHeaderAction';
 import {
@@ -41,6 +41,7 @@ import { CanvasTiledBackground } from '../components/CanvasTiledBackground';
 import {
   CaptureComposerSheet,
   ChooseJobBottomSheet,
+  SegmentedControl,
   SectionHeader,
   ViewMaterialsBuckets,
   ViewNotesBuckets,
@@ -63,7 +64,6 @@ import {
 } from '../lib/timeBuckets';
 import {
   bg,
-  cardShadowRn,
   createTextStyles,
   fg,
   space,
@@ -754,46 +754,17 @@ export function InboxScreen({ loadKey = 0, onRequestClose }: InboxScreenProps) {
           </View>
         </View>
 
-        <View style={styles.tabsWrap}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityState={{ selected: activeTab === 'notes' }}
-            onPress={() => selectTab('notes')}
-            style={({ pressed }) => [
-              activeTab === 'notes' ? styles.tabActive : styles.tabIdle,
-              pressed && styles.pressed,
-            ]}
-          >
-            <Text
-              style={[
-                typography.statusPillLabel,
-                styles.tabLabel,
-                { color: activeTab === 'notes' ? fg.primary : fg.secondary },
-              ]}
-            >
-              Notes
-            </Text>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityState={{ selected: activeTab === 'materials' }}
-            onPress={() => selectTab('materials')}
-            style={({ pressed }) => [
-              activeTab === 'materials' ? styles.tabActive : styles.tabIdle,
-              pressed && styles.pressed,
-            ]}
-          >
-            <Text
-              style={[
-                typography.statusPillLabel,
-                styles.tabLabel,
-                { color: activeTab === 'materials' ? fg.primary : fg.secondary },
-              ]}
-            >
-              Materials
-            </Text>
-          </Pressable>
-        </View>
+        <SegmentedControl
+          accessibilityLabel="Inbox category"
+          style={styles.inboxTabs}
+          value={activeTab}
+          options={[
+            { value: 'notes', label: 'Notes' },
+            { value: 'materials', label: 'Materials' },
+          ]}
+          onValueChange={selectTab}
+          labelStyle={typography.statusPillLabel}
+        />
 
         {loading ? (
           <ActivityIndicator
@@ -934,34 +905,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
     gap: space('Spacing/12'),
   },
-  tabsWrap: {
-    width: '100%',
-    marginTop: space('Spacing/12'),
-    backgroundColor: bg.subtle,
-    borderRadius: radius('Radius/Full'),
-    padding: space('Spacing/4'),
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  tabActive: {
-    flex: 1,
-    backgroundColor: bg.surfaceWhite,
-    borderRadius: radius('Radius/Full'),
-    minHeight: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-    ...cardShadowRn,
-  },
-  tabIdle: {
-    flex: 1,
-    minHeight: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  tabLabel: {
-    textTransform: 'uppercase',
-  },
+  inboxTabs: { marginTop: space('Spacing/12') },
   groupWrap: {
     width: '100%',
     alignItems: 'stretch',

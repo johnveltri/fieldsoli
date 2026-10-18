@@ -32,6 +32,7 @@ export type CreateMaterialInput = {
   quantityExplicit?: boolean;
   unitCostExplicit?: boolean;
   totalCostCents?: number;
+  markupOverrideBps?: number | null;
 };
 
 /**
@@ -56,6 +57,7 @@ export type UpdateMaterialInput = {
   quantityExplicit?: boolean;
   unitCostExplicit?: boolean;
   totalCostCents?: number;
+  markupOverrideBps?: number | null;
   sessionId?: SessionId | null;
   jobId?: JobId | null;
 };
@@ -122,6 +124,9 @@ export async function createMaterial(
     total_cost_cents:
       input.totalCostCents ?? computeTotalCostCents(input.unitCostCents, input.quantity),
     cost_type: 'material',
+    ...(input.markupOverrideBps !== undefined
+      ? { markup_override_bps: input.markupOverrideBps }
+      : {}),
     // When a session is chosen we null out job_id. Otherwise job-scoped, or —
     // when jobId is also null — an Inbox quick capture with no parent. Matches
     // how fetchJobDetail / inbox lists bucket materials.
@@ -189,6 +194,9 @@ export async function updateMaterial(
   if (input.totalCostCents !== undefined) {
     assertTotalCostNonNegative(input.totalCostCents);
     patch.total_cost_cents = input.totalCostCents;
+  }
+  if (input.markupOverrideBps !== undefined) {
+    patch.markup_override_bps = input.markupOverrideBps;
   }
 
   // If either side of the cost changed, recompute total_cost_cents. When

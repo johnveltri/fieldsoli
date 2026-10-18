@@ -80,8 +80,8 @@ export function HelpScreen({ onBack }: HelpScreenProps) {
             <PlatformHeaderAction accessibilityLabel="Back" onPress={onBack}>
               <TopHeaderBackIcon size={BACK_ICON_SIZE} color={fg.primary} />
             </PlatformHeaderAction>
-            <Text {...screenHeaderA11y()} style={[typography.displayH1, styles.title]}>
-              HELP
+            <Text {...screenHeaderA11y()} style={[typography.headingH2, styles.title]}>
+              Help & Support
             </Text>
           </View>
 
@@ -110,12 +110,11 @@ const styles = StyleSheet.create({
   scrollContent: { alignItems: 'stretch' },
   topHeaderRow: {
     width: '100%',
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 0,
     paddingTop: space('Spacing/32'),
     paddingBottom: space('Spacing/16'),
-    gap: space('Spacing/8'),
+    gap: space('Spacing/12'),
   },
   backHit: {
     minWidth: 44,
@@ -125,6 +124,7 @@ const styles = StyleSheet.create({
   },
   title: {
     flex: 1,
+    minWidth: 0,
     color: fg.primary,
   },
   bodyWrap: {

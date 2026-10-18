@@ -98,7 +98,7 @@ describe('validateJobEditDraft capture-now', () => {
     ).toBe(true);
   });
 
-  it('includes a referenced date-only session in the payload', () => {
+  it('includes a referenced date-only visit in the payload', () => {
     const job = minimalJob();
     const snapshot = createJobEditDraft(job);
     const draft: JobEditDraft = {
@@ -141,7 +141,7 @@ describe('validateJobEditDraft capture-now', () => {
     expect(payload.materials.create[0]?.sessionId).toBe('sess-new');
   });
 
-  it('persists sessions without a calendar date', () => {
+  it('persists visits without a calendar date', () => {
     const job = minimalJob();
     const snapshot = createJobEditDraft(job);
     const draft: JobEditDraft = {
@@ -167,7 +167,7 @@ describe('validateJobEditDraft capture-now', () => {
     expect(payload.sessions.create[0]?.calendarDateExplicit).toBe(false);
   });
 
-  it('can build and reopen an undated session without synthesizing from an empty date', () => {
+  it('can build and reopen an undated visit without synthesizing from an empty date', () => {
     const job = minimalJob({
       displaySessions: [
         {
@@ -228,7 +228,7 @@ describe('validateJobEditDraft capture-now', () => {
     expect(payload.notes.create).toHaveLength(1);
   });
 
-  it('detaches visible children when a session is removed', () => {
+  it('detaches visible children when a visit is removed', () => {
     const snapshot = createJobEditDraft(minimalJob());
     const draft: JobEditDraft = {
       ...snapshot,
@@ -409,6 +409,21 @@ describe('validateJobEditDraft capture-now', () => {
 });
 
 describe('useJobEditDraft confirm-none and refs', () => {
+  it('preserves billable other costs in the save payload after resetting an invoicing draft', () => {
+    const job = minimalJob();
+    const { result } = renderHook(() => useJobEditDraft(job, { invoicingEnabled: true }));
+    act(() => result.current.resetFromJob(job));
+    act(() => result.current.addOtherCost());
+    const id = result.current.draft!.otherCosts[0].id;
+    act(() => result.current.updateOtherCost(id, {
+      costType: 'other', costCents: 1200, description: 'Travel', invoiceCustomer: true,
+    }));
+    expect(result.current.buildPayload().job.pricingIntent).toBe('labor');
+    expect(result.current.buildPayload().otherCosts.create[0].invoiceCustomer).toBe(true);
+    act(() => result.current.updateOtherCost(id, { invoiceCustomer: false }));
+    expect(result.current.buildPayload().otherCosts.create[0].invoiceCustomer).toBe(false);
+  });
+
   function setupHook(job: JobDetailViewModel) {
     const { result } = renderHook(() => useJobEditDraft(job));
     act(() => {
@@ -499,6 +514,26 @@ describe('useJobEditDraft confirm-none and refs', () => {
       noRevenueConfirmed: true,
       noMaterialsConfirmed: true,
       noOtherCostsConfirmed: true,
+    });
+  });
+
+  it('persists no Labor & Services independently from no Revenue', () => {
+    const snapshot = createJobEditDraft(minimalJob());
+    const draft: JobEditDraft = {
+      ...snapshot,
+      revenueCents: 1500,
+      laborServicesCents: 0,
+      pricingIntent: 'labor',
+      noRevenueConfirmed: false,
+      noLaborServicesConfirmed: true,
+    };
+
+    expect(buildApplyJobDetailEditPayload(snapshot, draft).job).toMatchObject({
+      revenueCents: 1500,
+      laborServicesCents: 0,
+      pricingIntent: 'labor',
+      noRevenueConfirmed: false,
+      noLaborServicesConfirmed: true,
     });
   });
 

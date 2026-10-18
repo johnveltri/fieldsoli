@@ -70,7 +70,7 @@ describe('EditLiveSessionBottomSheet', () => {
 
       fireEvent.press(
         screen.getByLabelText(
-          'End time (optional — saving with a value ends the session)',
+          'End time (optional — saving with a value ends the visit)',
         ),
       );
       expect(screen.getByTestId('date-time-picker')).toBeTruthy();
@@ -99,7 +99,7 @@ describe('EditLiveSessionBottomSheet', () => {
 
       fireEvent.press(
         screen.getByLabelText(
-          'End time (optional — saving with a value ends the session)',
+          'End time (optional — saving with a value ends the visit)',
         ),
       );
       fireEvent.press(screen.getByTestId('date-time-picker'));

@@ -15,11 +15,13 @@ export function JobDetailSummaryCard({
   typography,
   onPress,
   noRevenueConfirmed,
+  isInvoiced,
 }: {
   earnings: JobDetailViewModel['earnings'];
   typography: TextStyles;
   onPress?: () => void;
   noRevenueConfirmed?: boolean;
+  isInvoiced?: boolean;
 }) {
   const netTone =
     earnings.netEarningsCents >= 0
@@ -36,7 +38,9 @@ export function JobDetailSummaryCard({
   const content = (
     <View style={styles.summaryStack}>
       <View style={styles.summaryRow}>
-        <Text style={[typography.body, { color: fg.secondary, flex: 1 }]}>Revenue</Text>
+        <Text style={[typography.body, { color: fg.secondary, flex: 1 }]}>
+          {isInvoiced ? 'Invoiced Revenue' : 'Revenue'}
+        </Text>
         <Text style={[typography.bodyBold, styles.summaryMoney]}>
           {noRevenueConfirmed
             ? formatUsdCombined(0)

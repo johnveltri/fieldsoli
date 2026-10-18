@@ -12,7 +12,12 @@ export type ApplyJobDetailEditJobPatch = {
   customerId: string | null;
   serviceAddress: string;
   revenueCents: number | null;
+  /** Present only when the invoicing UI saves Labor & Services. */
+  laborServicesCents?: number | null;
+  pricingIntent?: 'labor' | 'revenue';
   noRevenueConfirmed: boolean;
+  /** Explicit zero Labor & Services, independently of the total customer charge. */
+  noLaborServicesConfirmed?: boolean;
   noMaterialsConfirmed: boolean;
   noOtherCostsConfirmed: boolean;
 };
@@ -45,6 +50,7 @@ export type ApplyJobDetailEditMaterialRow = {
   unitCostExplicit: boolean;
   totalCostCents: number;
   sessionId: string | null;
+  markupOverrideBps?: number | null;
 };
 
 export type ApplyJobDetailEditOtherCostRow = {
@@ -54,6 +60,19 @@ export type ApplyJobDetailEditOtherCostRow = {
   description: string;
   costCents: number;
   sessionId: string | null;
+  invoiceCustomer?: boolean;
+};
+
+export type ApplyJobInvoicePreferences = {
+  revenueDocumentId: string | null;
+  expectedRevenueDocumentId: string | null;
+  confirmedPaidTotalCents?: number | null;
+  controls: Array<{
+    documentId: string;
+    archived: boolean;
+    linkEnabled: boolean;
+    expectedRevision: number;
+  }>;
 };
 
 export type ApplyJobDetailEditPayload = {
@@ -78,6 +97,7 @@ export type ApplyJobDetailEditPayload = {
     update: ApplyJobDetailEditOtherCostRow[];
     deleteIds: string[];
   };
+  invoicePreferences?: ApplyJobInvoicePreferences;
 };
 
 export type ApplyJobDetailEditErrorCode =
@@ -122,6 +142,13 @@ function toRpcPayload(payload: ApplyJobDetailEditPayload): Record<string, unknow
       customerId: payload.job.customerId,
       serviceAddress: payload.job.serviceAddress,
       revenueCents: payload.job.revenueCents,
+      ...(payload.job.pricingIntent === 'labor'
+        ? {
+            pricingIntent: 'labor' as const,
+            laborServicesCents: payload.job.laborServicesCents ?? null,
+            noLaborServicesConfirmed: payload.job.noLaborServicesConfirmed ?? false,
+          }
+        : {}),
       noRevenueConfirmed: payload.job.noRevenueConfirmed,
       noMaterialsConfirmed: payload.job.noMaterialsConfirmed,
       noOtherCostsConfirmed: payload.job.noOtherCostsConfirmed,
@@ -130,6 +157,7 @@ function toRpcPayload(payload: ApplyJobDetailEditPayload): Record<string, unknow
     notes: payload.notes,
     materials: payload.materials,
     otherCosts: payload.otherCosts,
+    ...(payload.invoicePreferences ? { invoicePreferences: payload.invoicePreferences } : {}),
   };
 }
 
@@ -139,7 +167,7 @@ export async function applyJobDetailEdit(
   jobId: JobId,
   payload: ApplyJobDetailEditPayload,
 ): Promise<void> {
-  const { data, error } = await client.rpc('apply_job_detail_edit_atomic', {
+  const { data, error } = await client.rpc('apply_job_detail_edit_with_invoice_preferences', {
     p_job_id: jobId,
     p_payload: toRpcPayload(payload) as import('./database.types').Json,
   });

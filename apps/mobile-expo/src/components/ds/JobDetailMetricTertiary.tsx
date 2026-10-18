@@ -46,7 +46,7 @@ export function JobDetailMetricTertiary({
           </View>
         </View>
         <View style={styles.metricColEqual}>
-          <Text style={typography.jobDetailMetricColumnLabel}>SESSIONS</Text>
+          <Text style={typography.jobDetailMetricColumnLabel}>VISITS</Text>
           <Text style={[typography.metric, styles.metricValueCentered, { textTransform: 'none' }]}>
             {String(metrics.sessionCount)}
           </Text>

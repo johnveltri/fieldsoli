@@ -101,7 +101,7 @@ jest.mock('../lib/supabase', () => ({
 jest.mock('./quickActionsFlowHelpers', () => ({
   formatCaptureError: (error: unknown) =>
     error instanceof Error ? error.message : 'Could not complete action.',
-  formatLiveSessionJobTitle: () => 'Live Session Sep 10 at 9:45 PM',
+  formatLiveSessionJobTitle: () => 'Live Visit Sep 10 at 9:45 PM',
 }));
 
 function Harness() {
@@ -115,7 +115,7 @@ function Harness() {
       />
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Live session"
+        accessibilityLabel="Live visit"
         onPress={() => handlePrimaryAction('live_session')}
       />
       <Pressable
@@ -200,7 +200,7 @@ describe('QuickActionsFlowProvider', () => {
     });
   });
 
-  it('starts a live session immediately without the Start Session chooser', async () => {
+  it('starts a live visit immediately without the Start Visit chooser', async () => {
     const apiClient = jest.requireMock('@fieldsolo/api-client') as any;
     apiClient.createBlankJobForLiveSessionStart.mockResolvedValue('job-live-1');
     mockStartLiveSession.mockResolvedValue({ id: 'sess-1', jobId: 'job-live-1' });
@@ -211,16 +211,16 @@ describe('QuickActionsFlowProvider', () => {
       </QuickActionsFlowProvider>,
     );
 
-    fireEvent.press(screen.getByRole('button', { name: 'Live session' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Live visit' }));
 
     await waitFor(() => {
       expect(apiClient.createBlankJobForLiveSessionStart).toHaveBeenCalledWith(
         {},
-        { shortDescription: 'Live Session Sep 10 at 9:45 PM' },
+        { shortDescription: 'Live Visit Sep 10 at 9:45 PM' },
       );
       expect(mockStartLiveSession).toHaveBeenCalledWith({
         jobId: 'job-live-1',
-        jobShortDescription: 'Live Session Sep 10 at 9:45 PM',
+        jobShortDescription: 'Live Visit Sep 10 at 9:45 PM',
       });
     });
     expect(screen.getByText('capture-closed')).toBeTruthy();
@@ -312,7 +312,7 @@ describe('QuickActionsFlowProvider', () => {
       </QuickActionsFlowProvider>,
     );
 
-    fireEvent.press(screen.getByRole('button', { name: 'Live session' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Live visit' }));
 
     await waitFor(() => expect(mockLegacyQuickActionsProps?.visible).toBe(true));
     expect(apiClient.createBlankJobForLiveSessionStart).not.toHaveBeenCalled();

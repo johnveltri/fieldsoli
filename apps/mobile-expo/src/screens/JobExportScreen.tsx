@@ -5,7 +5,6 @@ import {
 } from '@fieldsolo/design-system/expo/loadFieldSoloFonts';
 import { useCallback, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
   Animated,
   Pressable,
   StyleSheet,
@@ -17,10 +16,10 @@ import { requestJobExport, JobExportRequestError } from '@fieldsolo/api-client';
 import { color } from '@fieldsolo/design-system/lib/tokens';
 
 import { CanvasTiledBackground } from '../components/CanvasTiledBackground';
-import { DropdownBottomSheet, type DropdownBottomSheetOption } from '../components/ds';
+import { AccountSingleSelectCard } from '../components/ds/AccountSingleSelectCard';
+import { FullWidthFab } from '../components/ds/FullWidthFab';
 import { PlatformHeaderAction } from '../components/platform/PlatformHeaderAction';
 import { TopHeaderBackIcon } from '../components/figma-icons/TopHeaderIcons';
-import { JobDetailIconViewSessionChevron } from '../components/figma-icons/JobDetailScreenIcons';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import {
@@ -29,7 +28,6 @@ import {
 } from '../lib/jobExportYears';
 import {
   bg,
-  border,
   cardShadowRn,
   createTextStyles,
   fg,
@@ -66,7 +64,6 @@ export function JobExportScreen({ onBack, onBackToHome }: JobExportScreenProps) 
   const { session } = useAuth();
   const [scrollY] = useState(() => new Animated.Value(0));
   const [scrollContentHeight, setScrollContentHeight] = useState(0);
-  const [yearPickerOpen, setYearPickerOpen] = useState(false);
   const [requestState, setRequestState] = useState<RequestState>({ kind: 'idle' });
 
   const [fontsLoaded] = useFonts(fieldsoloExpoFontAssets);
@@ -94,10 +91,6 @@ export function JobExportScreen({ onBack, onBackToHome }: JobExportScreenProps) 
   const selectedYear = years[0] ?? new Date().getFullYear();
   const [year, setYear] = useState(selectedYear);
   const activeYear = years.includes(year) ? year : selectedYear;
-  const options = useMemo<DropdownBottomSheetOption[]>(
-    () => years.map((value) => ({ id: String(value), label: String(value), value: String(value) })),
-    [years],
-  );
   const verifiedEmail = user?.email ?? '—';
   const emailVerified = !!user?.email && !!user.email_confirmed_at;
   const terminalResult =
@@ -164,7 +157,7 @@ export function JobExportScreen({ onBack, onBackToHome }: JobExportScreenProps) 
       <CanvasTiledBackground scrollY={scrollY} contentHeight={scrollContentHeight} />
       <Animated.ScrollView
         style={[styles.scroll, { paddingTop: headerTopPad }]}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + space('Spacing/80') + space('Spacing/20') }]}
         onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
           useNativeDriver: true,
         })}
@@ -176,8 +169,8 @@ export function JobExportScreen({ onBack, onBackToHome }: JobExportScreenProps) 
             <PlatformHeaderAction accessibilityLabel="Back" onPress={onBack}>
               <TopHeaderBackIcon size={BACK_ICON_SIZE} color={fg.primary} />
             </PlatformHeaderAction>
-            <Text {...screenHeaderA11y()} selectable style={[typography.displayH1, styles.title]}>
-              EXPORT JOBS
+            <Text {...screenHeaderA11y()} selectable style={[typography.headingH2, styles.title]}>
+              Export Job Summary
             </Text>
           </View>
 
@@ -199,44 +192,39 @@ export function JobExportScreen({ onBack, onBackToHome }: JobExportScreenProps) 
               </View>
             ) : (
               <>
-                <Text selectable style={[typography.labelCaps, styles.label]}>YEAR</Text>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={`Export year ${activeYear}`}
-                  onPress={() => setYearPickerOpen(true)}
-                  disabled={years.length === 0}
-                  style={({ pressed }) => [styles.selector, pressed && styles.pressed]}
-                >
-                  <View style={styles.selectorLeading}>
-                    <Text selectable style={[typography.body, styles.selectorText]}>{activeYear}</Text>
-                  </View>
-                  <View style={styles.selectorTrailing}>
-                    <JobDetailIconViewSessionChevron color={fg.secondary} />
-                  </View>
-                </Pressable>
+                <Text accessibilityRole="header" style={[typography.titleH3, styles.sectionTitle]}>Year</Text>
+                {years.length > 0 ? (
+                  <AccountSingleSelectCard
+                    typography={typography}
+                    options={years.map((value) => ({ value, label: String(value) }))}
+                    selected={activeYear}
+                    disabled={requestState.kind === 'submitting'}
+                    onSelect={(value) => {
+                      setYear(value);
+                      if (requestState.kind === 'rate_limited' || requestState.kind === 'error') {
+                        setRequestState({ kind: 'idle' });
+                      }
+                    }}
+                  />
+                ) : null}
                 {yearsResult.error ? (
                   <Text selectable style={[typography.bodySmall, styles.errorText]}>
                     We couldn’t determine the available years. Try again later.
                   </Text>
                 ) : null}
 
-                <Text selectable style={[typography.labelCaps, styles.label]}>DELIVERY</Text>
-                <View style={styles.infoCard}>
-                  <Text selectable style={[typography.bodySmall, styles.infoLabel]}>Email</Text>
-                  <Text selectable style={typography.body}>{verifiedEmail}</Text>
-                  {!emailVerified ? (
-                    <Text selectable style={[typography.bodySmall, styles.errorText]}>
-                      Verify your email before requesting an export.
-                    </Text>
-                  ) : null}
-                </View>
-
-                <Text selectable style={[typography.labelCaps, styles.label]}>INCLUDED DATA</Text>
-                <View style={styles.infoCard}>
-                  <Text selectable style={[typography.body, styles.infoBody]}>
-                    Completed jobs, customer names, phone numbers, emails, service addresses, dates, revenue, costs, and net earnings.
+                <Text accessibilityRole="header" style={[typography.titleH3, styles.sectionTitle]}>Delivery</Text>
+                <Text selectable style={[typography.body, styles.infoText]}>{verifiedEmail}</Text>
+                {!emailVerified ? (
+                  <Text selectable style={[typography.bodySmall, styles.errorText]}>
+                    Verify your email before requesting an export.
                   </Text>
-                </View>
+                ) : null}
+
+                <Text accessibilityRole="header" style={[typography.titleH3, styles.sectionTitle]}>Included Data</Text>
+                <Text selectable style={[typography.body, styles.infoText]}>
+                  Completed jobs, customer names, phone numbers, emails, service addresses, dates, revenue, costs, and net earnings.
+                </Text>
 
                 {requestErrorCopy ? (
                   <Text
@@ -249,43 +237,24 @@ export function JobExportScreen({ onBack, onBackToHome }: JobExportScreenProps) 
                   </Text>
                 ) : null}
 
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Request Export"
-                  onPress={() => void submit()}
-                  disabled={!emailVerified || requestState.kind === 'submitting'}
-                  style={({ pressed }) => [
-                    styles.primaryButton,
-                    pressed && styles.pressed,
-                    (!emailVerified || requestState.kind === 'submitting') && styles.disabled,
-                  ]}
-                >
-                  {requestState.kind === 'submitting' ? <ActivityIndicator color={bg.canvasWarm} /> : null}
-                  <Text selectable style={[typography.bodyBold, styles.primaryButtonText]}>Request Export</Text>
-                </Pressable>
               </>
             )}
           </View>
         </View>
       </Animated.ScrollView>
 
-      <DropdownBottomSheet
-        typography={typography}
-        visible={yearPickerOpen}
-        title="Export year"
-        options={options}
-        currentValue={String(activeYear)}
-        onClose={() => setYearPickerOpen(false)}
-        onClosed={() => undefined}
-        onBack={() => setYearPickerOpen(false)}
-        onSelect={(value) => {
-          setYear(Number(value));
-          if (requestState.kind === 'rate_limited' || requestState.kind === 'error') {
-            setRequestState({ kind: 'idle' });
-          }
-          setYearPickerOpen(false);
-        }}
-      />
+      {!terminalResult ? (
+        <View pointerEvents="box-none" style={styles.fabOverlay}>
+          <FullWidthFab
+            typography={typography}
+            label={requestState.kind === 'submitting' ? 'REQUESTING…' : 'REQUEST EXPORT'}
+            accessibilityLabel="Request Export"
+            onPress={() => void submit()}
+            disabled={!emailVerified || years.length === 0 || requestState.kind === 'submitting'}
+            includeSafeArea
+          />
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -296,61 +265,18 @@ const styles = StyleSheet.create({
   scrollContent: { paddingBottom: space('Spacing/32'), flexGrow: 1, alignItems: 'stretch' },
   topHeaderRow: {
     width: '100%',
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: 'row', alignItems: 'center',
     paddingTop: space('Spacing/32'),
     paddingBottom: space('Spacing/16'),
-    gap: space('Spacing/8'),
+    gap: space('Spacing/12'),
   },
-  title: { flex: 1, color: fg.primary },
+  title: { flex: 1, minWidth: 0, color: fg.primary },
   body: { width: '100%', gap: space('Spacing/12'), paddingBottom: space('Spacing/24') },
-  label: { color: color('Brand/Accent'), paddingTop: space('Spacing/12') },
-  selector: {
-    width: '100%',
-    minHeight: space('Spacing/80'),
-    borderWidth: 1,
-    borderColor: border.subtle,
-    borderRadius: radius('Radius/16'),
-    backgroundColor: bg.surfaceWhite,
-    paddingHorizontal: space('Spacing/16'),
-    paddingVertical: space('Spacing/16'),
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  selectorLeading: {
-    flex: 1,
-    minWidth: 0,
-    paddingVertical: space('Spacing/4'),
-  },
-  selectorTrailing: {
-    flexShrink: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  selectorText: { color: fg.primary },
-  infoCard: {
-    backgroundColor: bg.surfaceWhite,
-    borderRadius: radius('Radius/12'),
-    padding: space('Spacing/16'),
-    gap: space('Spacing/8'),
-    ...cardShadowRn,
-  },
-  infoLabel: { color: fg.secondary },
-  infoBody: { color: fg.primary },
+  sectionTitle: { color: fg.primary, paddingTop: space('Spacing/24') },
+  infoText: { color: fg.secondary },
+  fabOverlay: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 2, elevation: 2 },
   errorText: { color: color('Semantic/Status/Error/Text') },
   resultTitle: { color: fg.primary },
-  primaryButton: {
-    minHeight: 52,
-    borderRadius: radius('Radius/12'),
-    backgroundColor: color('Brand/Primary'),
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-    gap: space('Spacing/8'),
-    marginTop: space('Spacing/8'),
-  },
-  primaryButtonText: { color: bg.canvasWarm },
   secondaryButton: {
     minHeight: 48,
     borderRadius: radius('Radius/12'),
@@ -370,6 +296,5 @@ const styles = StyleSheet.create({
     ...cardShadowRn,
   },
   resultText: { color: fg.primary },
-  disabled: { opacity: 0.65 },
   pressed: { opacity: 0.75 },
 });

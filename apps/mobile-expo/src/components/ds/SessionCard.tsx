@@ -53,7 +53,7 @@ export function SessionCard({
     return (
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`Session ${session.dateLabel}`}
+        accessibilityLabel={`Visit ${session.dateLabel}`}
         onPress={onRowBodyPress}
         style={({ pressed }) => [styles.card, pressed && styles.pressed]}
       >
@@ -86,7 +86,7 @@ export function SessionCard({
       <View style={styles.header}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`Session ${session.dateLabel}`}
+          accessibilityLabel={`Visit ${session.dateLabel}`}
           onPress={onRowBodyPress ?? onToggle}
           style={styles.headerBodyPressable}
         >
@@ -115,7 +115,7 @@ export function SessionCard({
         </Pressable>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`${expanded ? 'Collapse' : 'Expand'} session ${session.dateLabel}`}
+          accessibilityLabel={`${expanded ? 'Collapse' : 'Expand'} visit ${session.dateLabel}`}
           accessibilityState={{ expanded }}
           onPress={onToggle}
           style={styles.chevronPressable}
@@ -132,7 +132,7 @@ export function SessionCard({
           <View style={styles.editRow}>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Edit session"
+              accessibilityLabel="Edit visit"
               onPress={onEditPress}
               style={({ pressed }) => [styles.editButton, pressed && styles.pressed]}
             >

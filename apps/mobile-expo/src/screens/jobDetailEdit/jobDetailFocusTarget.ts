@@ -10,6 +10,7 @@ export type JobDetailEditFocusTarget =
   | { kind: 'material'; id: string }
   | 'otherCosts'
   | { kind: 'otherCost'; id: string }
+  | 'docs'
   | 'notes'
   | { kind: 'note'; id: string };
 
@@ -21,6 +22,7 @@ export type JobDetailEditSection =
   | 'sessions'
   | 'materials'
   | 'otherCosts'
+  | 'docs'
   | 'notes';
 
 export type JobEditOpenedSource =
@@ -51,6 +53,8 @@ export function editSectionsForFocusTarget(
         return ['materials'];
       case 'otherCosts':
         return ['otherCosts'];
+      case 'docs':
+        return ['docs'];
       case 'notes':
         return ['notes'];
     }

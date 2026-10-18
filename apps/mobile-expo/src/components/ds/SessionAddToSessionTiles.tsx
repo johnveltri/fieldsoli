@@ -53,7 +53,7 @@ export function SessionAddToSessionTiles({
 }: SessionAddToSessionTilesProps) {
   return (
     <View style={styles.captureSection}>
-      <Text style={[typography.bodySmall, { color: fg.primary }]}>Add to Session</Text>
+      <Text style={[typography.bodySmall, { color: fg.primary }]}>Add to Visit</Text>
       <View style={styles.tileRow}>
         {(['note', 'material'] as TileKind[]).map((kind) => {
           const interactive =
