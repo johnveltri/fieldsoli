@@ -695,7 +695,7 @@ jest.mock('./jobDetailEdit/JobDetailEditMode', () => ({
         <Pressable accessibilityRole="button" accessibilityLabel="Delete job" disabled={saving} onPress={onDeleteJob}>
           <Text>Delete job</Text>
         </Pressable>
-        {footer}
+        {focusTarget == null || focusTarget === 'docs' ? footer : null}
       </View>
     );
   },
@@ -1614,6 +1614,40 @@ describe('JobDetailScreen simplified view (flag on)', () => {
     await waitFor(() => expect(screen.getByText('Visits')).toBeTruthy());
     expect(screen.queryByLabelText('Add Visits')).toBeNull();
     expect(screen.queryByLabelText('Add Materials')).toBeNull();
+  });
+
+  it('opens invoice review after the final focused wizard editor returns to View', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const lastGapJob: JobDetailViewModel = {
+      ...incompleteJob,
+      shortDescription: 'QA door repair',
+      earnings: { ...incompleteJob.earnings, revenueCents: 12000 },
+      noMaterialsConfirmed: true,
+      displaySessions: [{
+        ...incompleteJob.displaySessions[0],
+        dateLabel: 'Apr 17, 2026',
+        durationLabel: '1.0h',
+        calendarDateExplicit: true,
+      }],
+    };
+    apiClient.fetchJobDetail.mockImplementation(async () => ({
+      ...lastGapJob,
+      noOtherCostsConfirmed: apiClient.applyJobDetailEdit.mock.calls.length > 0,
+    }));
+    const screen = render(<JobDetailScreen jobId="job-1" sessionUserId="user-1" />);
+    await waitFor(() => expect(screen.getByText('Primary status action')).toBeTruthy());
+    fireEvent.press(screen.getByText('Primary status action'));
+    await waitFor(() => expect(screen.getByText('Confirm Info')).toBeTruthy());
+    fireEvent.press(screen.getByText('Confirm Info'));
+    await waitFor(() => expect(screen.getByTestId('edit-focus-target')).toHaveTextContent('"otherCosts"'));
+    expect(screen.queryByLabelText('Generate new')).toBeNull();
+    fireEvent.press(screen.getByLabelText('Confirm no other costs'));
+    fireEvent.press(screen.getByLabelText('Done'));
+    await waitFor(() => expect(mockOpenFinalization).toHaveBeenCalledWith('completed'));
+    expect(mockOpenFinalization).toHaveBeenCalledTimes(1);
+    expect(apiClient.updateJobStatusById).not.toHaveBeenCalled();
+    expect(alertSpy).not.toHaveBeenCalled();
+    alertSpy.mockRestore();
   });
 
   it('TEST-V14 shows Missing line for incomplete jobs', async () => {

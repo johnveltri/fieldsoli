@@ -394,6 +394,7 @@ export function JobDetailScreen({
   const documentControlsRef = useRef<InvoicingJobControlsHandle>(null);
   const editDocumentControlsRef = useRef<InvoicingJobControlsHandle>(null);
   const [detailMode, setDetailMode] = useState<DetailMode>('view');
+  const [pendingWizardFinalization, setPendingWizardFinalization] = useState<'completed' | 'paid' | null>(null);
   const [editSaving, setEditSaving] = useState(false);
   // State updates are asynchronous; this ref closes the small double-tap /
   // navigation window before the Saving render reaches the edit controls.
@@ -1418,6 +1419,14 @@ export function JobDetailScreen({
     handle.openFinalization(status);
   }, [detailMode]);
 
+  useEffect(() => {
+    if (!pendingWizardFinalization || detailMode !== 'view') return;
+    // Focused wizard editors omit Documents. Wait for View and its controller
+    // to commit before opening review, rather than using the old Edit render.
+    setPendingWizardFinalization(null);
+    openFinancialFinalization(pendingWizardFinalization);
+  }, [detailMode, openFinancialFinalization, pendingWizardFinalization]);
+
   const onInvoiceFinalized = useCallback(async (status: 'completed' | 'paid') => {
     const previousStatus = jobRef.current?.workStatus ?? job?.workStatus;
     await refetchJob();
@@ -2215,7 +2224,9 @@ export function JobDetailScreen({
     if (!isCompletedOrPaidWorkStatus(toStatus)) return;
     setStatusActionPending(true);
     if (showInvoicing) {
-      openFinancialFinalization(toStatus);
+      setDetailMode('view');
+      setEditFocusTarget(null);
+      setPendingWizardFinalization(toStatus);
       return;
     }
     try {
@@ -2251,7 +2262,6 @@ export function JobDetailScreen({
     invalidateJobsList,
     job,
     maybeShowCompletionFeedbackPrompt,
-    openFinancialFinalization,
     refetchJob,
     showInvoicing,
   ]);

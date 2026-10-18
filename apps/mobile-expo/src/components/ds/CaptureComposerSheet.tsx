@@ -98,7 +98,17 @@ function isMaterialKind(kind: CaptureComposerKind): boolean {
   return kind === 'material' || kind === 'material-edit';
 }
 
+function hasNegativeSign(text: string): boolean {
+  return /[-\u2212]/.test(text);
+}
+
+function sanitizeMaterialDecimalInput(text: string): string {
+  // Keep invalid signed input visible for correction instead of changing its value.
+  return hasNegativeSign(text) ? text : sanitizeDecimalInput(text);
+}
+
 function parseMoneyToCents(text: string): number | null {
+  if (hasNegativeSign(text)) return null;
   const cleaned = text.replace(/[^0-9.]/g, '');
   if (!cleaned) return null;
   const n = Number(cleaned);
@@ -107,6 +117,7 @@ function parseMoneyToCents(text: string): number | null {
 }
 
 function parseQuantity(text: string): number | null {
+  if (hasNegativeSign(text)) return null;
   const cleaned = text.trim().replace(/[^0-9.]/g, '');
   if (!cleaned || cleaned === '.') return null;
   const n = Number(cleaned);
@@ -276,10 +287,15 @@ export function CaptureComposerSheet({
   ]);
 
   const busy = committing || saving;
+  const invalidTotal = totalText.trim() !== '' && parseMoneyToCents(totalText) == null;
+  const invalidQuantity = quantityText.trim() !== '' && parseQuantity(quantityText) == null;
+  const invalidUnitPrice = unitPriceText.trim() !== '' && parseMoneyToCents(unitPriceText) == null;
   const canCommitJob = title.trim().length > 0 && !busy;
   const canSaveNote = body.trim().length > 0 && !busy;
   const canSaveMaterial =
-    description.trim().length > 0 && resolvedTotalCents > 0 && !busy;
+    description.trim().length > 0 && resolvedTotalCents > 0 && !busy &&
+    !invalidQuantity && !invalidUnitPrice && (hasCompleteBreakdown || !invalidTotal);
+  const canAddToJob = kind !== 'material-edit' || canSaveMaterial;
   const canPrimary =
     kind === 'job'
       ? canCommitJob
@@ -335,6 +351,7 @@ export function CaptureComposerSheet({
   ]);
 
   const onAddToJob = useCallback(() => {
+    if (!canAddToJob) return;
     if (kind === 'note-edit') {
       onAddToJobNote?.({ body: body.trim() });
       return;
@@ -342,7 +359,7 @@ export function CaptureComposerSheet({
     if (kind === 'material-edit') {
       onAddToJobMaterial?.(materialValues());
     }
-  }, [body, kind, materialValues, onAddToJobMaterial, onAddToJobNote]);
+  }, [body, canAddToJob, kind, materialValues, onAddToJobMaterial, onAddToJobNote]);
 
   const iconColor = fg.secondary;
   const primaryLabel = primaryLabelForKind(kind);
@@ -373,9 +390,12 @@ export function CaptureComposerSheet({
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel="Add to job"
+                  accessibilityState={{ disabled: !canAddToJob }}
+                  disabled={!canAddToJob}
                   onPress={onAddToJob}
                   style={({ pressed }) => [
                     styles.jobPill,
+                    !canAddToJob && styles.disabled,
                     pressed && styles.pressed,
                   ]}
                 >
@@ -440,7 +460,7 @@ export function CaptureComposerSheet({
                   accessibilityLabel="Total cost"
                   placeholder="Total cost"
                   value={
-                    totalFocused && !hasCompleteBreakdown
+                    (totalFocused || invalidTotal) && !hasCompleteBreakdown
                       ? totalText
                       : totalCostDisplay
                   }
@@ -456,7 +476,7 @@ export function CaptureComposerSheet({
                   }}
                   onChangeText={(text) => {
                     if (hasCompleteBreakdown) return;
-                    const sanitized = sanitizeDecimalInput(text);
+                    const sanitized = sanitizeMaterialDecimalInput(text);
                     setTotalText(sanitized);
                     const cents = parseMoneyToCents(sanitized);
                     setTotalCents(cents != null && cents > 0 ? cents : 0);
@@ -486,7 +506,7 @@ export function CaptureComposerSheet({
                       }}
                       onBlur={() => {
                         const qty = parseQuantity(quantityText);
-                        setQuantityText(qty != null ? String(qty) : '');
+                        if (qty != null) setQuantityText(String(qty));
                       }}
                     />
                   }
@@ -508,12 +528,12 @@ export function CaptureComposerSheet({
                       keyboardType="decimal-pad"
                       inputMode="decimal"
                       onFocus={() => {
-                        if (unitCostExplicit) {
+                        if (unitCostExplicit && !invalidUnitPrice) {
                           setUnitPriceText(centsToEditText(unitCostCents));
                         }
                       }}
                       onChangeText={(text) => {
-                        const sanitized = sanitizeDecimalInput(text);
+                        const sanitized = sanitizeMaterialDecimalInput(text);
                         setUnitPriceText(sanitized);
                         const cents = parseMoneyToCents(sanitized);
                         const explicit = sanitized.trim().length > 0;
@@ -522,9 +542,7 @@ export function CaptureComposerSheet({
                       }}
                       onBlur={() => {
                         const cents = parseMoneyToCents(unitPriceText);
-                        setUnitPriceText(
-                          cents != null ? `@ ${formatUsdCombined(cents)}` : '',
-                        );
+                        if (cents != null) setUnitPriceText(`@ ${formatUsdCombined(cents)}`);
                       }}
                     />
                   }
