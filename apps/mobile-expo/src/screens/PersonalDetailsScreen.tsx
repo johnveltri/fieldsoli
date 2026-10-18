@@ -27,7 +27,21 @@ export function PersonalDetailsScreen({ typography, values, email, saving, onBac
   const { columnStyle } = useContentColumn();
   const [draft, setDraft] = useState(values);
   const [customText, setCustomText] = useState('');
-  const dirty = JSON.stringify(draft) !== JSON.stringify(values) || customText.trim().length > 0;
+  const pendingTrade = customText.trim();
+  const nextValues = {
+    ...draft,
+    firstName: draft.firstName.trim(),
+    lastName: draft.lastName.trim(),
+    trades: pendingTrade && !draft.trades.some((trade) => trade.trim().toLowerCase() === pendingTrade.toLowerCase())
+      ? [...draft.trades, pendingTrade]
+      : draft.trades,
+  };
+  const tradeSet = (trades: string[]) => JSON.stringify(
+    [...new Set(trades.map((trade) => trade.trim().toLowerCase()).filter(Boolean))].sort(),
+  );
+  const dirty = nextValues.firstName !== values.firstName.trim()
+    || nextValues.lastName !== values.lastName.trim()
+    || tradeSet(nextValues.trades) !== tradeSet(values.trades);
   const back = useCallback(() => {
     if (saving) return;
     if (!dirty) return onBack();
@@ -57,15 +71,7 @@ export function PersonalDetailsScreen({ typography, values, email, saving, onBac
       ? current.trades.filter((value) => value.toLowerCase() !== trade.toLowerCase())
       : [...current.trades, trade],
   }));
-  const save = () => {
-    const pendingTrade = customText.trim();
-    onSave({
-      ...draft,
-      firstName: draft.firstName.trim(),
-      lastName: draft.lastName.trim(),
-      trades: pendingTrade && !selected(pendingTrade) ? [...draft.trades, pendingTrade] : draft.trades,
-    });
-  };
+  const save = () => onSave(nextValues);
 
   return (
     <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>

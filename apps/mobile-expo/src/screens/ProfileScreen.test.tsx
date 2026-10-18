@@ -152,6 +152,34 @@ describe('ProfileScreen', () => {
     expect(screen.getByText('ACCOUNT')).toBeTruthy();
   });
 
+  it('leaves Personal Details without prompting after reverting equivalent edits', async () => {
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const screen = render(<ProfileScreen onBack={jest.fn()} />);
+    await act(async () => {});
+    fireEvent.press(screen.getByText('Personal Details'));
+    fireEvent.changeText(screen.getByLabelText('First name'), 'Changed');
+    fireEvent.changeText(screen.getByLabelText('First name'), ' Alex ');
+    fireEvent.press(screen.getByRole('checkbox', { name: 'Plumbing' }));
+    fireEvent.press(screen.getByRole('checkbox', { name: 'Plumbing' }));
+    fireEvent.changeText(screen.getByLabelText('Custom trade'), 'plumbing');
+    fireEvent.press(screen.getByLabelText('Back'));
+    expect(alert).not.toHaveBeenCalled();
+    expect(screen.getByText('ACCOUNT')).toBeTruthy();
+    expect(mockUpdateProfile).not.toHaveBeenCalled();
+    alert.mockRestore();
+  });
+
+  it('leaves untouched Personal Details without prompting', async () => {
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const screen = render(<ProfileScreen onBack={jest.fn()} />);
+    await act(async () => {});
+    fireEvent.press(screen.getByText('Personal Details'));
+    fireEvent.press(screen.getByLabelText('Back'));
+    expect(alert).not.toHaveBeenCalled();
+    expect(screen.getByText('ACCOUNT')).toBeTruthy();
+    alert.mockRestore();
+  });
+
   it('discards draft changes without saving', async () => {
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     const screen = render(<ProfileScreen onBack={jest.fn()} />);

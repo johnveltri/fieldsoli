@@ -87,7 +87,8 @@ function percentToBps(text: string): number | null {
 
 export type BusinessSettingsScreenHandle = { requestBack: () => void };
 
-type BusinessInfoField = 'businessName' | 'address' | 'phone' | 'email' | 'website' | 'license';
+const BUSINESS_INFO_FIELDS = ['businessName', 'address', 'phone', 'email', 'website', 'license'] as const;
+type BusinessInfoField = (typeof BUSINESS_INFO_FIELDS)[number];
 
 export const BusinessSettingsScreen = forwardRef<
   BusinessSettingsScreenHandle,
@@ -107,7 +108,7 @@ export const BusinessSettingsScreen = forwardRef<
   const [taxFocused, setTaxFocused] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [dirty, setDirty] = useState(false);
+  const [savedSettings, setSavedSettings] = useState<BusinessSettings | null>(null);
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
@@ -120,6 +121,7 @@ export const BusinessSettingsScreen = forwardRef<
       .then((settings) => {
         if (cancelled) return;
         setDraft(settings);
+        setSavedSettings(settings);
         setMarkupText((settings.materialMarkupBps / 100).toString());
         setTaxText((settings.taxRateBps / 100).toString());
         setFailed(false);
@@ -134,6 +136,15 @@ export const BusinessSettingsScreen = forwardRef<
       cancelled = true;
     };
   }, [session?.user.id, loadAttempt]);
+
+  const dirty = savedSettings !== null && (mode === 'business'
+    ? BUSINESS_INFO_FIELDS.some((key) => (draft[key] ?? '') !== (savedSettings[key] ?? ''))
+    : percentToBps(markupText) !== savedSettings.materialMarkupBps
+      || percentToBps(taxText) !== savedSettings.taxRateBps
+      || draft.paymentTerms !== savedSettings.paymentTerms
+      || draft.estimateExpirationDays !== savedSettings.estimateExpirationDays
+      || TAX_OPTIONS.some(({ value }) => draft.taxableCategories.includes(value)
+        !== savedSettings.taxableCategories.includes(value)));
 
   const save = async () => {
     const userId = session?.user.id;
@@ -151,7 +162,7 @@ export const BusinessSettingsScreen = forwardRef<
         materialMarkupBps: markup,
         taxRateBps: tax,
       });
-      setDirty(false);
+      setSavedSettings({ ...draft, materialMarkupBps: markup, taxRateBps: tax });
       onBack();
     } catch {
       Alert.alert('Could not save settings. Try again.');
@@ -185,7 +196,6 @@ export const BusinessSettingsScreen = forwardRef<
   }, [back]);
 
   const toggleCategory = (category: TaxableCategory) => {
-    setDirty(true);
     setDraft((current) => {
       const selected = new Set(current.taxableCategories);
       if (selected.has(category)) selected.delete(category);
@@ -200,7 +210,6 @@ export const BusinessSettingsScreen = forwardRef<
   };
 
   const updateBusinessField = (key: BusinessInfoField, value: string) => {
-    setDirty(true);
     setDraft((current) => ({ ...current, [key]: value }));
   };
 
@@ -403,7 +412,6 @@ export const BusinessSettingsScreen = forwardRef<
                         onFocus={() => setMarkupFocused(true)}
                         onBlur={() => setMarkupFocused(false)}
                         onChangeText={(value) => {
-                          setDirty(true);
                           setMarkupText(value);
                         }}
                       />
@@ -431,7 +439,6 @@ export const BusinessSettingsScreen = forwardRef<
                         onFocus={() => setTaxFocused(true)}
                         onBlur={() => setTaxFocused(false)}
                         onChangeText={(value) => {
-                          setDirty(true);
                           setTaxText(value);
                         }}
                       />
@@ -452,7 +459,6 @@ export const BusinessSettingsScreen = forwardRef<
                     Payment terms
                   </Text>
                   {choices(TERMS, draft.paymentTerms, (value) => {
-                    setDirty(true);
                     setDraft((current) => ({
                       ...current,
                       paymentTerms: value,
@@ -465,7 +471,6 @@ export const BusinessSettingsScreen = forwardRef<
                     EXPIRATIONS,
                     draft.estimateExpirationDays,
                     (value) => {
-                      setDirty(true);
                       setDraft((current) => ({
                         ...current,
                         estimateExpirationDays: value,
