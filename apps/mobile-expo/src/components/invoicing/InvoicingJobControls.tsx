@@ -99,6 +99,7 @@ import {
   type BusinessSettingsScreenHandle,
 } from '../../screens/BusinessSettingsScreen';
 import { BottomSheetShell } from '../ds/BottomSheetShell';
+import { ActionSummaryCard } from '../ds/ActionSummaryCard';
 import { FullWidthFab } from '../ds/FullWidthFab';
 import { ProfileRowsCard } from '../ds/ProfileRowsCard';
 import { SegmentedControl } from '../ds/SegmentedControl';
@@ -827,6 +828,8 @@ export const InvoicingJobControls = forwardRef<
   const createDocumentLabel = defaultDocumentType(workStatus) === 'invoice'
     ? 'Create Invoice'
     : 'Create Estimate';
+  const businessGaps = preview?.gaps.filter((gap) => gap === 'business_name') ?? [];
+  const jobGaps = preview?.gaps.filter((gap) => gap !== 'business_name') ?? [];
 
   return (
     <View style={styles.block}>
@@ -1064,43 +1067,31 @@ export const InvoicingJobControls = forwardRef<
             ) : null}
             {preview && !saved && preview.gaps.length > 0 ? (
               <View style={[columnStyle, styles.gapWrap]}>
-                <View style={styles.gapCard}>
-                  <Text style={typography.bodyBold}>
-                    {finalization ? 'Complete these details before finishing:' : 'Complete these details before sharing:'}
-                  </Text>
-                  {gapLabels(preview.gaps).map((label) => (
-                    <Text key={label} style={typography.body}>
-                      {label}
-                    </Text>
-                  ))}
-                  {preview.gaps.includes('business_name') ? (
-                    <Pressable
-                      accessibilityRole="button"
-                      style={styles.textAction}
-                      onPress={() => openBusinessSettings(finalization
-                        ? { kind: 'finalization', status: finalization.status }
-                        : { kind: 'preview' })}
-                    >
-                      <Text style={[typography.bodyBold, styles.accent]}>
-                        Edit business info
-                      </Text>
-                    </Pressable>
-                  ) : null}
-                  {preview.gaps.some((gap) => gap !== 'business_name') ? (
-                    <Pressable
-                      accessibilityRole="button"
-                      style={styles.textAction}
-                      onPress={() => {
-                        closeInvoicePreview();
-                        onEditDetails();
-                      }}
-                    >
-                      <Text style={[typography.bodyBold, styles.accent]}>
-                        Edit Job details
-                      </Text>
-                    </Pressable>
-                  ) : null}
-                </View>
+                {businessGaps.length > 0 ? (
+                  <ActionSummaryCard
+                    title="Business Details"
+                    subtitle={`Missing: ${gapLabels(businessGaps).join(', ')}`}
+                    subtitleColor={color('Semantic/Status/Error/Text')}
+                    accentColor={color('Semantic/Status/Info/Text')}
+                    typography={typography}
+                    onPress={() => openBusinessSettings(finalization
+                      ? { kind: 'finalization', status: finalization.status }
+                      : { kind: 'preview' })}
+                  />
+                ) : null}
+                {jobGaps.length > 0 ? (
+                  <ActionSummaryCard
+                    title="Job Details"
+                    subtitle={`Missing: ${gapLabels(jobGaps).join(', ')}`}
+                    subtitleColor={color('Semantic/Status/Error/Text')}
+                    accentColor={color('Semantic/Status/Warning/Text')}
+                    typography={typography}
+                    onPress={() => {
+                      closeInvoicePreview();
+                      onEditDetails();
+                    }}
+                  />
+                ) : null}
               </View>
             ) : null}
             <View style={styles.paperWrap}>
@@ -1314,19 +1305,19 @@ export const InvoicingJobControls = forwardRef<
               </BottomSheetShell>
             </GestureHandlerRootView>
           </Modal>
+          <Modal
+            visible={businessOpen}
+            animationType="slide"
+            onRequestClose={() => businessScreenRef.current?.requestBack()}
+          >
+            <BusinessSettingsScreen
+              ref={businessScreenRef}
+              typography={typography}
+              mode="business"
+              onBack={closeBusinessSettings}
+            />
+          </Modal>
         </Animated.View>
-      </Modal>
-      <Modal
-        visible={businessOpen}
-        animationType="slide"
-        onRequestClose={() => businessScreenRef.current?.requestBack()}
-      >
-        <BusinessSettingsScreen
-          ref={businessScreenRef}
-          typography={typography}
-          mode="business"
-          onBack={closeBusinessSettings}
-        />
       </Modal>
     </View>
   );
@@ -1415,16 +1406,7 @@ const styles = StyleSheet.create({
   },
   previewSelector: { width: 320, maxWidth: '100%', alignSelf: 'center' },
   loadingLabel: { color: fg.secondary, textAlign: 'center' },
-  gapWrap: { flexShrink: 1 },
-  gapCard: {
-    padding: space('Spacing/16'),
-    backgroundColor: bg.surfaceWhite,
-    borderRadius: radius('Radius/16'),
-    borderWidth: 1,
-    borderColor: border.subtle,
-    gap: space('Spacing/4'),
-  },
-  textAction: { minHeight: 44, justifyContent: 'center' },
+  gapWrap: { flexShrink: 1, gap: space('Spacing/12') },
   paperWrap: { width: '100%' },
   paper: {
     overflow: 'hidden',

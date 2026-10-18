@@ -66,6 +66,7 @@ export {
   type JobsOpenSectionKind,
 } from './JobsOpenStackSectionHeader';
 export { JobsOpenSummaryCard } from './JobsOpenSummaryCard';
+export { ActionSummaryCard } from './ActionSummaryCard';
 export { JobDetailJobHeader } from './JobDetailJobHeader';
 export { JobDetailMetricTertiary } from './JobDetailMetricTertiary';
 export { JobDetailStatusPill, JOB_DETAIL_WORK_STATUS_LABEL } from './JobDetailStatusPill';

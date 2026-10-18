@@ -196,7 +196,9 @@ describe('InvoicingJobControls', () => {
     await act(async () => {
       ref.current?.openPreview();
     });
-    fireEvent.press(await screen.findByText('Edit Job details'));
+    fireEvent.press(await screen.findByRole('button', {
+      name: 'Job Details. Missing: Labor & Services.',
+    }));
     expect(onEditDetails).toHaveBeenCalledTimes(1);
     await waitFor(() =>
       expect(screen.queryByRole('button', { name: 'Estimate' })).toBeNull(),
@@ -257,7 +259,9 @@ describe('InvoicingJobControls', () => {
     await act(async () => {
       ref.current?.openPreview();
     });
-    fireEvent.press(await screen.findByText('Edit business info'));
+    fireEvent.press(await screen.findByRole('button', {
+      name: 'Business Details. Missing: Business name.',
+    }));
     fireEvent.press(await screen.findByText('Business info form'));
     await waitFor(() => expect(mockPreview).toHaveBeenCalledTimes(2));
     expect(props.onEditDetails).not.toHaveBeenCalled();
