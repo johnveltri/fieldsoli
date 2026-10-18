@@ -23,7 +23,7 @@ describe('HelpScreen', () => {
     const openUrl = jest.spyOn(Linking, 'openURL').mockResolvedValue(true as never);
     const screen = render(<HelpScreen onBack={jest.fn()} />);
 
-    expect(screen.getByText('HELP')).toBeTruthy();
+    expect(screen.getByText('Help & Support')).toBeTruthy();
     expect(
       screen.getByText(/request a copy of your data/i),
     ).toBeTruthy();

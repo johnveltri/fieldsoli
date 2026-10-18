@@ -262,8 +262,8 @@ export const BusinessSettingsScreen = forwardRef<
               style={[typography.headingH2, styles.title]}
             >
               {mode === 'business'
-                ? 'Business Info'
-                : 'Estimate & Invoice Settings'}
+                ? 'Business Details'
+                : 'Estimates & Invoices'}
             </Text>
           </View>
           {loading ? (

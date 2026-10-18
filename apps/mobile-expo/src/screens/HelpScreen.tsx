@@ -80,8 +80,8 @@ export function HelpScreen({ onBack }: HelpScreenProps) {
             <PlatformHeaderAction accessibilityLabel="Back" onPress={onBack}>
               <TopHeaderBackIcon size={BACK_ICON_SIZE} color={fg.primary} />
             </PlatformHeaderAction>
-            <Text {...screenHeaderA11y()} style={[typography.displayH1, styles.title]}>
-              HELP
+            <Text {...screenHeaderA11y()} style={[typography.headingH2, styles.title]}>
+              Help & Support
             </Text>
           </View>
 

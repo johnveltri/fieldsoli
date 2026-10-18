@@ -1,13 +1,21 @@
 import React from 'react';
-import { Alert, Linking } from 'react-native';
+import { Alert, Linking, Text } from 'react-native';
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 
 import { ProfileScreen } from './ProfileScreen';
+import { ShellChromeProvider, useShellChrome } from '../shell/ShellChromeContext';
+
+function ChromeProbe() {
+  const { hideBottomChrome } = useShellChrome();
+  return <Text testID="chrome">{hideBottomChrome ? 'hidden' : 'visible'}</Text>;
+}
 
 jest.mock('expo-font', () => ({
   useFonts: () => [true],
 }));
+
+jest.mock('../lib/featureFlags', () => ({ useInvoicingFlag: () => ({ enabled: true, ready: true }) }));
 
 jest.mock('../components/CanvasTiledBackground', () => ({
   CanvasTiledBackground: () => null,
@@ -75,37 +83,41 @@ describe('ProfileScreen', () => {
     });
   });
 
-  it('renders the data-export entry point with the profile information', async () => {
+  it('groups the Account hub without personal summaries or an edit pill', async () => {
     const screen = render(<ProfileScreen onBack={jest.fn()} />);
-    await waitFor(() => {
-      expect(screen.getByText('Alex Builder')).toBeTruthy();
-    });
-    expect(screen.getByText('Personal Info')).toBeTruthy();
-    expect(screen.queryByText('Plan')).toBeNull();
-    expect(screen.getByText('Your data')).toBeTruthy();
-    expect(screen.getByText('Export Job Summary')).toBeTruthy();
-    expect(screen.getByText('Account')).toBeTruthy();
-    expect(screen.getByText('tech@example.com')).toBeTruthy();
-    expect(screen.getByText('Plumbing, Handyman')).toBeTruthy();
+    await waitFor(() => expect(mockFetchProfile).toHaveBeenCalled());
+    expect(screen.getByText('ACCOUNT')).toBeTruthy();
+    expect(screen.getAllByRole('button').map((button) => button.props.accessibilityLabel)).toEqual([
+      'Back', 'Business Details', 'Estimates & Invoices', 'Export Job Summary', 'Personal Details',
+      'Change Password', 'Help & Support', 'Privacy Choices', 'Send Feedback', 'Log Out', 'Delete Account',
+    ]);
+    for (const label of ['Business', 'Business Details', 'Estimates & Invoices', 'Export Job Summary',
+      'Account', 'Personal Details', 'Change Password', 'Help & Privacy', 'Help & Support',
+      'Privacy Choices', 'Send Feedback', 'Log Out', 'Delete Account']) {
+      expect(screen.getByText(label)).toBeTruthy();
+    }
+    expect(screen.queryByText('Alex Builder')).toBeNull();
+    expect(screen.queryByText('Your data')).toBeNull();
+    expect(screen.queryByLabelText('EDIT')).toBeNull();
   });
 
-  it('logs the user out when "Log out" is pressed', async () => {
+  it('logs the user out when "Log Out" is pressed', async () => {
     const screen = render(<ProfileScreen onBack={jest.fn()} />);
     await waitFor(() => {
-      expect(screen.getByText('Log out')).toBeTruthy();
+      expect(screen.getByText('Log Out')).toBeTruthy();
     });
     await act(async () => {
-      fireEvent.press(screen.getByText('Log out'));
+      fireEvent.press(screen.getByText('Log Out'));
     });
     expect(mockSignOut).toHaveBeenCalledTimes(1);
   });
 
-  it('opens a prefilled feedback email from the primary profile button', async () => {
+  it('opens a prefilled feedback email from the Help & Privacy section', async () => {
     const openUrlSpy = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
     const screen = render(<ProfileScreen onBack={jest.fn()} />);
 
-    await waitFor(() => expect(screen.getByText('Send feedback')).toBeTruthy());
-    fireEvent.press(screen.getByText('Send feedback'));
+    await waitFor(() => expect(screen.getByText('Send Feedback')).toBeTruthy());
+    fireEvent.press(screen.getByText('Send Feedback'));
 
     await waitFor(() => {
       expect(openUrlSpy).toHaveBeenCalledWith(expect.stringContaining('mailto:support@fieldsoli.com'));
@@ -113,80 +125,105 @@ describe('ProfileScreen', () => {
     openUrlSpy.mockRestore();
   });
 
-  it('opens the Update Profile sheet from the EDIT pill even when no profile row exists', async () => {
+  it('opens Personal Details even when no profile row exists', async () => {
     mockFetchProfile.mockResolvedValueOnce(null);
     const screen = render(<ProfileScreen onBack={jest.fn()} />);
-    await waitFor(() => {
-      expect(screen.getByText('Personal Info')).toBeTruthy();
-    });
-    fireEvent.press(screen.getByLabelText('EDIT'));
-    await waitFor(() => {
-      expect(screen.getByText('Update Profile')).toBeTruthy();
-    });
+    await waitFor(() => expect(mockFetchProfile).toHaveBeenCalled());
+    fireEvent.press(screen.getByText('Personal Details'));
+    expect(screen.getByLabelText('First name').props.value).toBe('');
+    expect(screen.getByLabelText('Sign-in email (read-only)').props.editable).toBe(false);
   });
 
-  it('returns from Trades with the new selections and saves them', async () => {
+  it('stages name and trade edits together until Save Changes', async () => {
     const screen = render(<ProfileScreen onBack={jest.fn()} />);
-    await waitFor(() => expect(screen.getByText('Alex Builder')).toBeTruthy());
-
-    fireEvent.press(screen.getByLabelText('EDIT'));
-    await waitFor(() => expect(screen.getByText('Update Profile')).toBeTruthy());
-    fireEvent.press(screen.getByLabelText('Choose trades'));
-
-    await waitFor(() => {
-      expect(screen.getByText('Trades')).toBeTruthy();
-      expect(screen.queryByText('Update Profile')).toBeNull();
-    });
-
-    fireEvent.press(screen.getByLabelText('Plumbing'));
-    fireEvent.press(screen.getByLabelText('Electrical'));
-    fireEvent.press(screen.getByLabelText('DONE'));
-
-    await waitFor(() => {
-      expect(screen.queryByText('Trades')).toBeNull();
-      expect(screen.getByText('Handyman, Electrical')).toBeTruthy();
-    });
-
+    await waitFor(() => expect(mockFetchProfile).toHaveBeenCalled());
+    await act(async () => {});
+    fireEvent.press(screen.getByText('Personal Details'));
+    fireEvent.changeText(screen.getByLabelText('First name'), ' Jamie ');
+    fireEvent.press(screen.getByRole('checkbox', { name: 'Plumbing' }));
+    fireEvent.press(screen.getByRole('checkbox', { name: 'Electrical' }));
+    fireEvent.changeText(screen.getByLabelText('Custom trade'), 'Stonework');
+    fireEvent.press(screen.getByLabelText('Add custom trade'));
+    expect(mockUpdateProfile).not.toHaveBeenCalled();
     fireEvent.press(screen.getByLabelText('SAVE CHANGES'));
+    await waitFor(() => expect(mockUpdateProfile).toHaveBeenCalledWith(
+      expect.anything(), { firstName: 'Jamie', lastName: 'Builder', trades: ['Handyman', 'Electrical', 'Stonework'] },
+    ));
+    expect(screen.getByText('ACCOUNT')).toBeTruthy();
+  });
+
+  it('discards draft changes without saving', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const screen = render(<ProfileScreen onBack={jest.fn()} />);
+    await act(async () => {});
+    fireEvent.press(screen.getByText('Personal Details'));
+    fireEvent.changeText(screen.getByLabelText('First name'), 'Unsaved');
+    fireEvent.press(screen.getByLabelText('Back'));
+    expect(alertSpy).toHaveBeenCalledWith('Discard changes?', undefined, expect.any(Array));
+    const buttons = alertSpy.mock.calls[0][2];
+    act(() => buttons?.find((button) => button.text === 'Discard')?.onPress?.());
+    expect(mockUpdateProfile).not.toHaveBeenCalled();
+    fireEvent.press(screen.getByText('Personal Details'));
+    expect(screen.getByLabelText('First name').props.value).toBe('Alex');
+    alertSpy.mockRestore();
+  });
+
+  it('opens Privacy Choices from Help & Privacy', async () => {
+    const screen = render(<ProfileScreen onBack={jest.fn()} />);
     await waitFor(() => {
-      expect(mockUpdateProfile).toHaveBeenCalledWith(
-        expect.anything(),
-        expect.objectContaining({ trades: ['Handyman', 'Electrical'] }),
-      );
+      expect(screen.getByText('Privacy Choices')).toBeTruthy();
+    });
+    fireEvent.press(screen.getByText('Privacy Choices'));
+    await waitFor(() => {
+      expect(screen.getByRole('header', { name: 'Privacy Choices' })).toBeTruthy();
     });
   });
 
-  it('opens Privacy from the account section', async () => {
+  it('opens Help & Support from Help & Privacy', async () => {
     const screen = render(<ProfileScreen onBack={jest.fn()} />);
     await waitFor(() => {
-      expect(screen.getByText('Privacy')).toBeTruthy();
+      expect(screen.getByText('Help & Support')).toBeTruthy();
     });
-    fireEvent.press(screen.getByText('Privacy'));
+    fireEvent.press(screen.getByText('Help & Support'));
     await waitFor(() => {
-      expect(screen.getByText('PRIVACY')).toBeTruthy();
-    });
-  });
-
-  it('opens Help from the account section', async () => {
-    const screen = render(<ProfileScreen onBack={jest.fn()} />);
-    await waitFor(() => {
-      expect(screen.getByText('Help')).toBeTruthy();
-    });
-    fireEvent.press(screen.getByText('Help'));
-    await waitFor(() => {
-      expect(screen.getByText('HELP')).toBeTruthy();
+      expect(screen.getByRole('header', { name: 'Help & Support' })).toBeTruthy();
       expect(screen.getByText('support@fieldsoli.com')).toBeTruthy();
     });
+  });
+
+  it('keeps the personal draft after a failed save so it can be retried', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    mockUpdateProfile.mockRejectedValueOnce(new Error('offline'));
+    const screen = render(<ProfileScreen onBack={jest.fn()} />);
+    await act(async () => {});
+    fireEvent.press(screen.getByText('Personal Details'));
+    fireEvent.changeText(screen.getByLabelText('First name'), 'Jamie');
+    fireEvent.press(screen.getByLabelText('SAVE CHANGES'));
+    await waitFor(() => expect(alertSpy).toHaveBeenCalled());
+    expect(screen.getByLabelText('First name').props.value).toBe('Jamie');
+    fireEvent.press(screen.getByLabelText('SAVE CHANGES'));
+    await waitFor(() => expect(screen.getByText('ACCOUNT')).toBeTruthy());
+    expect(mockUpdateProfile).toHaveBeenCalledTimes(2);
+    alertSpy.mockRestore();
+  });
+
+  it('hides shell navigation for the whole Account flow and restores it on exit', async () => {
+    const screen = render(<ShellChromeProvider><ProfileScreen onBack={jest.fn()} /><ChromeProbe /></ShellChromeProvider>);
+    await waitFor(() => expect(screen.getByTestId('chrome').props.children).toBe('hidden'));
+    fireEvent.press(screen.getByText('Personal Details'));
+    expect(screen.getByTestId('chrome').props.children).toBe('hidden');
+    screen.rerender(<ShellChromeProvider><ChromeProbe /></ShellChromeProvider>);
+    expect(screen.getByTestId('chrome').props.children).toBe('visible');
   });
 
   it('opens the delete account sheet before showing the system confirmation', async () => {
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     const screen = render(<ProfileScreen onBack={jest.fn()} />);
     await waitFor(() => {
-      expect(screen.getByText('Delete account')).toBeTruthy();
+      expect(screen.getByRole('button', { name: 'Delete Account' })).toBeTruthy();
     });
 
-    fireEvent.press(screen.getByText('Delete account'));
+    fireEvent.press(screen.getByRole('button', { name: 'Delete Account' }));
     expect(alertSpy).not.toHaveBeenCalled();
     expect(screen.getByText('Delete Account')).toBeTruthy();
 

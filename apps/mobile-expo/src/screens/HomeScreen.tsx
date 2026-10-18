@@ -39,7 +39,7 @@ import {
   SectionHeader,
   type JobsOpenSectionKind,
 } from '../components/ds';
-import { TopHeaderProfileIcon } from '../components/figma-icons/TopHeaderIcons';
+import { IconSettings } from '@tabler/icons-react-native';
 import { PlatformHeaderAction, platformHeaderActionIconColor } from '../components/platform/PlatformHeaderAction';
 import {
   platformHeaderDisplayTitleStyle,
@@ -302,11 +302,11 @@ export function HomeScreen({
                   </Text>
                 </View>
                 <PlatformHeaderAction
-                  accessibilityLabel="Profile"
+                  accessibilityLabel="Account"
                   variant="primary"
                   onPress={onOpenProfile}
                 >
-                  <TopHeaderProfileIcon color={platformHeaderActionIconColor} size={20} />
+                  <IconSettings color={platformHeaderActionIconColor} size={20} />
                 </PlatformHeaderAction>
               </View>
             </View>

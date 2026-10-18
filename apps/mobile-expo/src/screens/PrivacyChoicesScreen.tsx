@@ -183,8 +183,8 @@ export function PrivacyChoicesScreen({ userId, onBack }: PrivacyChoicesScreenPro
             <PlatformHeaderAction accessibilityLabel="Back" onPress={onBack}>
               <TopHeaderBackIcon size={BACK_ICON_SIZE} color={fg.primary} />
             </PlatformHeaderAction>
-            <Text {...screenHeaderA11y()} style={[typography.displayH1, styles.title]}>
-              PRIVACY
+            <Text {...screenHeaderA11y()} style={[typography.headingH2, styles.title]}>
+              Privacy Choices
             </Text>
           </View>
 
