@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Animated, BackHandler, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { IconBriefcase, IconMail, IconUser } from '@tabler/icons-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { EditConfirmNoneRow, EditFieldInput, EditIconRow, EditSheet } from '../components/ds/edit-mode/EditFormRows';
+import { EditConfirmNoneRow, EditFieldInput, EditIconGroup, EditIconRow, EditSheet } from '../components/ds/edit-mode/EditFormRows';
 import { CanvasTiledBackground } from '../components/CanvasTiledBackground';
 import { FullWidthFab } from '../components/ds/FullWidthFab';
 import type { UpdateProfileValues } from '../components/ds/UpdateProfileBottomSheet';
@@ -89,7 +89,7 @@ export function PersonalDetailsScreen({ typography, values, email, saving, onBac
             <Text accessibilityRole="header" style={[typography.headingH2, styles.title]}>Personal Details</Text>
           </View>
           <EditSheet>
-            <EditIconRow icon={<IconUser color={fg.secondary} size={20} />}>
+            <EditIconGroup icon={<IconUser color={fg.secondary} size={20} />}>
               <EditFieldInput
                 typography={typography}
                 accessibilityLabel="First name"
@@ -99,8 +99,6 @@ export function PersonalDetailsScreen({ typography, values, email, saving, onBac
                 autoCapitalize="words"
                 onChangeText={(firstName) => setDraft((current) => ({ ...current, firstName }))}
               />
-            </EditIconRow>
-            <EditIconRow icon={<IconUser color={fg.secondary} size={20} />} showTopBorder>
               <EditFieldInput
                 typography={typography}
                 accessibilityLabel="Last name"
@@ -110,7 +108,7 @@ export function PersonalDetailsScreen({ typography, values, email, saving, onBac
                 autoCapitalize="words"
                 onChangeText={(lastName) => setDraft((current) => ({ ...current, lastName }))}
               />
-            </EditIconRow>
+            </EditIconGroup>
             <EditIconRow icon={<IconMail color={fg.secondary} size={20} />} showTopBorder>
               <EditFieldInput
                 typography={typography}
@@ -124,7 +122,7 @@ export function PersonalDetailsScreen({ typography, values, email, saving, onBac
           </EditSheet>
           <Text accessibilityRole="header" style={[typography.titleH3, styles.tradesTitle]}>Trades</Text>
           <EditSheet>
-            {trades.map((trade, index) => (
+            {trades.map((trade) => (
               <EditConfirmNoneRow
                 key={trade}
                 typography={typography}
@@ -133,10 +131,10 @@ export function PersonalDetailsScreen({ typography, values, email, saving, onBac
                 confirmedLabel={trade}
                 onToggle={() => toggle(trade)}
                 disabled={saving}
-                showTopBorder={index > 0}
+                showTopBorder={false}
               />
             ))}
-            <EditIconRow icon={<IconBriefcase color={fg.secondary} size={20} />} showTopBorder>
+            <EditIconRow icon={<IconBriefcase color={fg.secondary} size={20} />}>
               <EditFieldInput
                 typography={typography}
                 accessibilityLabel="Custom trade"

@@ -314,7 +314,6 @@ export const BusinessSettingsScreen = forwardRef<
                     </EditIconRow>
                     <EditIconRow
                       icon={<IconMapPin color={fg.secondary} size={20} />}
-                      showTopBorder
                     >
                       <EditFieldInput
                         typography={typography}
@@ -328,7 +327,6 @@ export const BusinessSettingsScreen = forwardRef<
                     </EditIconRow>
                     <EditIconRow
                       icon={<IconPhone color={fg.secondary} size={20} />}
-                      showTopBorder
                     >
                       <EditFieldInput
                         typography={typography}
@@ -342,7 +340,6 @@ export const BusinessSettingsScreen = forwardRef<
                     </EditIconRow>
                     <EditIconRow
                       icon={<IconMail color={fg.secondary} size={20} />}
-                      showTopBorder
                     >
                       <EditFieldInput
                         typography={typography}
@@ -358,7 +355,6 @@ export const BusinessSettingsScreen = forwardRef<
                     </EditIconRow>
                     <EditIconRow
                       icon={<IconWorld color={fg.secondary} size={20} />}
-                      showTopBorder
                     >
                       <EditFieldInput
                         typography={typography}
@@ -374,7 +370,6 @@ export const BusinessSettingsScreen = forwardRef<
                     </EditIconRow>
                     <EditIconRow
                       icon={<IconLicense color={fg.secondary} size={20} />}
-                      showTopBorder
                     >
                       <EditFieldInput
                         typography={typography}
@@ -443,7 +438,7 @@ export const BusinessSettingsScreen = forwardRef<
                         }}
                       />
                     </EditIconRow>
-                    {TAX_OPTIONS.map((option) => (
+                    {TAX_OPTIONS.map((option, index) => (
                       <EditConfirmNoneRow
                         key={option.value}
                         typography={typography}
@@ -452,6 +447,7 @@ export const BusinessSettingsScreen = forwardRef<
                         confirmedLabel={`Apply to ${option.label}`}
                         disabled={saving}
                         onToggle={() => toggleCategory(option.value)}
+                        showTopBorder={index === 0}
                       />
                     ))}
                   </EditSheet>
