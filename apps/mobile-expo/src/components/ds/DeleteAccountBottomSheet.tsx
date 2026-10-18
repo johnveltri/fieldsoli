@@ -7,6 +7,7 @@ import { bg, border, cardShadowRn, fg } from '../../theme/nativeTokens';
 import type { TextStyles } from '../../theme/nativeTokens';
 import { SessionSheetBackIcon } from '../figma-icons/JobDetailScreenIcons';
 import { ProfileTrashIcon } from '../figma-icons/ProfileScreenIcons';
+import { AccountFormPage } from './AccountFormPage';
 import { BottomSheetShell } from './BottomSheetShell';
 import { screenHeaderA11y } from '../../lib/accessibility';
 
@@ -15,6 +16,7 @@ export const DELETE_ACCOUNT_CONFIRMATION_PHRASE = 'delete account';
 type DeleteAccountBottomSheetProps = {
   typography: TextStyles;
   visible: boolean;
+  presentation?: 'sheet' | 'page';
   onClose?: () => void;
   onClosed?: () => void;
   onBack?: () => void;
@@ -32,6 +34,7 @@ type DeleteAccountBottomSheetProps = {
 export function DeleteAccountBottomSheet({
   typography,
   visible,
+  presentation = 'sheet',
   onClose,
   onClosed,
   onBack,
@@ -48,6 +51,90 @@ export function DeleteAccountBottomSheet({
   const canSubmit = confirmation === DELETE_ACCOUNT_CONFIRMATION_PHRASE;
   const errorText = color('Semantic/Status/Error/Text');
 
+  const content = (
+    <View style={styles.body}>
+      {presentation === 'sheet' ? (
+        <>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Back"
+            onPress={onBack ?? onClose}
+            style={({ pressed }) => [styles.back, pressed && styles.pressed]}
+          >
+            <SessionSheetBackIcon color={fg.secondary} />
+            <Text style={[typography.bodyBold, { color: fg.secondary }]}>Back</Text>
+          </Pressable>
+
+          <View style={styles.header}>
+            <View style={styles.headerIcon}>
+              <ProfileTrashIcon color={errorText} />
+            </View>
+            <Text {...screenHeaderA11y()}
+              style={[typography.titleH3, styles.headerTitle, { color: fg.primary }]}
+            >
+              Delete Account
+            </Text>
+          </View>
+
+        </>
+      ) : null}
+
+      <View style={styles.copy}>
+        <Text style={[typography.bodySmall, styles.instruction, { color: fg.secondary }]}>
+          Type{' '}
+          <Text style={styles.emphasis}>&quot;{DELETE_ACCOUNT_CONFIRMATION_PHRASE}&quot;</Text>
+          {' '}below to continue.
+        </Text>
+        <Text style={[typography.bodySmall, styles.instruction, { color: fg.secondary }]}>
+          Deleting your account permanently deletes all associated jobs, visits, notes,
+          materials, and other provided job information. There will be no way to recover
+          this information for taxes or other recordkeeping purposes.
+        </Text>
+      </View>
+
+      <View style={styles.fields}>
+        <View style={styles.inputShell}>
+          <DsTextInput
+            value={confirmation}
+            onChangeText={setConfirmation}
+            placeholder={DELETE_ACCOUNT_CONFIRMATION_PHRASE}
+            placeholderTextColor={fg.secondary}
+            autoCapitalize="none"
+            autoCorrect={false}
+            autoComplete="off"
+            style={[typography.body, styles.inputText]}
+          />
+        </View>
+      </View>
+
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="DELETE ACCOUNT"
+        accessibilityState={{ disabled: !canSubmit }}
+        onPress={canSubmit ? onSubmit : undefined}
+        disabled={!canSubmit}
+        style={({ pressed }) => [
+          styles.primary,
+          { backgroundColor: errorText, shadowColor: errorText },
+          !canSubmit && styles.primaryDisabled,
+          pressed && canSubmit && styles.pressed,
+        ]}
+      >
+        <Text style={[typography.ctaPrimaryLabel, styles.primaryLabel]}>
+          DELETE ACCOUNT
+        </Text>
+      </Pressable>
+    </View>
+  );
+
+  if (presentation === 'page') {
+    return (
+      <AccountFormPage title="Delete Account" typography={typography} onBack={onBack ?? onClose}>
+        {content}
+      </AccountFormPage>
+    );
+  }
+
   return (
     <BottomSheetShell
       visible={visible}
@@ -56,74 +143,7 @@ export function DeleteAccountBottomSheet({
       registerInGlobalStack={registerInGlobalStack}
       bottomPaddingExtra={space('Spacing/4')}
     >
-      <View style={styles.body}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Back"
-          onPress={onBack ?? onClose}
-          style={({ pressed }) => [styles.back, pressed && styles.pressed]}
-        >
-          <SessionSheetBackIcon color={fg.secondary} />
-          <Text style={[typography.bodyBold, { color: fg.secondary }]}>Back</Text>
-        </Pressable>
-
-        <View style={styles.header}>
-          <View style={styles.headerIcon}>
-            <ProfileTrashIcon color={errorText} />
-          </View>
-          <Text {...screenHeaderA11y()}
-            style={[typography.titleH3, styles.headerTitle, { color: fg.primary }]}
-          >
-            Delete Account
-          </Text>
-        </View>
-
-        <View style={styles.copy}>
-          <Text style={[typography.bodySmall, styles.instruction, { color: fg.secondary }]}>
-            Type{' '}
-            <Text style={styles.emphasis}>&quot;{DELETE_ACCOUNT_CONFIRMATION_PHRASE}&quot;</Text>
-            {' '}below to continue.
-          </Text>
-          <Text style={[typography.bodySmall, styles.instruction, { color: fg.secondary }]}>
-            Deleting your account permanently deletes all associated jobs, visits, notes,
-            materials, and other provided job information. There will be no way to recover
-            this information for taxes or other recordkeeping purposes.
-          </Text>
-        </View>
-
-        <View style={styles.fields}>
-          <View style={styles.inputShell}>
-            <DsTextInput
-              value={confirmation}
-              onChangeText={setConfirmation}
-              placeholder={DELETE_ACCOUNT_CONFIRMATION_PHRASE}
-              placeholderTextColor={fg.secondary}
-              autoCapitalize="none"
-              autoCorrect={false}
-              autoComplete="off"
-              style={[typography.body, styles.inputText]}
-            />
-          </View>
-        </View>
-
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="DELETE ACCOUNT"
-          accessibilityState={{ disabled: !canSubmit }}
-          onPress={canSubmit ? onSubmit : undefined}
-          disabled={!canSubmit}
-          style={({ pressed }) => [
-            styles.primary,
-            { backgroundColor: errorText, shadowColor: errorText },
-            !canSubmit && styles.primaryDisabled,
-            pressed && canSubmit && styles.pressed,
-          ]}
-        >
-          <Text style={[typography.ctaPrimaryLabel, styles.primaryLabel]}>
-            DELETE ACCOUNT
-          </Text>
-        </Pressable>
-      </View>
+      {content}
     </BottomSheetShell>
   );
 }

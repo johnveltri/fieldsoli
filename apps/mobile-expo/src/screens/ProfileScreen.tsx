@@ -7,9 +7,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Animated,
-  Modal,
-  Platform,
-  Pressable,
   StyleSheet,
   Text,
   View,
@@ -173,8 +170,6 @@ export function ProfileScreen({ onBack, onBackToHome = onBack }: ProfileScreenPr
   const [deleteAccountMounted, setDeleteAccountMounted] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const profileSheetsMounted =
-    changePasswordMounted || deleteAccountMounted;
   const setProfileSheetsMounted = useShellChromeOptional()?.setProfileSheetsMounted;
   useEffect(() => {
     setProfileSheetsMounted?.(true);
@@ -389,37 +384,6 @@ export function ProfileScreen({ onBack, onBackToHome = onBack }: ProfileScreenPr
     [openDeleteAccount],
   );
 
-  const profileSheetLayer = (
-    <>
-      {changePasswordMounted ? (
-        <ChangePasswordBottomSheet
-          typography={typography}
-          visible={flow === 'changePassword'}
-          saving={saving}
-          onClose={closeChangePassword}
-          onClosed={() => {
-            if (flow === 'closed') setChangePasswordMounted(false);
-          }}
-          onBack={closeChangePassword}
-          onSubmit={onSubmitNewPassword}
-        />
-      ) : null}
-
-      {deleteAccountMounted ? (
-        <DeleteAccountBottomSheet
-          typography={typography}
-          visible={flow === 'deleteAccount'}
-          onClose={closeDeleteAccount}
-          onClosed={() => {
-            if (flow === 'closed') setDeleteAccountMounted(false);
-          }}
-          onBack={closeDeleteAccount}
-          onSubmit={onDeleteAccountSheetSubmit}
-        />
-      ) : null}
-    </>
-  );
-
   if (!fontsLoaded) {
     return (
       <View style={styles.root}>
@@ -429,7 +393,7 @@ export function ProfileScreen({ onBack, onBackToHome = onBack }: ProfileScreenPr
   }
 
   const secondaryMounted = personalMounted || businessScreen !== null
-    || helpMounted || privacyMounted || jobExportMounted;
+    || helpMounted || privacyMounted || jobExportMounted || changePasswordMounted || deleteAccountMounted;
 
   return (
     <View style={styles.root}>
@@ -531,26 +495,39 @@ export function ProfileScreen({ onBack, onBackToHome = onBack }: ProfileScreenPr
         </OverlaySlideHost>
       ) : null}
 
-      {Platform.OS === 'android' ? (
-        profileSheetsMounted ? (
-          <Modal
-            visible
-            transparent
-            animationType="none"
-            statusBarTranslucent
-            navigationBarTranslucent
-            onRequestClose={() => {
-              if (flow === 'changePassword') closeChangePassword();
-              else if (flow === 'deleteAccount') closeDeleteAccount();
-              else closeEditProfile();
-            }}
-          >
-            <View style={styles.profileSheetModalHost}>{profileSheetLayer}</View>
-          </Modal>
-        ) : null
-      ) : (
-        profileSheetLayer
-      )}
+      {changePasswordMounted ? (
+        <OverlaySlideHost
+          visible={flow === 'changePassword'}
+          axis="horizontal"
+          onRequestClose={closeChangePassword}
+          onExited={() => setChangePasswordMounted(false)}
+        >
+          <ChangePasswordBottomSheet
+            presentation="page"
+            typography={typography}
+            visible={flow === 'changePassword'}
+            saving={saving}
+            onBack={closeChangePassword}
+            onSubmit={onSubmitNewPassword}
+          />
+        </OverlaySlideHost>
+      ) : null}
+      {deleteAccountMounted ? (
+        <OverlaySlideHost
+          visible={flow === 'deleteAccount'}
+          axis="horizontal"
+          onRequestClose={closeDeleteAccount}
+          onExited={() => setDeleteAccountMounted(false)}
+        >
+          <DeleteAccountBottomSheet
+            presentation="page"
+            typography={typography}
+            visible={flow === 'deleteAccount'}
+            onBack={closeDeleteAccount}
+            onSubmit={onDeleteAccountSheetSubmit}
+          />
+        </OverlaySlideHost>
+      ) : null}
 
       {helpMounted ? (
         <OverlaySlideHost
@@ -601,7 +578,6 @@ function ProfileSectionHeader({ typography, title }: { typography: TextStyles; t
 
 const styles = StyleSheet.create({
   root: { flex: 1, alignItems: 'center', backgroundColor: bg.canvasWarm },
-  profileSheetModalHost: { flex: 1, backgroundColor: 'transparent' },
   scroll: { flex: 1, width: '100%', backgroundColor: 'transparent', zIndex: 1 },
   scrollContent: {
     alignItems: 'stretch',

@@ -261,7 +261,38 @@ describe('ProfileScreen', () => {
     expect(screen.getByTestId('chrome').props.children).toBe('visible');
   });
 
-  it('opens the delete account sheet before showing the system confirmation', async () => {
+  it('validates the Change Password page and keeps the existing success behavior', async () => {
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const screen = render(<ProfileScreen onBack={jest.fn()} />);
+    await act(async () => {});
+    fireEvent.press(screen.getByText('Change Password'));
+    expect(screen.getByRole('header', { name: 'Change Password' })).toBeTruthy();
+    expect(screen.getByLabelText('SAVE NEW PASSWORD').props.accessibilityState.disabled).toBe(true);
+    fireEvent.changeText(screen.getByPlaceholderText('New Password'), 'Password123!');
+    fireEvent.changeText(screen.getByPlaceholderText('Repeat Password'), 'Different123!');
+    expect(screen.getByText('Password does not match')).toBeTruthy();
+    expect(mockUpdatePassword).not.toHaveBeenCalled();
+    fireEvent.changeText(screen.getByPlaceholderText('Repeat Password'), 'Password123!');
+    fireEvent.press(screen.getByLabelText('SAVE NEW PASSWORD'));
+    await waitFor(() => expect(mockUpdatePassword).toHaveBeenCalledWith('Password123!'));
+    expect(alert).toHaveBeenCalledWith('Password updated');
+    await waitFor(() => expect(screen.getByText('ACCOUNT')).toBeTruthy());
+    alert.mockRestore();
+  });
+
+  it('returns from a security page and clears its input on reopening', async () => {
+    const screen = render(<ProfileScreen onBack={jest.fn()} />);
+    await act(async () => {});
+    fireEvent.press(screen.getByText('Change Password'));
+    fireEvent.changeText(screen.getByPlaceholderText('New Password'), 'Unsaved123!');
+    fireEvent.press(screen.getByLabelText('Back'));
+    await waitFor(() => expect(screen.getByText('ACCOUNT')).toBeTruthy());
+    expect(mockUpdatePassword).not.toHaveBeenCalled();
+    fireEvent.press(screen.getByText('Change Password'));
+    expect(screen.getByPlaceholderText('New Password').props.value).toBe('');
+  });
+
+  it('opens the Delete Account page before showing the system confirmation', async () => {
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     const screen = render(<ProfileScreen onBack={jest.fn()} />);
     await waitFor(() => {
