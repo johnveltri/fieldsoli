@@ -1,5 +1,6 @@
 -- App Store screenshot fixture. This is intentionally NOT part of db.seed.sql:
--- it is loaded only by `npm run screenshots:reset` against the local stack.
+-- it is loaded by `npm run screenshots:reset` locally, or rendered by the
+-- Dev-only `npm run screenshots:reset:dev` wrapper for the reserved demo account.
 --
 -- psql variables supplied by scripts/seed-app-store-demo.mjs:
 --   demo_user_id, privacy_version, terms_version
