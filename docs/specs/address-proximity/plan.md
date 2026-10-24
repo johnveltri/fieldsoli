@@ -2,6 +2,12 @@
 
 Status: implemented and deployed to hosted Dev; selected iOS simulator checks completed, including business-address fallback with a qualifying city-level result. No production/store release claimed.
 
+## PR review focus correction
+
+Address input focus is tracked separately from retained suggestion visibility in both Customer fields and Business Details. Blur ends location resolution and ignores pending autocomplete responses while keeping completed suggestions tappable. Cache invalidation on foreground return cannot start another lookup until the input is focused again.
+
+Automated follow-up under Node 22.13.1 passed the six focused mobile suites (55 tests), mobile TypeScript checking, product export, design validation, and diff whitespace checks. Coverage includes blur followed by background/foreground, late location responses, refocus, and suggestion selection after blur. The review also found 11 app-shell test failures that reproduced on both the original PR head and its base in the isolated review setup. No new native runtime evidence or visible layout change is claimed for this correction; existing visual references remain applicable.
+
 ## Sequence
 
 1. Add server validation, optional proximity bias and authenticated saved-business resolver. Preserve JWT verification, user-scoped RLS, budgets and redacted errors.

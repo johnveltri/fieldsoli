@@ -23,6 +23,7 @@ export function useAddressAutocomplete(
   client: FieldSoloSupabaseClient,
   query: string,
   enabled: boolean,
+  focused: boolean = enabled,
 ) {
   const [suggestions, setSuggestions] = useState<AddressSuggestion[]>([]);
   const [loading, setLoading] = useState(false);
@@ -43,8 +44,9 @@ export function useAddressAutocomplete(
   }, []);
 
   useEffect(() => {
+    if (!enabled) setProximity(null);
+    if (!enabled || !focused || AppState.currentState === 'background') return;
     setProximity(null);
-    if (!enabled || AppState.currentState === 'background') return;
     const controller = new AbortController();
     locationControllerRef.current = controller;
     void deviceAddressProximity(controller.signal).then(async (point) => {
@@ -56,7 +58,7 @@ export function useAddressAutocomplete(
       controller.abort();
       if (locationControllerRef.current === controller) locationControllerRef.current = null;
     };
-  }, [client, enabled, locationRevision]);
+  }, [client, enabled, focused, locationRevision]);
 
   const runLookup = useCallback(
     async (text: string, requestId: number) => {
@@ -95,6 +97,13 @@ export function useAddressAutocomplete(
       return;
     }
 
+    // Keep completed suggestions tappable after blur, but end the interaction.
+    if (!focused) {
+      requestIdRef.current += 1;
+      setLoading(false);
+      return;
+    }
+
     if (!meetsAddressThreshold(query) || rateLimitedRef.current) {
       requestIdRef.current += 1;
       setSuggestions([]);
@@ -114,7 +123,7 @@ export function useAddressAutocomplete(
       clearTimeout(timer);
       requestIdRef.current += 1;
     };
-  }, [enabled, query, runLookup, locationRevision]);
+  }, [enabled, focused, query, runLookup, locationRevision]);
 
   return {
     suggestions,

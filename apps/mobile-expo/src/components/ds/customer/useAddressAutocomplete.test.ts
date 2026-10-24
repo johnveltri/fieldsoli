@@ -1,15 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { act, renderHook, waitFor } from '@testing-library/react-native';
+import { AppState } from 'react-native';
 
 import { fetchAddressSuggestions } from '@fieldsolo/api-client';
 
 import { useAddressAutocomplete } from './useAddressAutocomplete';
-import { businessAddressProximity, deviceAddressProximity } from '../../../lib/addressLocation';
+import { businessAddressProximity, deviceAddressProximity, subscribeAddressProximity } from '../../../lib/addressLocation';
 
 jest.mock('../../../lib/addressLocation', () => ({
   deviceAddressProximity: jest.fn<() => Promise<unknown>>().mockResolvedValue(null),
   businessAddressProximity: jest.fn<() => Promise<unknown>>().mockResolvedValue(null),
-  subscribeAddressProximity: () => () => {},
+  subscribeAddressProximity: jest.fn(() => () => {}),
 }));
 
 jest.mock('@fieldsolo/api-client', () => ({
@@ -107,6 +108,61 @@ describe('useAddressAutocomplete', () => {
     });
     rerender({ enabled: false });
     await act(async () => { resolve({ latitude: 1, longitude: 2 }); jest.advanceTimersByTime(500); });
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it('keeps suggestions after blur without restarting location or searches on foreground return', async () => {
+    const point = { latitude: 41.88, longitude: -87.63 };
+    const matches = [{ token: 'g0', displayAddress: '123 Main St, Chicago, IL' }];
+    jest.mocked(deviceAddressProximity).mockResolvedValue(point);
+    mockFetch.mockResolvedValue({ status: 'ok', suggestions: matches });
+    const { result, rerender } = renderHook(
+      ({ focused }) => useAddressAutocomplete(client, '123 Main', true, focused),
+      { initialProps: { focused: true } },
+    );
+    await act(async () => {});
+    await act(async () => { jest.advanceTimersByTime(300); });
+    expect(result.current.suggestions).toEqual(matches);
+    const signal = jest.mocked(deviceAddressProximity).mock.calls[0][0];
+
+    rerender({ focused: false });
+    expect(signal.aborted).toBe(true);
+    expect(result.current.suggestions).toEqual(matches);
+    expect(result.current.showPanel).toBe(true);
+
+    const invalidate = jest.mocked(subscribeAddressProximity).mock.calls[0][0];
+    const originalState = AppState.currentState;
+    try {
+      AppState.currentState = 'background';
+      act(() => invalidate());
+      AppState.currentState = 'active';
+      act(() => invalidate());
+      await act(async () => { jest.advanceTimersByTime(500); });
+      expect(deviceAddressProximity).toHaveBeenCalledTimes(1);
+      expect(businessAddressProximity).not.toHaveBeenCalled();
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+
+      rerender({ focused: true });
+      await act(async () => {});
+      await act(async () => { jest.advanceTimersByTime(300); });
+      expect(deviceAddressProximity).toHaveBeenCalledTimes(2);
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+      expect(result.current.suggestions).toEqual(matches);
+    } finally {
+      AppState.currentState = originalState;
+    }
+  });
+
+  it('ignores a late location after blur while the suggestion panel stays enabled', async () => {
+    let resolve!: (point: null) => void;
+    jest.mocked(deviceAddressProximity).mockImplementationOnce(() => new Promise((done) => { resolve = done; }));
+    const { rerender } = renderHook(
+      ({ focused }) => useAddressAutocomplete(client, '123 Main', true, focused),
+      { initialProps: { focused: true } },
+    );
+    rerender({ focused: false });
+    await act(async () => { resolve(null); jest.advanceTimersByTime(500); });
+    expect(businessAddressProximity).not.toHaveBeenCalled();
     expect(mockFetch).not.toHaveBeenCalled();
   });
 

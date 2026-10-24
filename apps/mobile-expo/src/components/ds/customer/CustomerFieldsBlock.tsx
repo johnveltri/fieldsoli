@@ -70,10 +70,12 @@ export function CustomerFieldsBlock({
   onFocusChange,
 }: CustomerFieldsBlockProps) {
   const [customerFocused, setCustomerFocused] = useState(false);
+  // Suggestion taps can finish after blur; location access follows actual input focus.
   const [addressFocused, setAddressFocused] = useState(false);
+  const [addressInputFocused, setAddressInputFocused] = useState(false);
   const { suggestions, suggestionsQuery, loading, error, reload } =
     useCustomerSuggestions(supabase);
-  const addressLookup = useAddressAutocomplete(supabase, draft.serviceAddress, addressFocused);
+  const addressLookup = useAddressAutocomplete(supabase, draft.serviceAddress, addressFocused, addressInputFocused);
 
   const applyDraft = useCallback(
     (next: CustomerDraft, source: 'recent' | 'search' | 'device_contact' | 'manual') => {
@@ -262,10 +264,12 @@ export function CustomerFieldsBlock({
             }
             onFocus={() => {
               setAddressFocused(true);
+              setAddressInputFocused(true);
               onFocusChange?.(true);
             }}
             onBlur={() => {
               // Keep lookup results mounted through suggestion taps after blur.
+              setAddressInputFocused(false);
               onCustomerFieldBlur?.();
               onFocusChange?.(false);
             }}

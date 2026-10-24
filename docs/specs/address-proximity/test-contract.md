@@ -4,7 +4,7 @@
 | --- | --- | --- |
 | TEST-01 | REQ-01, DATA-01/02 | API and provider tests: optional point, rounding, invalid/boundary/zero coordinates, longitude-first bias, legacy request and unchanged response |
 | TEST-02 | REQ-02, STATE-01/03, UX-01/02 | Mobile service/hook: ask on empty focus once, denial/blocked/expired permission, no repeated prompt, no fix after denial |
-| TEST-03 | REQ-03, STATE-02/04/08 | Mobile: device wins; fallback/null; services disabled, timeout, rejected and late fix, blur/query staleness |
+| TEST-03 | REQ-03, STATE-02/04/08 | Mobile: device wins; fallback/null; services disabled, timeout, rejected and late fix, blur/query staleness; retained suggestions stay selectable after blur without restarting lookups on foreground return, and refocus resumes resolution |
 | TEST-04 | DATA-03/04/07 | Server/client: resolver has no caller address/user, confidence and ambiguity, invalid/missing response, bounded timeout, existing budget contract; hosted authentication/RLS checks |
 | TEST-05 | REQ-05, STATE-06/07, DATA-05/06 | Mobile: TTLs, deduplication, background/inactive/foreground, account switch, sign-out, explicit invalidation and ignored old-generation response; inspect safe logging |
 | TEST-06 | REQ-04, STATE-05, UX-04/05 | Privacy Choices component/service: matching switches, metadata-only reads, first native request, later Settings, OS-controlled state and foreground refresh, limited Contacts shown on, per-permission failure isolation; native accessibility and text scaling |
