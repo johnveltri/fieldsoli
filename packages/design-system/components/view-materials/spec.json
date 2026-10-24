@@ -72,5 +72,8 @@
       "2026-04-08: Component set `1287:618` — `VERTICAL` + `NO_WRAP`, 16px `itemSpacing`; `clipsContent` false on set and variant masters. Generic `Container` / `Input` chrome renamed to `view-materials-*` (card / surface, bucket header + label, row + row-content + name/quantity/price, session section + session header + text). Multi Session (`1287:668`): bordered `view-materials-card-surface` stacks `view-materials-unassigned-block` and `view-materials-session-section`. Materials Same Session (`1287:721`): `view-materials-card` > `view-materials-card-surface`, two unassigned rows, no session block. No `flatten()` in automation.",
       "2026-04-11: Sync Figma `1287:618` — DOM matches layer names (Multi: surface + unassigned-block; Single/Same: card + surface); session band copy `{date} ` + uppercase **Session**; outer `view-materials-root` + py 9; third code variant `materialsSameSession`."
     ]
+  },
+  "nativeJobView": {
+    "customerPrice": "In invoicing Job View, keep cost primary and right-align {amount} with markup beneath it using bodySmall, Foundation/Text/Secondary and Spacing/4. Use current business markup or explicit row override (including zero), round-half-up integer cents. Omit unknown charge. Preserve quantity/actions; allow wrapping and growing height at large type. VoiceOver distinguishes Cost from Price with markup."
   }
 }

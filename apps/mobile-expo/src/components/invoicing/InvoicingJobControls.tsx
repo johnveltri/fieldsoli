@@ -74,6 +74,7 @@ import { EditSwipeableRow } from '../ds/edit-mode/EditSwipeableRow';
 import {
   defaultDocumentType,
   documentLinkText,
+  documentSmsRecipient,
   documentNumberLabel,
   gapLabels,
   gmailSubject,
@@ -119,7 +120,10 @@ type Props = {
   jobId: string;
   workStatus: string;
   typography: TextStyles;
-  mode: 'view' | 'edit';
+  mode: 'view' | 'edit' | 'launcher';
+  onPreviewDocument?: (documentId: string) => void;
+  refreshKey?: number;
+  onDocumentsChanged?: () => void;
   active?: boolean;
   onEditDetails: () => void;
   onManageDocs?: () => void;
@@ -249,6 +253,9 @@ export const InvoicingJobControls = forwardRef<
     onFinalized,
     onFinalizationClosed,
     onRevenueInvoiceChanged,
+    onPreviewDocument,
+    refreshKey,
+    onDocumentsChanged,
   }: Props,
   ref,
 ) {
@@ -256,6 +263,10 @@ export const InvoicingJobControls = forwardRef<
   const { columnStyle } = useContentColumn();
   const businessScreenRef = useRef<BusinessSettingsScreenHandle>(null);
   const previewRequestRef = useRef(0);
+  const savedPreviewIdRef = useRef<string | null>(null);
+  const [previewFailure, setPreviewFailure] = useState(false);
+  const [webViewGeneration, setWebViewGeneration] = useState(0);
+  useEffect(() => () => { previewRequestRef.current += 1; }, []);
   const archivingRef = useRef(false);
   const [documents, setDocuments] = useState<FinancialDocumentRecord[]>([]);
   const [pendingControls, setPendingControls] = useState<Record<string, { archived: boolean; linkEnabled: boolean }>>({});
@@ -268,11 +279,15 @@ export const InvoicingJobControls = forwardRef<
     defaultDocumentType(workStatus),
   );
   const [saved, setSaved] = useState<FinancialDocumentRecord | null>(null);
+  useEffect(() => {
+    if (saved) savedPreviewIdRef.current = saved.id;
+  }, [saved]);
   const [savedWorkStatus, setSavedWorkStatus] = useState(workStatus);
   const [refreshingSaved, setRefreshingSaved] = useState(false);
   const workStatusRef = useRef(workStatus);
   workStatusRef.current = workStatus;
   const [previewOpen, setPreviewOpenState] = useState(false);
+  const previewVisibleRef = useRef(false);
   const { height: previewWindowHeight } = useWindowDimensions();
   const previewTranslateY = useRef(new Animated.Value(previewWindowHeight)).current;
   useEffect(() => () => previewTranslateY.stopAnimation(), [previewTranslateY]);
@@ -286,12 +301,15 @@ export const InvoicingJobControls = forwardRef<
     }).start();
   }, [previewTranslateY, reduceMotion]);
   const setPreviewOpen = useCallback((open: boolean, afterClose?: () => void) => {
+    if (open && previewVisibleRef.current) return;
     previewTranslateY.stopAnimation();
     if (open) {
+      previewVisibleRef.current = true;
       previewTranslateY.setValue(previewWindowHeight);
       setPreviewOpenState(true);
       return;
     }
+    previewVisibleRef.current = false;
     Animated.timing(previewTranslateY, {
       toValue: previewWindowHeight,
       duration: reduceMotion ? 0 : 210,
@@ -318,7 +336,7 @@ export const InvoicingJobControls = forwardRef<
   const [busy, setBusy] = useState<string | null>(null);
   const [copySuccess, setCopySuccess] = useState(false);
   const [offline, setOffline] = useState(false);
-  const [recoveringIntent, setRecoveringIntent] = useState(true);
+  const [recoveringIntent, setRecoveringIntent] = useState(!onPreviewDocument);
   const recoveryBlockedRef = useRef(false);
   const recoveryScopeRef = useRef<string | null>(null);
   const creationRunningRef = useRef(false);
@@ -347,7 +365,7 @@ export const InvoicingJobControls = forwardRef<
     if (!previewOpen) return;
     let cancelled = false;
     setPreviewFontsReady(false);
-    void loadPreviewFontData()
+    void boundedDocumentRead(loadPreviewFontData())
       .then((fonts) => {
         if (!cancelled) {
           setPreviewFonts(fonts);
@@ -370,7 +388,7 @@ export const InvoicingJobControls = forwardRef<
     setLoading(true);
     setError(null);
     try {
-      const nextDocuments = await listFinancialDocuments(client, jobId);
+      const nextDocuments = await readDocuments(client, jobId);
       setDocuments(nextDocuments);
       setRevenueDocumentDraft(nextDocuments.find((doc) => doc.isRevenueSource)?.id ?? null);
       setSaved((current) => current
@@ -389,7 +407,7 @@ export const InvoicingJobControls = forwardRef<
   }, [client, jobId]);
 
   const refreshDocument = useCallback(async (documentId: string) => {
-    const fresh = (await listFinancialDocuments(client, jobId)).find((item) => item.id === documentId);
+    const fresh = (await readDocuments(client, jobId)).find((item) => item.id === documentId);
     if (!fresh) throw new Error('financial_document_not_available');
     setDocuments((current) => current.map((item) => item.id === fresh.id ? fresh : item));
     setOffline(false);
@@ -411,7 +429,7 @@ export const InvoicingJobControls = forwardRef<
 
   const executeIntent = useCallback(async (intent: FinancialDocumentIntent) => {
     if (intent.kind === 'create') {
-      return intent.type === 'invoice'
+      const created = await (intent.type === 'invoice'
         ? createAndSelectFinancialDocument(client, {
             jobId: intent.jobId,
             fingerprint: intent.fingerprint,
@@ -425,9 +443,11 @@ export const InvoicingJobControls = forwardRef<
             fingerprint: intent.fingerprint,
             timezone: intent.timezone,
             requestKey: intent.requestKey,
-          });
+          }));
+      onDocumentsChanged?.();
+      return created;
     }
-    return finalizeJobWithInvoice(client, {
+    const finalized = await finalizeJobWithInvoice(client, {
       jobId: intent.jobId,
       status: intent.status,
       documentId: intent.documentId,
@@ -436,7 +456,9 @@ export const InvoicingJobControls = forwardRef<
       requestKey: intent.requestKey,
       confirmedPaidTotalCents: intent.confirmedPaidTotalCents,
     });
-  }, [client]);
+    onDocumentsChanged?.();
+    return finalized;
+  }, [client, onDocumentsChanged]);
 
   const clearIntent = useCallback(async (requestKey: string | undefined) => {
     if (!ownerId || !requestKey) return;
@@ -484,7 +506,7 @@ export const InvoicingJobControls = forwardRef<
 
   useEffect(() => {
     const scope = `${ownerId}:${jobId}`;
-    if (!isActive || !ownerId || recoveryScopeRef.current === scope) return;
+    if (!isActive || !ownerId || onPreviewDocument || recoveryScopeRef.current === scope) return;
     recoveryScopeRef.current = scope;
     recoveryBlockedRef.current = false;
     let cancelled = false;
@@ -526,33 +548,29 @@ export const InvoicingJobControls = forwardRef<
       cancelled = true;
       if (recoveryScopeRef.current === scope) recoveryScopeRef.current = null;
     };
-  }, [client, executeIntent, isActive, jobId, onFinalized, onRevenueInvoiceChanged, ownerId, reload]);
+  }, [client, executeIntent, isActive, jobId, onFinalized, onPreviewDocument, onRevenueInvoiceChanged, ownerId, reload]);
 
   useEffect(() => {
     if (isActive && !recoveringIntent) void reload();
-  }, [isActive, recoveringIntent, reload, workStatus]);
+  }, [isActive, recoveringIntent, refreshKey, reload, workStatus]);
 
-  useEffect(() => {
-    const subscription = AppState.addEventListener('change', (state) => {
-      if (state === 'active' && isActive && !recoveringIntent) void reload();
-    });
-    return () => subscription.remove();
-  }, [isActive, recoveringIntent, reload]);
 
   const openUnsaved = useCallback(async () => {
     if (beforeOpen) {
       const ok = await beforeOpen().catch(() => false);
       if (!ok) return;
     }
+    savedPreviewIdRef.current = null;
+    setPreviewFailure(false);
     setPreviewOpen(true);
     setSaved(null);
     setPreview(null);
     setOffline(false);
     const request = ++previewRequestRef.current;
-    setBusy('Loading');
+    setBusy('Loading…');
     setPreviewType(defaultDocumentType(workStatus));
     try {
-      const next = await previewFinancialDocument(client, {
+      const next = await readPreview(client, {
         jobId,
         type: defaultDocumentType(workStatus),
         timezone: deviceIanaTimeZone(),
@@ -563,6 +581,7 @@ export const InvoicingJobControls = forwardRef<
       }
     } catch {
       if (request === previewRequestRef.current) {
+        setPreviewFailure(true);
         setOffline(true);
         Alert.alert('Could not load this document.', 'Retry');
       }
@@ -575,10 +594,11 @@ export const InvoicingJobControls = forwardRef<
     async (type: 'estimate' | 'invoice') => {
       if (saved) return;
       const request = ++previewRequestRef.current;
+      setPreviewFailure(false);
       setPreviewType(type);
-      setBusy(null);
+      setBusy('Loading…');
       try {
-        const next = await previewFinancialDocument(client, {
+        const next = await readPreview(client, {
           jobId,
           type,
           timezone: deviceIanaTimeZone(),
@@ -590,8 +610,12 @@ export const InvoicingJobControls = forwardRef<
       } catch {
         if (request === previewRequestRef.current) {
           setPreviewType(preview?.payload.documentType ?? defaultDocumentType(workStatus));
+          setPreviewFailure(true);
+          setOffline(true);
           Alert.alert('Could not load this document.', 'Retry');
         }
+      } finally {
+        if (request === previewRequestRef.current) setBusy(null);
       }
     },
     [client, jobId, preview, saved, workStatus],
@@ -649,7 +673,7 @@ export const InvoicingJobControls = forwardRef<
         Alert.alert(
           'This Job changed. Review the updated preview before sharing.',
         );
-        const next = await previewFinancialDocument(client, {
+        const next = await readPreview(client, {
           jobId,
           type: previewType,
           timezone: deviceIanaTimeZone(),
@@ -707,7 +731,7 @@ export const InvoicingJobControls = forwardRef<
     const handoffUrl = shareDocumentUrl(handoffDocument.token);
     const handoffText = documentLinkText({
       type: handoffDocument.documentType,
-      number: handoffDocument.documentNumber,
+      totalCents: handoffDocument.payload.totalCents,
       businessName: handoffDocument.payload.businessName,
       url: handoffUrl,
     });
@@ -725,7 +749,8 @@ export const InvoicingJobControls = forwardRef<
           ]);
           return;
         }
-        await SMS.sendSMSAsync(handoffDocument.payload.customerPhone ?? '', handoffText);
+        const recipient = documentSmsRecipient(handoffDocument.payload.customerPhone);
+        await SMS.sendSMSAsync(recipient ? [recipient] : [], handoffText);
       } else if (action.kind === 'email') {
         const subject = gmailSubject({
           type: handoffDocument.documentType,
@@ -913,6 +938,8 @@ export const InvoicingJobControls = forwardRef<
   };
 
   const openDocument = useCallback((documentId: string) => {
+    savedPreviewIdRef.current = documentId;
+    setPreviewFailure(false);
     previewRequestRef.current += 1;
     const request = previewRequestRef.current;
     setSaved(null);
@@ -930,6 +957,7 @@ export const InvoicingJobControls = forwardRef<
       .catch(() => {
         if (request === previewRequestRef.current) {
           setSaved(null);
+          setPreviewFailure(true);
           setOffline(true);
           Alert.alert('Could not refresh this document.', 'Connect and retry before viewing or sharing it.');
         }
@@ -940,19 +968,24 @@ export const InvoicingJobControls = forwardRef<
   }, [refreshDocument, setPreviewOpen, workStatus]);
 
   const openFinalization = useCallback(async (status: 'completed' | 'paid') => {
+    const request = ++previewRequestRef.current;
+    const wasOpen = previewVisibleRef.current;
+    setPreviewFailure(false);
+    setOffline(false);
     setBusy('Reviewing…');
     try {
-      const nextDocuments = await listFinancialDocuments(client, jobId);
+      const nextDocuments = await readDocuments(client, jobId);
+      if (request !== previewRequestRef.current) return;
       setDocuments(nextDocuments);
       const selected = nextDocuments.find((doc) => doc.isRevenueSource) ?? null;
-      const nextPreview = selected ? null : await previewFinancialDocument(client, {
+      const nextPreview = selected ? null : await readPreview(client, {
         jobId,
         type: 'invoice',
         timezone: deviceIanaTimeZone(),
       });
+      if (request !== previewRequestRef.current) return;
       setRevenueDocumentDraft(selected?.id ?? null);
       setFinalization({ status, selected, preview: nextPreview });
-      previewRequestRef.current += 1;
       setSaved(selected);
       setSavedWorkStatus(workStatus);
       setPreview(nextPreview);
@@ -960,10 +993,13 @@ export const InvoicingJobControls = forwardRef<
       setShareOpen(false);
       setPreviewOpen(true);
     } catch {
+      if (request !== previewRequestRef.current) return;
+      setPreviewFailure(true);
+      setOffline(true);
       Alert.alert('Could not review this invoice. Try again.');
-      onFinalizationClosed?.();
+      if (!wasOpen) onFinalizationClosed?.();
     } finally {
-      setBusy(null);
+      if (request === previewRequestRef.current) setBusy(null);
     }
   }, [client, jobId, onFinalizationClosed, setPreviewOpen, workStatus]);
 
@@ -982,6 +1018,30 @@ export const InvoicingJobControls = forwardRef<
       void switchType(previewType);
     }
   }, [openFinalization, previewType, switchType]);
+
+  const retryPreview = useCallback(() => {
+    if (finalization) {
+      void openFinalization(finalization.status);
+    } else if (savedPreviewIdRef.current) {
+      openDocument(savedPreviewIdRef.current);
+    } else {
+      void switchType(previewType);
+    }
+  }, [finalization, openDocument, openFinalization, previewType, switchType]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state !== 'active' || !isActive || recoveringIntent || onPreviewDocument) return;
+      // WKWebView content can be discarded while the app is suspended.
+      setWebViewGeneration((value) => value + 1);
+      if (previewVisibleRef.current && !businessOpen && !creationRunningRef.current && !handoffRunningRef.current) {
+        retryPreview();
+      } else {
+        void reload();
+      }
+    });
+    return () => subscription.remove();
+  }, [businessOpen, isActive, onPreviewDocument, previewOpen, recoveringIntent, reload, retryPreview]);
 
   const confirmFinalization = useCallback(async () => {
     if (!finalization || creationRunningRef.current || recoveringIntent) return;
@@ -1049,7 +1109,9 @@ export const InvoicingJobControls = forwardRef<
   }, [clearIntent, executeIntent, finalization, jobId, onFinalized, openFinalization, ownerId, recoveringIntent, reload, retryPendingIntent, setPreviewOpen]);
 
   const closeInvoicePreview = () => {
-    if (busy) return;
+    if (busy && busy !== 'Loading' && busy !== 'Loading…' && busy !== 'Reviewing…') return;
+    previewRequestRef.current += 1;
+    setBusy(null);
     setPreviewOpen(false);
     if (finalization) {
       setFinalization(null);
@@ -1102,7 +1164,8 @@ export const InvoicingJobControls = forwardRef<
   const jobGaps = preview?.gaps.filter((gap) => gap !== 'business_name') ?? [];
 
   return (
-    <View style={styles.block}>
+    <View style={mode === 'launcher' ? undefined : styles.block}>
+      {mode !== 'launcher' ? <>
       {mode === 'view' ? (
         <Text
           accessibilityRole="header"
@@ -1155,7 +1218,7 @@ export const InvoicingJobControls = forwardRef<
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={`Preview ${documentNumberLabel(doc.documentType, doc.documentNumber)}, ${doc.issueDate}, ${formatUsdCombined(doc.payload.totalCents)}`}
-                onPress={() => openDocument(doc.id)}
+                onPress={() => (onPreviewDocument ?? openDocument)(doc.id)}
                 style={({ pressed }) => [styles.row, pressed && styles.pressed]}
               >
                 <View style={styles.rowLabel}>
@@ -1175,7 +1238,7 @@ export const InvoicingJobControls = forwardRef<
                 accessibilityLabel={doc.archived ? 'Un-Archive to Preview' : 'Preview and Share'}
                 accessibilityState={{ disabled: doc.archived }}
                 disabled={doc.archived}
-                onPress={() => openDocument(doc.id)}
+                onPress={() => (onPreviewDocument ?? openDocument)(doc.id)}
                 style={({ pressed }) => [
                   styles.documentPreviewRow,
                   pressed && !doc.archived && styles.pressed,
@@ -1201,7 +1264,7 @@ export const InvoicingJobControls = forwardRef<
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={`Preview ${documentNumberLabel(doc.documentType, doc.documentNumber)}, ${doc.issueDate}`}
-                  onPress={() => openDocument(doc.id)}
+                  onPress={() => (onPreviewDocument ?? openDocument)(doc.id)}
                   style={({ pressed }) => [
                     styles.documentDetailsRow,
                     pressed && styles.pressed,
@@ -1266,6 +1329,7 @@ export const InvoicingJobControls = forwardRef<
         </Text>
       ) : null}
 
+      </> : null}
       <Modal
         visible={previewOpen}
         transparent
@@ -1311,7 +1375,7 @@ export const InvoicingJobControls = forwardRef<
                   ]}
                   onValueChange={(type) => void switchType(type)}
                   labelStyle={typography.statusPillLabel}
-                  disabled={busy != null && busy !== 'Loading'}
+                  disabled={busy != null && busy !== 'Loading' && busy !== 'Loading…'}
                   fill={false}
                   style={styles.previewSelector}
                 />
@@ -1354,10 +1418,20 @@ export const InvoicingJobControls = forwardRef<
                 ) : null}
               </View>
             ) : null}
+            {previewFailure ? (
+              <Pressable accessibilityRole="button" accessibilityLabel="Retry document preview" onPress={retryPreview} style={styles.message}>
+                <Text style={typography.body}>Could not load this document.</Text>
+                <Text style={typography.bodyBold}>Retry</Text>
+              </Pressable>
+            ) : null}
             <View style={styles.paperWrap}>
               <View style={styles.paper}>
-                {previewFontsReady ? (
+                {previewFontsReady && (displaySaved || preview) && !previewFailure ? (
                   <WebView
+                    key={webViewGeneration}
+                    onContentProcessDidTerminate={() => setWebViewGeneration((value) => value + 1)}
+                    onRenderProcessGone={() => setWebViewGeneration((value) => value + 1)}
+                    onError={() => setPreviewFailure(true)}
                     testID="document-preview-html"
                     originWhitelist={['*']}
                     source={{
@@ -1392,13 +1466,13 @@ export const InvoicingJobControls = forwardRef<
                     }}
                     style={[styles.web, { height: previewHeight }]}
                   />
-                ) : (
+                ) : previewFailure ? null : (
                   <ActivityIndicator size="small" color={fg.primary} />
                 )}
               </View>
             </View>
           </ScrollView>
-          {!finalization && !displaySaved && preview && preview.gaps.length === 0 ? (
+          {!previewFailure && !offline && !finalization && !displaySaved && preview && preview.gaps.length === 0 ? (
             <View pointerEvents="box-none" style={styles.fabOverlay}>
               <FullWidthFab
                 typography={typography}
@@ -1415,7 +1489,7 @@ export const InvoicingJobControls = forwardRef<
               />
             </View>
           ) : null}
-          {!finalization && displaySaved ? (
+          {!previewFailure && !offline && !finalization && displaySaved ? (
             <View pointerEvents="box-none" style={styles.fabOverlay}>
               <FullWidthFab
                 typography={typography}
@@ -1429,7 +1503,7 @@ export const InvoicingJobControls = forwardRef<
               />
             </View>
           ) : null}
-          {finalization && (finalization.selected || finalization.preview?.gaps.length === 0) ? (
+          {!previewFailure && !offline && finalization && (finalization.selected || finalization.preview?.gaps.length === 0) ? (
             <View pointerEvents="box-none" style={styles.fabOverlay}>
               <FullWidthFab
                 typography={typography}
@@ -1582,6 +1656,27 @@ export const InvoicingJobControls = forwardRef<
     </View>
   );
 });
+
+/** Only reads time out here; financial mutations retain their durable recovery key. */
+async function boundedDocumentRead<T>(read: Promise<T>): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      read,
+      new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error('document_read_timeout')), 15000); }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+function readDocuments(client: FieldSoloSupabaseClient, jobId: string) {
+  return boundedDocumentRead(listFinancialDocuments(client, jobId));
+}
+
+function readPreview(client: FieldSoloSupabaseClient, input: Parameters<typeof previewFinancialDocument>[1]) {
+  return boundedDocumentRead(previewFinancialDocument(client, input));
+}
 
 function newRequestKey(): string {
   const bytes = new Uint8Array(16);

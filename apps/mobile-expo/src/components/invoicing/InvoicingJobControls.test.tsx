@@ -1,6 +1,6 @@
-import React, { createRef } from 'react';
+import React, { createRef, useCallback, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Animated, AppState, StyleSheet } from 'react-native';
+import { Alert, Animated, AppState, Modal, StyleSheet } from 'react-native';
 import { act, fireEvent, render, waitFor, within } from '@testing-library/react-native';
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { color } from '@fieldsolo/design-system/lib/tokens';
@@ -27,6 +27,8 @@ const mockCreateAndSelect =
   jest.fn<(...args: unknown[]) => Promise<FinancialDocumentRecord>>();
 const mockPrintToFile = jest.fn<(...args: unknown[]) => Promise<{ uri: string }>>();
 const mockPdfSharingAvailable = jest.fn<() => Promise<boolean>>();
+const mockSendSms = jest.fn<(...args: unknown[]) => Promise<unknown>>();
+let mockShareSheetClosed: (() => void) | undefined;
 
 jest.mock('@fieldsolo/api-client', () => ({
   ...jest.requireActual<object>('@fieldsolo/api-client'),
@@ -41,6 +43,7 @@ jest.mock('@fieldsolo/api-client', () => ({
 jest.mock('react-native-webview', () => ({
   WebView: require('react-native').View,
 }));
+jest.mock('expo-sms', () => ({ isAvailableAsync: async () => true, sendSMSAsync: (...args: unknown[]) => mockSendSms(...args) }));
 jest.mock('expo-clipboard', () => ({ setStringAsync: jest.fn() }));
 jest.mock('expo-mail-composer', () => ({ isAvailableAsync: jest.fn() }));
 jest.mock('expo-print', () => ({ printToFileAsync: (...args: unknown[]) => mockPrintToFile(...args) }));
@@ -64,7 +67,7 @@ jest.mock('../../screens/BusinessSettingsScreen', () => ({
   },
 }));
 jest.mock('../ds/BottomSheetShell', () => ({
-  BottomSheetShell: ({ children }: { children: React.ReactNode }) => children,
+  BottomSheetShell: ({ children, onClosed }: { children: React.ReactNode; onClosed: () => void }) => { mockShareSheetClosed = onClosed; return children; },
 }));
 jest.mock('@fieldsolo/document-renderer', () => ({
   RENDERER_VERSION: 1,
@@ -127,6 +130,7 @@ describe('InvoicingJobControls', () => {
     mockCreateAndSelect.mockResolvedValue(doc);
     mockPrintToFile.mockResolvedValue({ uri: 'file:///generated.pdf' });
     mockPdfSharingAvailable.mockResolvedValue(true);
+    mockSendSms.mockResolvedValue({ result: 'cancelled' });
     mockPreview.mockResolvedValue({
       payload,
       gaps: ['labor'],
@@ -638,4 +642,204 @@ describe('InvoicingJobControls', () => {
     expect(await screen.findByRole('button', { name: 'Copied' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Share document' })).toBeTruthy();
   });
+  it.each([['paid', 'invoice'], ['inProgress', 'estimate']])('opens FAB previews on %s jobs without changing financial state', async (workStatus, type) => {
+    const ref = createRef<InvoicingJobControlsHandle>();
+    const screen = render(<InvoicingJobControls {...props} ref={ref} mode="launcher" workStatus={workStatus} />);
+    await waitFor(() => expect(mockList).toHaveBeenCalled());
+    await act(async () => { ref.current?.openPreview(); });
+    expect(mockPreview).toHaveBeenLastCalledWith({}, expect.objectContaining({ type }));
+    expect(await screen.findByTestId('document-preview-html')).toBeTruthy();
+    expect(screen.queryByText('Documents')).toBeNull();
+    expect(mockCreate).not.toHaveBeenCalled();
+    expect(mockCreateAndSelect).not.toHaveBeenCalled();
+    expect(mockFinalize).not.toHaveBeenCalled();
+  });
+
+  it('refreshes the selected unsaved type after app switching and recovers a failed read inline', async () => {
+    const listener = jest.fn<(state: string) => void>();
+    jest.spyOn(AppState, 'addEventListener').mockImplementation((_event, callback) => {
+      listener.mockImplementation(callback as (state: string) => void);
+      return { remove: jest.fn() } as never;
+    });
+    jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    const ref = createRef<InvoicingJobControlsHandle>();
+    const screen = render(<InvoicingJobControls {...props} ref={ref} mode="launcher" />);
+    await waitFor(() => expect(mockList).toHaveBeenCalled());
+    await act(async () => { ref.current?.openPreview(); });
+    mockPreview.mockResolvedValue({ payload: { ...payload, documentType: 'invoice' }, gaps: [], rendererVersion: 1 } as DocumentPreview);
+    await act(async () => fireEvent.press(screen.getByRole('button', { name: 'Invoice' })));
+    await screen.findByLabelText('CREATE & SHARE INVOICE');
+    mockPreview.mockRejectedValueOnce(new Error('offline'));
+    act(() => listener('background'));
+    act(() => listener('active'));
+    const retry = await screen.findByLabelText('Retry document preview');
+    expect(screen.queryByLabelText('CREATE & SHARE INVOICE')).toBeNull();
+    fireEvent.press(retry);
+    await waitFor(() => expect(screen.queryByLabelText('Retry document preview')).toBeNull());
+    expect(mockPreview).toHaveBeenLastCalledWith({}, expect.objectContaining({ type: 'invoice' }));
+    expect(screen.getByLabelText('Close preview')).toBeTruthy();
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
+  it('ignores a superseded preview response after foreground refresh', async () => {
+    const listener = jest.fn<(state: string) => void>();
+    jest.spyOn(AppState, 'addEventListener').mockImplementation((_event, callback) => {
+      listener.mockImplementation(callback as (state: string) => void);
+      return { remove: jest.fn() } as never;
+    });
+    const ref = createRef<InvoicingJobControlsHandle>();
+    const screen = render(<InvoicingJobControls {...props} ref={ref} mode="launcher" />);
+    await waitFor(() => expect(mockList).toHaveBeenCalled());
+    let resolveOld!: (value: DocumentPreview) => void;
+    mockPreview.mockImplementationOnce(() => new Promise((resolve) => { resolveOld = resolve; }));
+    act(() => ref.current?.openPreview());
+    mockPreview.mockResolvedValueOnce({ payload, gaps: [], rendererVersion: 1, paymentProjection: 'paid' } as DocumentPreview);
+    act(() => listener('active'));
+    await waitFor(() => expect(screen.getByTestId('document-preview-html').props.source.html).toBe('paid'));
+    await act(async () => resolveOld({ payload, gaps: [], rendererVersion: 1, paymentProjection: 'unpaid' } as DocumentPreview));
+    expect(screen.getByTestId('document-preview-html').props.source.html).toBe('paid');
+  });
+
+  it('retries a saved document identity after a WebView error without creating another document', async () => {
+    const ref = createRef<InvoicingJobControlsHandle>();
+    const screen = render(<InvoicingJobControls {...props} ref={ref} mode="launcher" />);
+    await waitFor(() => expect(mockList).toHaveBeenCalled());
+    act(() => ref.current?.openDocument(doc.id));
+    const html = await screen.findByTestId('document-preview-html');
+    fireEvent(html, 'onError');
+    fireEvent.press(await screen.findByLabelText('Retry document preview'));
+    expect(await screen.findByLabelText('SHARE ESTIMATE')).toBeTruthy();
+    expect(mockPreview).not.toHaveBeenCalled();
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
+  it('allows closing a pending read and ignores its late completion', async () => {
+    const ref = createRef<InvoicingJobControlsHandle>();
+    const screen = render(<InvoicingJobControls {...props} ref={ref} mode="launcher" />);
+    await waitFor(() => expect(mockList).toHaveBeenCalled());
+    let resolveRead!: (value: DocumentPreview) => void;
+    mockPreview.mockImplementationOnce(() => new Promise((resolve) => { resolveRead = resolve; }));
+    act(() => ref.current?.openPreview());
+    fireEvent.press(await screen.findByLabelText('Close preview'));
+    await act(async () => resolveRead({ payload, gaps: [], rendererVersion: 1 } as DocumentPreview));
+    expect(screen.queryByTestId('document-preview-scroll')).toBeNull();
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
+  it('recovers a finalization renderer error on Retry', async () => {
+    const ref = createRef<InvoicingJobControlsHandle>();
+    const screen = render(<InvoicingJobControls {...props} ref={ref} mode="launcher" />);
+    await waitFor(() => expect(mockList).toHaveBeenCalled());
+    await act(async () => ref.current?.openFinalization('completed'));
+    fireEvent(await screen.findByTestId('document-preview-html'), 'onError');
+    fireEvent.press(await screen.findByLabelText('Retry document preview'));
+    expect(await screen.findByTestId('document-preview-html')).toBeTruthy();
+    expect(screen.queryByLabelText('Retry document preview')).toBeNull();
+    expect(mockFinalize).not.toHaveBeenCalled();
+  });
+
+  it('refreshes the visible Documents list after a FAB estimate is created', async () => {
+    const ref = createRef<InvoicingJobControlsHandle>();
+    function Harness() {
+      const [revision, setRevision] = useState(0);
+      const changed = useCallback(() => setRevision((value) => value + 1), []);
+      return <>
+        <InvoicingJobControls {...props} mode="view" refreshKey={revision} onPreviewDocument={(id) => ref.current?.openDocument(id)} />
+        <InvoicingJobControls {...props} ref={ref} mode="launcher" refreshKey={revision} onDocumentsChanged={changed} />
+      </>;
+    }
+    mockList.mockResolvedValue([]);
+    mockPreview.mockResolvedValue({ payload, gaps: [], rendererVersion: 1, fingerprint: 'new-estimate' } as DocumentPreview);
+    mockCreate.mockImplementationOnce(async () => { mockList.mockResolvedValue([doc]); return doc; });
+    const screen = render(<Harness />);
+    await screen.findByText('No documents yet');
+    await act(async () => ref.current?.openPreview());
+    fireEvent.press(await screen.findByLabelText('CREATE & SHARE ESTIMATE'));
+    expect(await screen.findByLabelText(/^Preview Estimate #00001,/)).toBeTruthy();
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([['(419) 708-4470', ['+14197084470']], ['Buddy name', []], [null, []]])('passes only snapshot phone recipients to the native composer: %s', async (phone, recipients) => {
+    const ref = createRef<InvoicingJobControlsHandle>();
+    mockList.mockResolvedValue([{ ...doc, payload: { ...payload, customerPhone: phone, totalCents: 123456 } } as FinancialDocumentRecord]);
+    const screen = render(<InvoicingJobControls {...props} ref={ref} mode="launcher" />);
+    await waitFor(() => expect(mockList).toHaveBeenCalled());
+    act(() => ref.current?.openDocument(doc.id));
+    fireEvent.press(await screen.findByLabelText('SHARE ESTIMATE'));
+    await screen.findByRole('button', { name: phone ? 'Text Customer' : 'Text' });
+    const modals = screen.UNSAFE_getAllByType(Modal);
+    const previewModal = modals.find((modal) => modal.props.onShow)!;
+    const shareModal = modals.find((modal) => modal.props.statusBarTranslucent)!;
+    await act(async () => fireEvent.press(screen.getByRole('button', { name: phone ? 'Text Customer' : 'Text' })));
+    act(() => mockShareSheetClosed?.());
+    act(() => shareModal.props.onDismiss());
+    await act(async () => previewModal.props.onDismiss());
+    await waitFor(() => expect(mockSendSms).toHaveBeenCalledWith(recipients, expect.stringContaining('Estimate for $1,234.56 from Example Business')));
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
+  it('settles a hung preview read into Retry without requiring close and reopen', async () => {
+    const ref = createRef<InvoicingJobControlsHandle>();
+    const screen = render(<InvoicingJobControls {...props} ref={ref} mode="launcher" />);
+    await waitFor(() => expect(mockList).toHaveBeenCalled());
+    jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    jest.useFakeTimers();
+    try {
+      mockPreview.mockImplementationOnce(() => new Promise(() => undefined));
+      act(() => ref.current?.openPreview());
+      await act(async () => { jest.advanceTimersByTime(15000); });
+      expect(screen.getByLabelText('Retry document preview')).toBeTruthy();
+      fireEvent.press(screen.getByLabelText('Retry document preview'));
+      await act(async () => undefined);
+      expect(screen.queryByLabelText('Retry document preview')).toBeNull();
+      expect(screen.getByTestId('document-preview-html')).toBeTruthy();
+      expect(mockCreate).not.toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('keeps finalization confirmation blocked when a foreground refresh fails', async () => {
+    const listener = jest.fn<(state: string) => void>();
+    jest.spyOn(AppState, 'addEventListener').mockImplementation((_event, callback) => {
+      listener.mockImplementation(callback as (state: string) => void);
+      return { remove: jest.fn() } as never;
+    });
+    jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    mockList.mockResolvedValue([{ ...doc, isRevenueSource: true } as FinancialDocumentRecord]);
+    const ref = createRef<InvoicingJobControlsHandle>();
+    const screen = render(<InvoicingJobControls {...props} ref={ref} mode="launcher" />);
+    await waitFor(() => expect(mockList).toHaveBeenCalled());
+    await act(async () => ref.current?.openFinalization('paid'));
+    await screen.findByLabelText('CONFIRM $0.00 PAID');
+    mockList.mockRejectedValueOnce(new Error('offline'));
+    act(() => listener('active'));
+    expect(await screen.findByLabelText('Retry document preview')).toBeTruthy();
+    expect(screen.queryByLabelText('CONFIRM $0.00 PAID')).toBeNull();
+    fireEvent.press(screen.getByLabelText('Retry document preview'));
+    expect(await screen.findByLabelText('CONFIRM $0.00 PAID')).toBeTruthy();
+    expect(mockFinalize).not.toHaveBeenCalled();
+  });
+
+  it('does not reopen a finalization dismissed during a foreground read', async () => {
+    const listener = jest.fn<(state: string) => void>();
+    jest.spyOn(AppState, 'addEventListener').mockImplementation((_event, callback) => {
+      listener.mockImplementation(callback as (state: string) => void);
+      return { remove: jest.fn() } as never;
+    });
+    mockList.mockResolvedValue([{ ...doc, isRevenueSource: true } as FinancialDocumentRecord]);
+    const ref = createRef<InvoicingJobControlsHandle>();
+    const screen = render(<InvoicingJobControls {...props} ref={ref} mode="launcher" />);
+    await waitFor(() => expect(mockList).toHaveBeenCalled());
+    await act(async () => ref.current?.openFinalization('paid'));
+    await screen.findByLabelText('CONFIRM $0.00 PAID');
+    let resolveRead!: (value: FinancialDocumentRecord[]) => void;
+    mockList.mockImplementationOnce(() => new Promise((resolve) => { resolveRead = resolve; }));
+    act(() => listener('active'));
+    fireEvent.press(screen.getByLabelText('Close preview'));
+    await act(async () => resolveRead([doc]));
+    expect(screen.queryByTestId('document-preview-scroll')).toBeNull();
+    expect(mockFinalize).not.toHaveBeenCalled();
+  });
+
 });

@@ -11,6 +11,7 @@ import {
   BackHandler,
   Animated,
   KeyboardAvoidingView,
+  Keyboard,
   Platform,
   Pressable,
   ScrollView,
@@ -37,13 +38,16 @@ import {
   type TaxableCategory,
 } from '@fieldsolo/api-client';
 
+import { AddressSuggestionPanel } from '../components/ds/customer/AddressSuggestionPanel';
+import { useAddressAutocomplete } from '../components/ds/customer/useAddressAutocomplete';
+
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { bg, border, color, fg, radius, space } from '../theme/nativeTokens';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CanvasTiledBackground } from '../components/CanvasTiledBackground';
 import { AccountSingleSelectCard } from '../components/ds/AccountSingleSelectCard';
-import { EditConfirmNoneRow, EditFieldInput, EditIconRow, EditSheet } from '../components/ds/edit-mode/EditFormRows';
+import { EditConfirmNoneRow, EditFieldInput, EditIconGroup, EditIconRow, EditSheet } from '../components/ds/edit-mode/EditFormRows';
 import { FullWidthFab } from '../components/ds/FullWidthFab';
 import { JobDetailIconSectionMaterials } from '../components/figma-icons/JobDetailScreenIcons';
 import { TopHeaderBackIcon } from '../components/figma-icons/TopHeaderIcons';
@@ -106,10 +110,17 @@ export const BusinessSettingsScreen = forwardRef<
   const [taxText, setTaxText] = useState('0');
   const [markupFocused, setMarkupFocused] = useState(false);
   const [taxFocused, setTaxFocused] = useState(false);
+  const [markupZeroPlaceholder, setMarkupZeroPlaceholder] = useState(false);
+  const [taxZeroPlaceholder, setTaxZeroPlaceholder] = useState(false);
+  const [addressFocused, setAddressFocused] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savedSettings, setSavedSettings] = useState<BusinessSettings | null>(null);
   const [failed, setFailed] = useState(false);
+  const addressLookup = useAddressAutocomplete(
+    supabase, draft.address ?? '', mode === 'business' && addressFocused && !saving,
+  );
+  const showAddressSuggestions = addressFocused && addressLookup.showPanel;
 
   useEffect(() => {
     const userId = session?.user.id;
@@ -149,8 +160,8 @@ export const BusinessSettingsScreen = forwardRef<
   const save = async () => {
     const userId = session?.user.id;
     if (!userId) return;
-    const markup = percentToBps(markupText);
-    const tax = percentToBps(taxText);
+    const markup = percentToBps(markupText.trim() || '0');
+    const tax = percentToBps(taxText.trim() || '0');
     if (markup == null || markup > 100000 || tax == null || tax > 10000) {
       Alert.alert('Could not save settings. Try again.');
       return;
@@ -234,7 +245,7 @@ export const BusinessSettingsScreen = forwardRef<
     >
       <CanvasTiledBackground scrollY={scrollY} />
       <ScrollView
-        keyboardShouldPersistTaps="never"
+        keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
         contentContainerStyle={{
           paddingTop: insets.top + space('Spacing/20'),
@@ -288,23 +299,43 @@ export const BusinessSettingsScreen = forwardRef<
                         accessibilityLabel="Business name"
                         value={draft.businessName ?? ''}
                         onChangeText={(value) => updateBusinessField('businessName', value)}
+                        onFocus={() => setAddressFocused(false)}
                         editable={!saving}
                         autoCapitalize="words"
                       />
                     </EditIconRow>
-                    <EditIconRow
+                    <EditIconGroup
                       icon={<IconMapPin color={fg.secondary} size={20} />}
+                      iconAlign={showAddressSuggestions ? 'top' : 'center'}
                     >
-                      <EditFieldInput
-                        typography={typography}
-                        placeholder="Address"
-                        accessibilityLabel="Address"
-                        value={draft.address ?? ''}
-                        onChangeText={(value) => updateBusinessField('address', value)}
-                        editable={!saving}
-                        autoCapitalize="words"
-                      />
-                    </EditIconRow>
+                      <View style={styles.addressColumn}>
+                        <EditFieldInput
+                          typography={typography}
+                          placeholder="Address"
+                          accessibilityLabel="Address"
+                          value={draft.address ?? ''}
+                          onChangeText={(value) => updateBusinessField('address', value.replace(/[\r\n]+/g, ' '))}
+                          onFocus={() => setAddressFocused(true)}
+                          returnKeyType="done"
+                          onSubmitEditing={() => setAddressFocused(false)}
+                          editable={!saving}
+                          autoCapitalize="words"
+                        />
+                        {showAddressSuggestions ? (
+                          <AddressSuggestionPanel
+                            typography={typography}
+                            suggestions={addressLookup.suggestions}
+                            loading={addressLookup.loading}
+                            noResults={addressLookup.noResults}
+                            onSelect={(suggestion) => {
+                              updateBusinessField('address', suggestion.displayAddress);
+                              setAddressFocused(false);
+                              Keyboard.dismiss();
+                            }}
+                          />
+                        ) : null}
+                      </View>
+                    </EditIconGroup>
                     <EditIconRow
                       icon={<IconPhone color={fg.secondary} size={20} />}
                     >
@@ -314,6 +345,7 @@ export const BusinessSettingsScreen = forwardRef<
                         accessibilityLabel="Phone"
                         value={draft.phone ?? ''}
                         onChangeText={(value) => updateBusinessField('phone', value)}
+                        onFocus={() => setAddressFocused(false)}
                         editable={!saving}
                         keyboardType="phone-pad"
                       />
@@ -327,6 +359,7 @@ export const BusinessSettingsScreen = forwardRef<
                         accessibilityLabel="Email"
                         value={draft.email ?? ''}
                         onChangeText={(value) => updateBusinessField('email', value)}
+                        onFocus={() => setAddressFocused(false)}
                         editable={!saving}
                         keyboardType="email-address"
                         autoCapitalize="none"
@@ -342,6 +375,7 @@ export const BusinessSettingsScreen = forwardRef<
                         accessibilityLabel="Website"
                         value={draft.website ?? ''}
                         onChangeText={(value) => updateBusinessField('website', value)}
+                        onFocus={() => setAddressFocused(false)}
                         editable={!saving}
                         keyboardType="url"
                         autoCapitalize="none"
@@ -357,6 +391,7 @@ export const BusinessSettingsScreen = forwardRef<
                         accessibilityLabel="License # (optional)"
                         value={draft.license ?? ''}
                         onChangeText={(value) => updateBusinessField('license', value)}
+                        onFocus={() => setAddressFocused(false)}
                         editable={!saving}
                         autoCapitalize="characters"
                       />
@@ -378,15 +413,23 @@ export const BusinessSettingsScreen = forwardRef<
                         placeholder="Material Markup"
                         value={
                           markupFocused || !markupText.trim()
-                            ? markupText
+                            ? (markupZeroPlaceholder ? '' : markupText)
                             : `${markupText}% Default Markup`
                         }
                         keyboardType="decimal-pad"
                         inputMode="decimal"
                         editable={!saving}
-                        onFocus={() => setMarkupFocused(true)}
-                        onBlur={() => setMarkupFocused(false)}
+                        onFocus={() => {
+                          setMarkupFocused(true);
+                          setMarkupZeroPlaceholder(percentToBps(markupText) === 0);
+                        }}
+                        onBlur={() => {
+                          setMarkupFocused(false);
+                          setMarkupZeroPlaceholder(false);
+                          if (!markupText.trim()) setMarkupText('0');
+                        }}
                         onChangeText={(value) => {
+                          setMarkupZeroPlaceholder(false);
                           setMarkupText(value);
                         }}
                       />
@@ -405,15 +448,23 @@ export const BusinessSettingsScreen = forwardRef<
                         placeholder="Tax Rate"
                         value={
                           taxFocused || !taxText.trim()
-                            ? taxText
+                            ? (taxZeroPlaceholder ? '' : taxText)
                             : `${taxText}% Tax Rate`
                         }
                         keyboardType="decimal-pad"
                         inputMode="decimal"
                         editable={!saving}
-                        onFocus={() => setTaxFocused(true)}
-                        onBlur={() => setTaxFocused(false)}
+                        onFocus={() => {
+                          setTaxFocused(true);
+                          setTaxZeroPlaceholder(percentToBps(taxText) === 0);
+                        }}
+                        onBlur={() => {
+                          setTaxFocused(false);
+                          setTaxZeroPlaceholder(false);
+                          if (!taxText.trim()) setTaxText('0');
+                        }}
                         onChangeText={(value) => {
+                          setTaxZeroPlaceholder(false);
                           setTaxText(value);
                         }}
                       />
@@ -497,6 +548,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: space('Spacing/12'),
   },
+  addressColumn: { flex: 1, minWidth: 0 },
   secondary: { color: fg.secondary },
   accent: { color: color('Brand/Primary') },
   message: { padding: space('Spacing/16') },

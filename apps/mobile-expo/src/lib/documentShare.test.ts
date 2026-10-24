@@ -2,6 +2,7 @@ import { describe, expect, it } from '@jest/globals';
 
 import {
   defaultDocumentType,
+  documentSmsRecipient,
   documentLinkText,
   gapLabels,
   gmailSubject,
@@ -11,15 +12,15 @@ import {
 } from './documentShare';
 
 describe('documentShare', () => {
-  it('builds link text and filenames from the saved number', () => {
+  it('builds amount-first link text and keeps document numbers in filenames and subjects', () => {
     expect(
       documentLinkText({
         type: 'estimate',
-        number: 1,
+        totalCents: 123456,
         businessName: 'North & Co',
         url: 'https://fieldsoli.com/share/abc',
       }),
-    ).toBe('Estimate #00001 from North & Co\nhttps://fieldsoli.com/share/abc');
+    ).toBe('Estimate for $1,234.56 from North & Co\nhttps://fieldsoli.com/share/abc');
     expect(gmailSubject({ type: 'invoice', number: 12, businessName: 'North' })).toBe(
       'Invoice #00012 from North',
     );
@@ -49,4 +50,12 @@ describe('documentShare', () => {
   it('names readiness gaps', () => {
     expect(gapLabels(['business_name', 'labor'])).toEqual(['Business name', 'Labor & Services']);
   });
+});
+
+it('only supplies a validated snapshot phone to Messages', () => {
+  expect(documentSmsRecipient('(419) 708-4470')).toBe('+14197084470');
+  expect(documentSmsRecipient('+44 20 7946 0958')).toBe('+442079460958');
+  for (const value of [null, '', 'Buddy name', 'Buddy 4197084470', '12', '4197084470 ext 2']) {
+    expect(documentSmsRecipient(value)).toBeNull();
+  }
 });

@@ -14,6 +14,7 @@ import type {
   JobDetailOtherCostBucket,
   JobDetailSession,
 } from '@fieldsolo/shared-types';
+import { computeJobPricing, formatUsd } from '@fieldsolo/document-renderer';
 import { color, radius, space } from '@fieldsolo/design-system/lib/tokens';
 
 import {
@@ -292,8 +293,11 @@ export function ViewMaterialsBuckets({
   onDeleteMaterial,
   hideBucketHeaders = false,
   emphasizeCriticalEmpty = false,
+  materialMarkupBps,
 }: {
   buckets: JobDetailMaterialBucket[];
+  /** Current business default. Omit outside invoicing Job View. */
+  materialMarkupBps?: number;
   typography: TextStyles;
   /** Tap a row → open the Edit Material sheet / Add to Job sheet for this material. */
   onMaterialPress?: (materialId: string) => void;
@@ -335,7 +339,25 @@ export function ViewMaterialsBuckets({
                   : undefined;
               const descriptionEmpty =
                 emphasizeCriticalEmpty && isMaterialDescriptionEmpty(item);
-              const totalEmpty = emphasizeCriticalEmpty && isMaterialTotalEmpty(item);
+              // A captured zero unit cost is real cost; an untouched zero total is unknown.
+              const costKnown = item.totalCostCents > 0 || (
+                item.totalCostCents === 0 && item.quantityExplicit && item.quantity != null &&
+                item.unitCostExplicit && item.unitCostCents != null
+              );
+              const chargeLabel = materialMarkupBps != null && costKnown
+                ? `${formatUsd(computeJobPricing({
+                    laborServicesCents: null,
+                    materialMarkupBps,
+                    costs: [{
+                      costType: 'material',
+                      totalCostCents: item.totalCostCents,
+                      markupOverrideBps: item.markupOverrideBps,
+                    }],
+                    taxRateBps: 0,
+                    taxableCategories: [],
+                  }).materialChargeCents)} with markup`
+                : null;
+              const totalEmpty = emphasizeCriticalEmpty && isMaterialTotalEmpty(item) && !costKnown;
               const showQuantity = shouldShowMaterialQuantity(item);
               return (
                 <ViewRowShell
@@ -345,7 +367,8 @@ export function ViewMaterialsBuckets({
                     'Material',
                     item.name,
                     showQuantity ? item.quantityLabel : '',
-                    totalEmpty ? 'No total' : item.priceLabel,
+                    totalEmpty ? 'No total' : chargeLabel ? `Cost ${item.priceLabel}` : item.priceLabel,
+                    chargeLabel ? `Price ${chargeLabel}` : '',
                   ].filter(Boolean).join('. ')}
                   accessibilityHint={rowPress ? 'Opens material editing' : undefined}
                   onPress={rowPress}
@@ -372,17 +395,28 @@ export function ViewMaterialsBuckets({
                       </Text>
                     ) : null}
                   </View>
-                  <Text
-                    style={[
-                      typography.metric,
-                      {
-                        textTransform: 'none',
-                        color: totalEmpty ? criticalEmptyColor() : fg.primary,
-                      },
-                    ]}
-                  >
-                    {totalEmpty ? 'No total' : item.priceLabel}
-                  </Text>
+                  <View style={styles.materialPrices}>
+                    <Text
+                      style={[
+                        typography.metric,
+                        {
+                          textTransform: 'none',
+                          color: totalEmpty ? criticalEmptyColor() : fg.primary,
+                        },
+                      ]}
+                    >
+                      {totalEmpty ? 'No total' : item.priceLabel}
+                    </Text>
+                    {chargeLabel ? (
+                      <Text style={[
+                        typography.bodySmall,
+                        styles.materialCharge,
+                        { color: fg.secondary },
+                      ]}>
+                        {chargeLabel}
+                      </Text>
+                    ) : null}
+                  </View>
                 </ViewRowShell>
               );
             })}
@@ -684,6 +718,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     padding: space('Spacing/16'),
     gap: space('Spacing/16'),
+  },
+  materialPrices: {
+    alignItems: 'flex-end',
+    flexShrink: 1,
+    minWidth: 0,
+  },
+  materialCharge: {
+    textAlign: 'right',
+    marginTop: space('Spacing/4'),
   },
   noteRow: {
     flexDirection: 'row',

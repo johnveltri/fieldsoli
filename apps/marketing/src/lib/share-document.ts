@@ -1,5 +1,6 @@
 import {
   renderDocument,
+  formatUsd,
   unsupportedRendererHtml,
   type DocumentPayload,
   type PaymentProjection,
@@ -15,14 +16,18 @@ export type SharedDocument =
       payload: DocumentPayload;
     };
 
+export const UNAVAILABLE_DOCUMENT_MESSAGE = "Invoice/Estimate no longer exists.";
+export const OUTAGE_DOCUMENT_MESSAGE = "This document is temporarily unavailable. Please try again.";
+
 export function shareDocumentHtml(document: SharedDocument): string {
   if (document.status === "unavailable") {
-    return pageShell("This document is unavailable.", "This document is unavailable.");
+    return pageShell(UNAVAILABLE_DOCUMENT_MESSAGE, UNAVAILABLE_DOCUMENT_MESSAGE);
   }
   if (document.status === "outage") {
     return pageShell(
-      "This document is temporarily unavailable. Please try again.",
-      "This document is temporarily unavailable. Please try again.",
+      OUTAGE_DOCUMENT_MESSAGE,
+      OUTAGE_DOCUMENT_MESSAGE,
+      true,
     );
   }
   if (document.rendererVersion !== 1) return unsupportedRendererHtml();
@@ -31,11 +36,12 @@ export function shareDocumentHtml(document: SharedDocument): string {
 
 export function shareCard(document: Extract<SharedDocument, { status: "ok" }>) {
   const typeLabel = document.payload.documentType === "estimate" ? "Estimate" : "Invoice";
-  const number = String(document.payload.documentNumber ?? 0).padStart(5, "0");
+  const amount = formatUsd(document.payload.totalCents);
   return {
-    title: `${typeLabel} from ${document.payload.businessName}`,
+    title: `${typeLabel} from ${document.payload.businessName} — ${amount}`,
     businessName: document.payload.businessName,
-    typeNumber: `${typeLabel} #${number}`,
+    typeLabel,
+    amount,
     shortDescription: document.payload.shortDescription,
     totalCents: document.payload.totalCents,
   };
@@ -48,8 +54,8 @@ export const SHARE_RESPONSE_HEADERS = {
   "X-Robots-Tag": "noindex, nofollow, noarchive",
 } as const;
 
-function pageShell(title: string, message: string): string {
-  return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8" /><meta name="robots" content="noindex,nofollow" /><title>${title}</title></head><body><article><h1>${message}</h1></article></body></html>`;
+function pageShell(title: string, message: string, retry = false): string {
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8" /><meta name="robots" content="noindex,nofollow" /><title>${title}</title></head><body><article><h1>${message}</h1>${retry ? '<a href="">Retry</a>' : ''}</article></body></html>`;
 }
 
 export function parseResolveResult(value: unknown): SharedDocument {

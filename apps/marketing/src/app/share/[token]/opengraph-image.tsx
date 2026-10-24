@@ -1,16 +1,16 @@
 import { ImageResponse } from "next/og";
 
 import { loadSharedDocument } from "../../../lib/load-shared-document";
-import { shareCard } from "../../../lib/share-document";
+import {
+  OUTAGE_DOCUMENT_MESSAGE,
+  UNAVAILABLE_DOCUMENT_MESSAGE,
+  shareCard,
+} from "../../../lib/share-document";
 
 export const dynamic = "force-dynamic";
-export const alt = "FieldSoli document";
+export const alt = "Shared invoice or estimate";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
-
-function dollars(cents: number): string {
-  return `$${(cents / 100).toFixed(2)}`;
-}
 
 export default async function ShareCardImage({
   params,
@@ -30,13 +30,17 @@ export default async function ShareCardImage({
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            fontSize: 48,
+            fontSize: 40,
+            padding: 64,
+            textAlign: "center",
           }}
         >
-          FieldSoli
+          {document.status === "unavailable"
+            ? UNAVAILABLE_DOCUMENT_MESSAGE
+            : OUTAGE_DOCUMENT_MESSAGE}
         </div>
       ),
-      { ...size },
+      { ...size, headers: { "Cache-Control": "private, no-store" } },
     );
   }
   const card = shareCard(document);
@@ -55,15 +59,19 @@ export default async function ShareCardImage({
           fontSize: 36,
         }}
       >
-        <div style={{ display: "flex", fontSize: 28 }}>fieldsoli.com</div>
+        <div style={{ display: "flex", fontSize: 32 }}>{card.typeLabel}</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <div style={{ display: "flex", fontSize: 56 }}>{card.businessName}</div>
-          <div style={{ display: "flex" }}>{card.typeNumber}</div>
-          <div style={{ display: "flex" }}>{card.shortDescription}</div>
+          <div style={{ display: "block", fontSize: 56, whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden" }}>
+            {card.businessName}
+          </div>
+          <div style={{ display: "block", color: "#525252", whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden" }}>
+            {card.shortDescription}
+          </div>
         </div>
-        <div style={{ display: "flex", fontSize: 48 }}>{dollars(card.totalCents)}</div>
+        <div style={{ display: "flex", fontSize: 72 }}>{card.amount}</div>
+        <div style={{ display: "flex", fontSize: 24, color: "#737373" }}>Shared with FieldSoli</div>
       </div>
     ),
-    { ...size },
+    { ...size, headers: { "Cache-Control": "private, no-store" } },
   );
 }

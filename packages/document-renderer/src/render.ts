@@ -78,6 +78,19 @@ export function formatUsd(cents: number): string {
   return `${sign}$${dollars.toLocaleString('en-US')}.${String(remainder).padStart(2, '0')}`;
 }
 
+/** Display US numbers without rewriting the immutable contact payload. */
+export function formatDocumentPhone(value: string | null): string | null {
+  if (value == null) return null;
+  const trimmed = value.trim();
+  // Only recognized phone punctuation is disposable. Extensions, letters and
+  // other country codes retain their readable source text.
+  if (!/^\+?[\d\s().-]+$/.test(trimmed)) return value;
+  const digits = trimmed.replace(/\D/g, '');
+  const national = digits.length === 11 && digits.startsWith('1') ? digits.slice(1) : digits;
+  if (national.length !== 10 || (trimmed.startsWith('+') && (digits.length !== 11 || !digits.startsWith('1')))) return value;
+  return `(${national.slice(0, 3)}) ${national.slice(3, 6)}-${national.slice(6)}`;
+}
+
 export function formatDocumentNumber(value: number | null): string {
   if (value == null) return 'Number assigned on creation';
   return String(value).padStart(5, '0');
@@ -243,10 +256,10 @@ td.amount.with-details { vertical-align: middle; }
 </style></head><body><article class="page">
 <header class="header"><div>
 <section class="business"><h1>${escapeHtml(payload.businessName.trim() || "Business")}</h1>
-${detail(payload.businessAddress)}${detail(payload.businessPhone)}${detail(payload.businessEmail)}${detail(payload.businessWebsite)}${payload.businessLicense?.trim() ? detail(`License # ${payload.businessLicense.trim()}`) : ""}
+${detail(payload.businessAddress)}${detail(formatDocumentPhone(payload.businessPhone))}${detail(payload.businessEmail)}${detail(payload.businessWebsite)}${payload.businessLicense?.trim() ? detail(`License # ${payload.businessLicense.trim()}`) : ""}
 </section>
 <section class="recipient"><h2>Recipient</h2>${payload.customerName.trim() ? `<p class="name">${escapeHtml(payload.customerName.trim())}</p>` : ""}
-${detail(payload.serviceAddress)}${detail(payload.customerPhone)}${detail(payload.customerEmail)}</section>
+${detail(payload.serviceAddress)}${detail(formatDocumentPhone(payload.customerPhone))}${detail(payload.customerEmail)}</section>
 </div><section class="document-summary" aria-label="Document summary">
 <div class="document-title"><div class="document-title-row"><h2>${escapeHtml(title)}${presentation !== "preview" || !pendingNumber || payload.documentNumber == null ? "" : '<span class="pending-label"> (pending)</span>'}</h2></div>${!estimate ? `<p class="payment-status">${paid ? "Paid" : "Unpaid"}</p>` : ""}</div>
 ${row("Issued", formatDate(payload.issueDate))}
