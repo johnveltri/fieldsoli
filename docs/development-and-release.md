@@ -3,7 +3,8 @@
 FieldSoli uses a right-sized workflow for a solo developer:
 
 - **Local Supabase is the default** for feature and schema work.
-- The hosted staging project is optional rehearsal for changes that need a real hosted environment.
+- **FieldSoli (Dev)** is the hosted development project; it also supports hosted release rehearsals.
+  The legacy `db:deploy:staging*` command names still target that same project.
 - The production Supabase project is changed only through an explicit, reviewed release command.
 - Mobile production values come from the Expo EAS `production` environment, not the local Expo env file.
 
@@ -89,9 +90,69 @@ authenticated API is checked before the command finishes, so the app uses its re
 reads rather than a demo bypass.
 
 The fixture is in `backend/supabase/fixtures/app-store-demo.sql`, deliberately outside
-`db.seed.sql`. It never runs during ordinary resets and refuses a non-local Supabase API URL. Use
+`db.seed.sql`. It never runs during ordinary resets. The local wrapper refuses a non-local
+Supabase API URL; the separate hosted Dev wrapper is described below. Use
 only fictional names, addresses, and content in it. When the schema or required legal versions
 change, update the fixture in the same change and rerun this command before capturing screenshots.
+
+## Hosted Dev screenshot data
+
+The former staging project is now **FieldSoli (Dev)**, project
+`anypejjoovlatmrkrxvx`. Use fictional fixture data for daily development rather
+than copying production accounts, customer details, or financial records.
+
+```bash
+cp .env.screenshots-dev.example .env.screenshots-dev.local
+# Add SUPABASE_ACCESS_TOKEN to the local file, then:
+npm run screenshots:reset:dev
+npm run mobile
+```
+
+Use Node 22.13 or newer within Node 22, as specified by this repo. The command uses the Supabase Management
+and Auth APIs; it needs no Docker, Supabase CLI, `psql`, or local database. Create
+a personal access token at <https://supabase.com/dashboard/account/tokens> with
+project read, database read/write, and API key/secret read permissions for Dev
+where token scoping supports it. The token is an administrative credential:
+keep it in the ignored root `.env.screenshots-dev.local` file or inject it as a
+server-side environment secret. Never put it in an `EXPO_PUBLIC_*` variable.
+The linked CLI project and Expo's current URL do not select this command's target.
+It accepts no project or URL overrides and verifies the exact Dev project first.
+
+On the first run, it generates and saves `DEV_SCREENSHOT_PASSWORD` in the same
+ignored file and creates the confirmed fictional account
+`app-store-demo@fieldsoli.example`. Use that email and password to sign in. You
+can supply your own separate password of at least 16 characters through the same
+file or environment instead. The local screenshot password is rejected. Keep
+the chosen password for later resets; the command verifies sign-in and does not
+silently change an existing account's password. Do not paste administrative keys
+or the password into chat, commit them, or share them in a PR.
+
+Each run checks that all repo migrations are applied, then replaces the marked
+demo account's jobs, sessions, notes, costs, customers, documents, business
+settings, document counters, and legal records in one transaction. It reuses
+`backend/supabase/fixtures/app-store-demo.sql`, with relative dates and current
+legal versions. It verifies the 13 jobs and business/invoice defaults through
+the normal authenticated API, and configures ignored
+`apps/mobile-expo/.env.local` for hosted Dev with analytics disabled. Restart
+Metro after switching environments. Only the publishable/anon key goes into the
+Expo env file; administrative credentials stay out of the client.
+
+Other accounts, schema, Auth identity, existing CSV export requests/files, and
+Storage are preserved. An existing unmarked account with the reserved email or
+a fixture UUID owned by another account causes a refusal. If the demo account
+has attachments, remove them through the app before resetting so their Storage
+files can be cleaned up normally. Export requests retain their normal expiry
+and cleanup lifecycle. A failed data reset rolls back the dataset; a newly
+created Auth account may remain and can be reused on the next run.
+
+The existing `npm run screenshots:reset` remains local-only and still resets
+the whole local database. `npm run local:setup` switches Expo back to local.
+Neither screenshot command applies hosted migrations, deploys Edge Functions,
+or copies production data. Test the hosted wrapper without credentials with:
+
+```bash
+npm run test:screenshots:dev
+```
 
 ## Making a database change
 
@@ -123,9 +184,9 @@ Keep every remotely applied migration immutable. If a deployed migration needs c
 new forward migration rather than editing the old file. New Data API tables must include deliberate
 grants, RLS, and policies in the migration.
 
-## Optional hosted staging rehearsal
+## Hosted Dev release rehearsal (legacy staging commands)
 
-Use staging for migrations, Auth, email, or Edge Function behavior that cannot be fully proven
+Use hosted Dev for migrations, Auth, email, or Edge Function behavior that cannot be fully proven
 locally. From a clean, committed feature worktree:
 
 ```bash
@@ -137,21 +198,20 @@ npm run db:deploy:staging:plan
 npm run db:deploy:staging
 ```
 
-The staging project is `anypejjoovlatmrkrxvx`. The deployment wrapper always relinks and then
+The Dev project (formerly staging) is `anypejjoovlatmrkrxvx`. The deployment wrapper always relinks and then
 checks `backend/supabase/.temp/project-ref`, because `supabase link` persists the last selected
 remote project.
 
-To point a local Expo session at hosted staging temporarily, use ignored
+To point a local Expo session at hosted Dev manually, use ignored
 `apps/mobile-expo/.env.local` with:
 
 ```bash
-EXPO_PUBLIC_APP_ENV=staging
-EXPO_PUBLIC_SUPABASE_URL=<staging Project URL>
-EXPO_PUBLIC_SUPABASE_ANON_KEY=<staging publishable key>
+EXPO_PUBLIC_APP_ENV=development
+EXPO_PUBLIC_SUPABASE_URL=https://anypejjoovlatmrkrxvx.supabase.co
+EXPO_PUBLIC_SUPABASE_ANON_KEY=<Dev publishable key>
 ```
 
-Restart Expo after changing the file. When staging testing is finished, run `npm run local:setup`
-to restore local Supabase. Do not point the normal local env file back at production.
+Restart Expo after changing the file. To return to local Supabase, run `npm run local:setup`. Do not point the normal local env file back at production.
 
 ## Production database checklist
 

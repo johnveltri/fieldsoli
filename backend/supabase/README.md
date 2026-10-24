@@ -7,7 +7,8 @@ This folder is the **source of truth** for schema and local tooling. Remote Supa
 - `config.toml` — local stack (API, DB, Studio ports, etc.).
 - `migrations/` — ordered SQL migrations (apply to hosted project with `supabase db push` after linking).
 - `seed.sql` — normal local seed, intentionally empty for FieldSoli.
-- `fixtures/app-store-demo.sql` — explicit local-only App Store screenshot fixture.
+- `fixtures/app-store-demo.sql` — fictional screenshot fixture, loaded by the local reset
+  or the Dev-only hosted demo reset wrapper.
 
 ## CLI commands (from repo root)
 
@@ -40,6 +41,15 @@ npm run db:deploy:staging
 npm run db:deploy:production:plan
 npm run db:deploy:production
 ```
+
+## Hosted Dev screenshot fixture
+
+`npm run screenshots:reset:dev` recreates only the reserved, marked demo account's
+app dataset in FieldSoli (Dev), `anypejjoovlatmrkrxvx`, then configures Expo for
+that project. It preserves other accounts and does not reset schema. Configure
+its administrative token in ignored `.env.screenshots-dev.local`; the first run
+saves a separate random demo password there. See the
+[hosted Dev setup and reset contract](../../docs/development-and-release.md#hosted-dev-screenshot-data).
 
 ## Env for `apps/mobile-expo`
 
