@@ -11,6 +11,7 @@ import { clearAnalyticsConsentCache } from '../lib/analytics/consentStorage';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { AUTH_CONFIRM_URL, AUTH_RESET_PASSWORD_URL } from '../lib/authUrls';
 import { newPasswordPolicyError } from '../lib/passwordPolicy';
+import { observeAddressLocationLifecycle, setAddressLocationAccount } from '../lib/addressLocation';
 
 export type SignUpProfileSeed = {
   firstName: string;
@@ -55,6 +56,7 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  useEffect(observeAddressLocationLifecycle, []);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [signupLegalPending, setSignupLegalPending] = useState(false);
@@ -92,6 +94,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .getSession()
       .then(({ data: { session: s } }) => {
         if (mounted) {
+          setAddressLocationAccount(s?.user.id ?? null);
           setSession(s);
           if (s === null) {
             void clearSignedOutAnalyticsState();
@@ -102,6 +105,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })
       .catch(() => {
         if (mounted) {
+          setAddressLocationAccount(null);
           setSession(null);
           void clearSignedOutAnalyticsState();
         }
@@ -114,6 +118,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, next) => {
       if (!mounted) return;
+      setAddressLocationAccount(next?.user.id ?? null);
       setSession(next);
       if (next === null) {
         void clearSignedOutAnalyticsState();

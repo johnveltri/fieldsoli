@@ -2,6 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
 
 import {
   fetchGeoapifySuggestions,
+  fetchBusinessAddressProximity,
   addressAutocompleteFailureReason,
   redactAddressAutocompleteError,
   validateAddressAutocompleteRequest,
@@ -54,6 +55,16 @@ Deno.serve(async (request) => {
     return json({ status: 'error', error: 'unauthorized' } satisfies AddressAutocompleteResponse, 401, CORS);
   }
 
+  // The authenticated client enforces RLS. Never accept a caller-supplied user or address.
+  let businessAddress: string | null = null;
+  if ('action' in validated) {
+    const { data, error } = await userClient.from('business_settings')
+      .select('address').eq('user_id', authData.user.id).maybeSingle();
+    if (error) return json({ status: 'error', error: 'unavailable' }, 503, CORS);
+    businessAddress = data?.address?.trim() ?? null;
+    if (!businessAddress) return json({ status: 'ok', proximity: null }, 200, CORS);
+  }
+
   const { data: budgetOk, error: budgetError } = await serviceClient.rpc(
     'consume_address_autocomplete_budget',
     { p_user_id: authData.user.id },
@@ -68,6 +79,10 @@ Deno.serve(async (request) => {
   }
 
   try {
+    if ('action' in validated) {
+      const proximity = await fetchBusinessAddressProximity(apiKey, businessAddress!);
+      return json({ status: 'ok', proximity }, 200, CORS);
+    }
     const suggestions = await fetchGeoapifySuggestions(apiKey, validated);
     return json({ status: 'ok', suggestions } satisfies AddressAutocompleteResponse, 200, CORS);
   } catch (error) {

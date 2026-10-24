@@ -3,10 +3,11 @@ import {
   fieldsoloExpoFontAssets,
   fieldsoloLoadedFonts,
 } from '@fieldsolo/design-system/expo/loadFieldSoloFonts';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  AppState,
   Animated,
   Linking,
   Pressable,
@@ -28,6 +29,11 @@ import {
   withdrawAnalyticsConsent,
 } from '../lib/analytics/consentSync';
 import { LEGAL_URLS } from '../lib/legal-versions';
+import {
+  manageDevicePermission,
+  readDevicePermissions,
+  type DevicePermissions,
+} from '../lib/devicePermissions';
 import {
   bg,
   createTextStyles,
@@ -80,6 +86,37 @@ export function PrivacyChoicesScreen({ userId, onBack, onDeleteAccount }: Privac
   const [saving, setSaving] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteMounted, setDeleteMounted] = useState(false);
+  const [permissions, setPermissions] = useState<DevicePermissions | null>(null);
+  const [openingSettings, setOpeningSettings] = useState(false);
+  const refreshPermissions = useRef<() => void>(() => {});
+
+  useEffect(() => {
+    let cancelled = false;
+    let revision = 0;
+    setPermissions(null);
+    const refresh = () => {
+      const requestRevision = ++revision;
+      void readDevicePermissions().then((next) => {
+        if (!cancelled && requestRevision === revision) setPermissions(next);
+      });
+    };
+    refreshPermissions.current = refresh;
+    refresh();
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') refresh();
+    });
+    return () => { cancelled = true; refreshPermissions.current = () => {}; subscription.remove(); };
+  }, [userId]);
+
+  const manageDevicePermissions = useCallback(async (permission: keyof DevicePermissions) => {
+    if (openingSettings) return;
+    setOpeningSettings(true);
+    try {
+      await manageDevicePermission(permission);
+    } catch {
+      Alert.alert('Could not manage permission', 'Open your device Settings and select FieldSoli to manage access.');
+    } finally { refreshPermissions.current(); setOpeningSettings(false); }
+  }, [openingSettings]);
 
   useEffect(() => {
     let cancelled = false;
@@ -205,6 +242,26 @@ export function PrivacyChoicesScreen({ userId, onBack, onDeleteAccount }: Privac
             ) : (
               <ProfileRowsCard typography={typography} rows={analyticsRows} />
             )}
+
+            <Text accessibilityRole="header" style={[typography.titleH3, styles.sectionLabel]}>Device permissions</Text>
+            <ProfileRowsCard typography={typography} rows={[
+              {
+                kind: 'toggle',
+                label: 'Address suggestions',
+                accessibilityHint: 'Requests location access the first time. Later changes open FieldSoli in device Settings.',
+                value: permissions?.location === 'allowed',
+                disabled: !permissions || permissions.location === 'unavailable' || openingSettings,
+                onValueChange: () => { void manageDevicePermissions('location'); },
+              },
+              {
+                kind: 'toggle',
+                label: 'Contacts',
+                accessibilityHint: `${permissions?.contacts === 'limited' ? 'Limited contacts access. ' : ''}Requests contacts access the first time. Later changes open FieldSoli in device Settings.`,
+                value: permissions?.contacts === 'allowed' || permissions?.contacts === 'limited',
+                disabled: !permissions || permissions.contacts === 'unavailable' || openingSettings,
+                onValueChange: () => { void manageDevicePermissions('contacts'); },
+              },
+            ]} />
 
             <Text accessibilityRole="header" style={[typography.titleH3, styles.sectionLabel]}>Legal</Text>
             <ProfileRowsCard typography={typography} rows={legalRows} />

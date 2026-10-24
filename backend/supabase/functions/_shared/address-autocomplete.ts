@@ -2,7 +2,19 @@ export type AddressAutocompleteRequest = {
   query: string;
   countryCode: 'us';
   limit: number;
+  proximity?: AddressProximity;
 };
+
+export type AddressProximity = { latitude: number; longitude: number };
+export type BusinessProximityRequest = { action: 'resolve_business_proximity' };
+
+export function roundedProximity(input: unknown): AddressProximity | null {
+  if (!input || typeof input !== 'object') return null;
+  const { latitude, longitude } = input as Record<string, unknown>;
+  if (typeof latitude !== 'number' || !Number.isFinite(latitude) || Math.abs(latitude) > 90
+    || typeof longitude !== 'number' || !Number.isFinite(longitude) || Math.abs(longitude) > 180) return null;
+  return { latitude: Math.round(latitude * 100) / 100, longitude: Math.round(longitude * 100) / 100 };
+}
 
 export type AddressSuggestion = {
   token: string;
@@ -31,11 +43,18 @@ const UPSTREAM_TIMEOUT_MS = 12000;
 
 export function validateAddressAutocompleteRequest(
   input: unknown,
-): AddressAutocompleteRequest | AddressAutocompleteResponse {
+): AddressAutocompleteRequest | BusinessProximityRequest | AddressAutocompleteResponse {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
     return { status: 'error', error: 'invalid_request' };
   }
   const body = input as Record<string, unknown>;
+  if (body.action === 'resolve_business_proximity') {
+    if (Object.keys(body).some((key) => key !== 'action')) {
+      return { status: 'error', error: 'invalid_request' };
+    }
+    return { action: 'resolve_business_proximity' };
+  }
+  if (body.action !== undefined) return { status: 'error', error: 'invalid_request' };
   if (body.countryCode !== 'us') {
     return { status: 'error', error: 'invalid_request' };
   }
@@ -51,7 +70,9 @@ export function validateAddressAutocompleteRequest(
   if (!Number.isInteger(limit) || limit < 1 || limit > MAX_LIMIT) {
     return { status: 'error', error: 'invalid_request' };
   }
-  return { query, countryCode: 'us', limit };
+  const proximity = body.proximity === undefined ? undefined : roundedProximity(body.proximity);
+  if (proximity === null) return { status: 'error', error: 'invalid_request' };
+  return { query, countryCode: 'us', limit, ...(proximity ? { proximity } : {}) };
 }
 
 type GeoapifyAddressFields = {
@@ -129,6 +150,9 @@ export async function fetchGeoapifySuggestions(
   url.searchParams.set('filter', `countrycode:${request.countryCode}`);
   url.searchParams.set('limit', String(request.limit));
   url.searchParams.set('apiKey', apiKey);
+  if (request.proximity) {
+    url.searchParams.set('bias', `proximity:${request.proximity.longitude},${request.proximity.latitude}`);
+  }
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
@@ -145,6 +169,47 @@ export async function fetchGeoapifySuggestions(
       return mapGeoapifyResults(payload.results, request.limit);
     }
     return mapGeoapifyFeatures(payload.features ?? [], request.limit);
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+type GeocodedBusiness = {
+  lat?: number;
+  lon?: number;
+  result_type?: string;
+  rank?: { confidence?: number };
+};
+
+export function businessProximityFromResults(results: GeocodedBusiness[]): AddressProximity | null {
+  const points = results
+    .filter((result) => (result.rank?.confidence ?? 0) >= 0.9
+      && ['building', 'street', 'postcode', 'city'].includes(result.result_type ?? ''))
+    .map((result) => roundedProximity({ latitude: result.lat, longitude: result.lon }))
+    .filter((point): point is AddressProximity => point !== null);
+  if (!points.length) return null;
+  const first = points[0];
+  return points.every((point) => point.latitude === first.latitude && point.longitude === first.longitude)
+    ? first : null;
+}
+
+export async function fetchBusinessAddressProximity(
+  apiKey: string,
+  address: string,
+): Promise<AddressProximity | null> {
+  const url = new URL('https://api.geoapify.com/v1/geocode/search');
+  url.searchParams.set('text', address);
+  url.searchParams.set('format', 'json');
+  url.searchParams.set('filter', 'countrycode:us');
+  url.searchParams.set('limit', '2');
+  url.searchParams.set('apiKey', apiKey);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
+  try {
+    const response = await fetch(url.toString(), { signal: controller.signal });
+    if (!response.ok) throw new Error(`geoapify_status_${response.status}`);
+    const payload = await response.json() as { results?: GeocodedBusiness[] };
+    return businessProximityFromResults(Array.isArray(payload.results) ? payload.results : []);
   } finally {
     clearTimeout(timeout);
   }

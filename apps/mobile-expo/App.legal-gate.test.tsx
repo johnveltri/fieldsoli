@@ -174,7 +174,7 @@ describe('App legal reacceptance gate', () => {
     });
     expect(mockHasCachedLegalAcceptance).toHaveBeenCalledWith({
       userId: 'user-77',
-      privacyVersion: '2026-09-20',
+      privacyVersion: '2026-10-24',
       termsVersion: '2026-09-20',
     });
     expect(screen.queryByTestId('legal-reacceptance-modal')).toBeNull();

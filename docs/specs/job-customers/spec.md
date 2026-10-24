@@ -82,7 +82,7 @@ Live Session exposes the same four editable fields, Customer picker, address pic
 
 ### REQ-07 — Device contacts
 
-Device contacts are a read-only input source. The app requests access only after the user taps `Add from Contacts` for the first time.
+Device contacts are a read-only input source. The app requests access only after an explicit user action: the first `Add from Contacts` tap, or the Contacts switch in Privacy Choices → Device permissions. Opening Privacy Choices only reads permission metadata. Full and limited Contacts access display as on; later taps on that switch open FieldSoli's device Settings.
 
 - Denial never blocks manual entry.
 - The app stores and transmits only the selected person's chosen values; it does not upload or retain the device address book.

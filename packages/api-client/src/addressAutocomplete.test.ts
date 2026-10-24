@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { FieldSoloSupabaseClient } from './client';
-import { fetchAddressSuggestions } from './addressAutocomplete';
+import { fetchAddressSuggestions, resolveBusinessProximity } from './addressAutocomplete';
 
 function clientWith(invoke: ReturnType<typeof vi.fn>) {
   return { functions: { invoke } } as unknown as FieldSoloSupabaseClient;
@@ -9,6 +9,12 @@ function clientWith(invoke: ReturnType<typeof vi.fn>) {
 afterEach(() => vi.useRealTimers());
 
 describe('fetchAddressSuggestions', () => {
+  it('passes optional proximity without changing the suggestion response', async () => {
+    const invoke = vi.fn().mockResolvedValue({ data: { status: 'ok', suggestions: [] }, error: null });
+    const proximity = { latitude: 41.88, longitude: -87.63 };
+    await fetchAddressSuggestions(clientWith(invoke), '123 Main', { proximity });
+    expect(invoke.mock.calls[0][1].body).toEqual({ query: '123 Main', countryCode: 'us', limit: 4, proximity });
+  });
   it('calls the authenticated endpoint with the shared result limit', async () => {
     const suggestions = [{ token: 'g0', displayAddress: '123 Main St' }];
     const invoke = vi.fn().mockResolvedValue({ data: { status: 'ok', suggestions }, error: null });
@@ -46,5 +52,32 @@ describe('fetchAddressSuggestions', () => {
     const pending = fetchAddressSuggestions(clientWith(invoke), '123 Main');
     await vi.advanceTimersByTimeAsync(18000);
     expect(await pending).toEqual({ status: 'error', code: 'unavailable' });
+  });
+});
+
+describe('resolveBusinessProximity', () => {
+  it('sends no user or address and returns only rounded coordinates', async () => {
+    const invoke = vi.fn().mockResolvedValue({ data: {
+      status: 'ok', proximity: { latitude: 41.8781, longitude: -87.6298, place_id: 'private' },
+    }, error: null });
+    expect(await resolveBusinessProximity(clientWith(invoke))).toEqual({ latitude: 41.88, longitude: -87.63 });
+    expect(invoke.mock.calls[0][1].body).toEqual({ action: 'resolve_business_proximity' });
+  });
+
+  it.each([null, {}, { latitude: '1', longitude: 0 }, { latitude: 91, longitude: 0 }, { latitude: 0, longitude: Infinity }])(
+    'falls back safely for missing or invalid coordinates %j', async (proximity) => {
+      const invoke = vi.fn().mockResolvedValue({ data: { status: 'ok', proximity }, error: null });
+      expect(await resolveBusinessProximity(clientWith(invoke))).toBeNull();
+    },
+  );
+
+  it('falls back for unavailable endpoints and bounded timeouts', async () => {
+    const invoke = vi.fn().mockRejectedValueOnce(new Error('offline')).mockImplementation(() => new Promise(() => {}));
+    expect(await resolveBusinessProximity(clientWith(invoke))).toBeNull();
+    vi.useFakeTimers();
+    const pending = resolveBusinessProximity(clientWith(invoke));
+    await vi.advanceTimersByTimeAsync(18000);
+    expect(await pending).toBeNull();
+    expect(invoke.mock.calls[1][1].signal.aborted).toBe(true);
   });
 });

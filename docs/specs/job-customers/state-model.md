@@ -150,7 +150,7 @@ The typed value remains intact and savable. The app hides the suggestion panel a
 
 ### STATE-14 — Device-contact access unresolved
 
-The user has not tapped `Add from Contacts`. The app has not requested broad permission or opened the native picker.
+The user has not tapped `Add from Contacts` or the explicit Contacts permission switch in Privacy Choices. The app has not requested permission or opened the native picker. Opening Privacy Choices alone only reads permission metadata.
 
 ### STATE-15 — Device-contact chooser active
 

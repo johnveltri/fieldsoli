@@ -49,3 +49,9 @@ Provider requests have a 12-second deadline; the client allows 18 seconds for
 authentication, budget enforcement and the provider request. Both remain bounded.
 Production (`gfvqmxsiuhhujnckghpa`) requires its own separately authorized secret
 and deployment operations; a Dev update does not change production.
+
+## Proximity ranking (approved October 24, 2026)
+
+New clients may send a rounded optional proximity point; Geoapify receives a soft proximity bias with longitude first. Legacy requests remain valid. `resolve_business_proximity` reads only the authenticated user's saved business address under RLS and returns an approximate point or null. Missing/ambiguous addresses and resolver failures leave ordinary autocomplete available. Each actual geocoding lookup consumes the existing budget; the app deduplicates and caches fallback results for five minutes.
+
+Keep JWT verification enabled. Never log coordinate/request/provider payloads or URLs. Deploy this function before native clients that use the resolver. Smoke-test legacy, biased and resolver requests in hosted Dev with fictional data. Native and production rollout evidence belongs in `docs/specs/address-proximity/plan.md`.

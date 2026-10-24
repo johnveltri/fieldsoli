@@ -15,3 +15,5 @@ Use fieldsolo-states-and-overlays.png for visual questions about alternate state
 When the visible prose and fieldsolo-product-index disagree, flag the conflict and do not infer that an experiment is shipped.
 
 When asked whether a feature exists, cite its capability ID and linked screen/state from the HTML. State clearly when the feature is absent from the shipped capability index.
+
+The approved-but-unshipped location addition is shown in address-location-privacy-choices.html and address-location-privacy-choices.png. These are local design references, not native screenshots or release evidence; see docs/specs/address-proximity/plan.md for current validation.

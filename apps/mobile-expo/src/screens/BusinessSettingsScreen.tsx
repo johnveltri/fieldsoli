@@ -40,6 +40,7 @@ import {
 
 import { AddressSuggestionPanel } from '../components/ds/customer/AddressSuggestionPanel';
 import { useAddressAutocomplete } from '../components/ds/customer/useAddressAutocomplete';
+import { invalidateAddressProximity } from '../lib/addressLocation';
 
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -173,6 +174,7 @@ export const BusinessSettingsScreen = forwardRef<
         materialMarkupBps: markup,
         taxRateBps: tax,
       });
+      invalidateAddressProximity();
       setSavedSettings({ ...draft, materialMarkupBps: markup, taxRateBps: tax });
       onBack();
     } catch {

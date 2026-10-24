@@ -4,6 +4,13 @@ import { act, renderHook, waitFor } from '@testing-library/react-native';
 import { fetchAddressSuggestions } from '@fieldsolo/api-client';
 
 import { useAddressAutocomplete } from './useAddressAutocomplete';
+import { businessAddressProximity, deviceAddressProximity } from '../../../lib/addressLocation';
+
+jest.mock('../../../lib/addressLocation', () => ({
+  deviceAddressProximity: jest.fn<() => Promise<unknown>>().mockResolvedValue(null),
+  businessAddressProximity: jest.fn<() => Promise<unknown>>().mockResolvedValue(null),
+  subscribeAddressProximity: () => () => {},
+}));
 
 jest.mock('@fieldsolo/api-client', () => ({
   ADDRESS_SUGGESTION_LIMIT: 4,
@@ -15,8 +22,11 @@ const client = {} as Parameters<typeof useAddressAutocomplete>[0];
 
 describe('useAddressAutocomplete', () => {
   beforeEach(() => {
+    jest.clearAllMocks();
     jest.useFakeTimers();
     mockFetch.mockReset();
+    jest.mocked(deviceAddressProximity).mockResolvedValue(null);
+    jest.mocked(businessAddressProximity).mockResolvedValue(null);
   });
 
   afterEach(() => {
@@ -59,6 +69,45 @@ describe('useAddressAutocomplete', () => {
     expect(result.current.loading).toBe(false);
     expect(result.current.noResults).toBe(false);
     expect(result.current.showPanel).toBe(true);
+  });
+
+  it('asks for location on focus even with an empty query, without searching yet', async () => {
+    renderHook(() => useAddressAutocomplete(client, '', true));
+    await act(async () => { jest.advanceTimersByTime(300); });
+    expect(deviceAddressProximity).toHaveBeenCalled();
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it('uses device proximity before the business fallback', async () => {
+    const point = { latitude: 41.88, longitude: -87.63 };
+    jest.mocked(deviceAddressProximity).mockResolvedValue(point);
+    mockFetch.mockResolvedValue({ status: 'ok', suggestions: [] });
+    renderHook(() => useAddressAutocomplete(client, '123 Main', true));
+    await act(async () => {});
+    await act(async () => { jest.advanceTimersByTime(300); });
+    expect(mockFetch).toHaveBeenLastCalledWith(client, '123 Main', { countryCode: 'us', limit: 4, proximity: point });
+    expect(businessAddressProximity).not.toHaveBeenCalled();
+  });
+
+  it('uses business proximity when device location is unavailable', async () => {
+    const point = { latitude: 40.71, longitude: -74.01 };
+    jest.mocked(businessAddressProximity).mockResolvedValue(point);
+    mockFetch.mockResolvedValue({ status: 'ok', suggestions: [] });
+    renderHook(() => useAddressAutocomplete(client, '123 Main', true));
+    await act(async () => {});
+    await act(async () => { jest.advanceTimersByTime(300); });
+    expect(mockFetch).toHaveBeenLastCalledWith(client, '123 Main', { countryCode: 'us', limit: 4, proximity: point });
+  });
+
+  it('ignores a late location after the address field loses focus', async () => {
+    let resolve!: (point: { latitude: number; longitude: number }) => void;
+    jest.mocked(deviceAddressProximity).mockImplementationOnce(() => new Promise((done) => { resolve = done; }));
+    const { rerender } = renderHook(({ enabled }) => useAddressAutocomplete(client, '123 Main', enabled), {
+      initialProps: { enabled: true },
+    });
+    rerender({ enabled: false });
+    await act(async () => { resolve({ latitude: 1, longitude: 2 }); jest.advanceTimersByTime(500); });
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 
   it('shows Searching before No results', async () => {
