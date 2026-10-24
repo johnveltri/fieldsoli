@@ -169,4 +169,54 @@ describe('useAddressAutocomplete', () => {
     });
     expect(result.current.showPanel).toBe(true);
   });
+  it('settles a rejected lookup and recovers for the next query', async () => {
+    mockFetch.mockRejectedValueOnce(new Error('network')).mockResolvedValueOnce({ status: 'ok', suggestions: [] });
+    const { result, rerender } = renderHook(
+      ({ query }) => useAddressAutocomplete(client, query, true),
+      { initialProps: { query: '123 Main' } },
+    );
+    await act(async () => { jest.advanceTimersByTime(300); });
+    expect(result.current.loading).toBe(false);
+    expect(result.current.showPanel).toBe(false);
+    rerender({ query: '456 Broad' });
+    await act(async () => { jest.advanceTimersByTime(300); });
+    expect(result.current.noResults).toBe(true);
+  });
+
+  it('ignores stale responses after a new query and after disabling', async () => {
+    const resolvers: ((value: Awaited<ReturnType<typeof fetchAddressSuggestions>>) => void)[] = [];
+    mockFetch.mockImplementation(() => new Promise((resolve) => { resolvers.push(resolve); }));
+    const { result, rerender } = renderHook(
+      ({ query, enabled }) => useAddressAutocomplete(client, query, enabled),
+      { initialProps: { query: '123 Main', enabled: true } },
+    );
+    await act(async () => { jest.advanceTimersByTime(300); });
+    rerender({ query: '456 Broad', enabled: true });
+    await act(async () => {
+      resolvers[0]?.({ status: 'ok', suggestions: [{ token: 'old', displayAddress: '123 Main St' }] });
+    });
+    expect(result.current.suggestions).toEqual([]);
+    await act(async () => { jest.advanceTimersByTime(300); });
+    rerender({ query: '456 Broad', enabled: false });
+    await act(async () => { resolvers[1]?.({ status: 'ok', suggestions: [] }); });
+    expect(result.current.loading).toBe(false);
+    expect(result.current.showPanel).toBe(false);
+  });
+
+  it('debounces edits and skips queries below the threshold', async () => {
+    mockFetch.mockResolvedValue({ status: 'ok', suggestions: [] });
+    const { rerender } = renderHook(
+      ({ query }) => useAddressAutocomplete(client, query, true),
+      { initialProps: { query: '1234' } },
+    );
+    await act(async () => { jest.advanceTimersByTime(500); });
+    expect(mockFetch).not.toHaveBeenCalled();
+    rerender({ query: '123 Main' });
+    await act(async () => { jest.advanceTimersByTime(299); });
+    rerender({ query: '123 Main St' });
+    await act(async () => { jest.advanceTimersByTime(300); });
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(mockFetch).toHaveBeenCalledWith(client, '123 Main St', { countryCode: 'us', limit: 4 });
+  });
+
 });

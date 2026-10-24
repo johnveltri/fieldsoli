@@ -37,7 +37,7 @@ export function useAddressAutocomplete(
       const lookup = await fetchAddressSuggestions(client, text, {
         countryCode: 'us',
         limit: ADDRESS_SUGGESTION_LIMIT,
-      });
+      }).catch(() => ({ status: 'error' as const, code: 'unavailable' as const }));
       if (requestId !== requestIdRef.current) return;
 
       setLoading(false);
@@ -72,10 +72,16 @@ export function useAddressAutocomplete(
     }
 
     const requestId = ++requestIdRef.current;
+    setSuggestions([]);
+    setLoading(false);
+    setNoResults(false);
     const timer = setTimeout(() => {
       void runLookup(query.trim(), requestId);
     }, DEBOUNCE_MS);
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      requestIdRef.current += 1;
+    };
   }, [enabled, query, runLookup]);
 
   return {

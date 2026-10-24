@@ -144,3 +144,59 @@ describe('Job Detail readable row accessibility', () => {
     ).toBeTruthy();
   });
 });
+
+
+describe('Job View material customer price', () => {
+  const material = {
+    id: 'material-1', sessionId: null, name: 'Copper pipe', quantity: 2,
+    quantityExplicit: true, unit: 'ft', unitCostCents: 500, unitCostExplicit: true,
+    totalCostCents: 1000, quantityLabel: '2 ft @ $5.00', priceLabel: '$10.00',
+    capturedMarkupBps: 5000,
+  };
+
+  function renderMaterial(overrides = {}, defaultBps: number | undefined = 2000) {
+    return render(<ViewMaterialsBuckets
+      typography={typography}
+      materialMarkupBps={defaultBps}
+      onCardPress={jest.fn()}
+      emphasizeCriticalEmpty
+      buckets={[{ id: 'materials-job', kind: 'unassigned', items: [{ ...material, ...overrides }] }]}
+    />);
+  }
+
+  it('shows current default charge below cost and announces both distinctly', () => {
+    const screen = renderMaterial();
+    expect(screen.getByText('$10.00')).toBeTruthy();
+    expect(screen.getByText('$12.00 with markup')).toBeTruthy();
+    expect(screen.getByLabelText('Material. Copper pipe. 2 ft @ $5.00. Cost $10.00. Price $12.00 with markup')).toBeTruthy();
+  });
+
+  it.each([
+    [0, '$10.00 with markup'],
+    [3000, '$13.00 with markup'],
+  ])('respects explicit %i bps override', (markupOverrideBps, label) => {
+    expect(renderMaterial({ markupOverrideBps }).getByText(label)).toBeTruthy();
+  });
+
+  it('rounds half cents up through canonical pricing', () => {
+    expect(renderMaterial({ totalCostCents: 5 }, 1000).getByText('$0.06 with markup')).toBeTruthy();
+  });
+
+  it('shows an explicitly captured zero cost and zero markup', () => {
+    const screen = renderMaterial({ totalCostCents: 0, unitCostCents: 0, priceLabel: '$0.00' }, 0);
+    expect(screen.getByText('$0.00 with markup')).toBeTruthy();
+    expect(screen.queryByText('No total')).toBeNull();
+  });
+
+  it('omits the charge when cost was not captured', () => {
+    const screen = renderMaterial({ totalCostCents: 0, unitCostExplicit: false, unitCostCents: null });
+    expect(screen.queryByText(/with markup/)).toBeNull();
+    expect(screen.getByText('No total')).toBeTruthy();
+  });
+
+  it('omits the charge when the current business rate is unavailable', () => {
+    const screen = render(<ViewMaterialsBuckets typography={typography}
+      buckets={[{ id: 'materials-job', kind: 'unassigned', items: [material] }]} />);
+    expect(screen.queryByText(/with markup/)).toBeNull();
+  });
+});

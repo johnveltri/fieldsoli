@@ -109,7 +109,7 @@ export type JobDetailMaterialLine = {
   priceLabel: string;
   /** Markup captured when the material was added, in basis points. */
   capturedMarkupBps?: number | null;
-  /** Owner override of the captured markup, in basis points. Null uses the captured rate. */
+  /** Owner override in basis points. Null uses the current business default for Job pricing. */
   markupOverrideBps?: number | null;
 };
 

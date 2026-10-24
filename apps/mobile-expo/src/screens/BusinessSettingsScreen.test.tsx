@@ -1,6 +1,6 @@
 import React from 'react';
 import { Alert } from 'react-native';
-import { fireEvent, render, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { DEFAULT_BUSINESS_SETTINGS } from '@fieldsolo/api-client';
 import { createTextStyles } from '../theme/nativeTokens';
@@ -8,10 +8,12 @@ import { BusinessSettingsScreen } from './BusinessSettingsScreen';
 
 const mockFetch =
   jest.fn<(...args: unknown[]) => Promise<typeof DEFAULT_BUSINESS_SETTINGS>>();
+const mockAddressFetch = jest.fn<(...args: unknown[]) => Promise<unknown>>();
 const mockSave = jest.fn<(...args: unknown[]) => Promise<void>>();
 
 jest.mock('@fieldsolo/api-client', () => ({
   ...jest.requireActual<object>('@fieldsolo/api-client'),
+  fetchAddressSuggestions: (...args: unknown[]) => mockAddressFetch(...args),
   fetchBusinessSettings: (...args: unknown[]) => mockFetch(...args),
   saveBusinessSettings: (...args: unknown[]) => mockSave(...args),
 }));
@@ -35,6 +37,7 @@ describe('BusinessSettingsScreen', () => {
     jest.clearAllMocks();
     mockFetch.mockResolvedValue(DEFAULT_BUSINESS_SETTINGS);
     mockSave.mockResolvedValue(undefined);
+    mockAddressFetch.mockResolvedValue({ status: 'ok', suggestions: [] });
   });
 
   it('retries the read after a failure instead of opening an unsaved default form', async () => {
@@ -152,4 +155,93 @@ describe('BusinessSettingsScreen', () => {
     );
     expect(onBack).toHaveBeenCalledTimes(1);
   });
+  it('looks up a business address without saving until Save Changes', async () => {
+    mockAddressFetch.mockResolvedValue({
+      status: 'ok', suggestions: [{ token: 'g0', displayAddress: '123 Main St, Chicago, IL' }],
+    });
+    const screen = render(<BusinessSettingsScreen typography={typography} mode="business" onBack={() => {}} />);
+    const address = await screen.findByLabelText('Address');
+    jest.useFakeTimers();
+    fireEvent(address, 'focus', { nativeEvent: { target: 1 } });
+    fireEvent.changeText(address, '123 Main');
+    await act(async () => { jest.advanceTimersByTime(300); });
+    fireEvent.press(screen.getByRole('button', { name: '123 Main St, Chicago, IL' }));
+    expect(screen.getByLabelText('Address').props.value).toBe('123 Main St, Chicago, IL');
+    expect(screen.queryByText('Powered by Geoapify · © OpenStreetMap contributors')).toBeNull();
+    expect(mockSave).not.toHaveBeenCalled();
+    fireEvent.press(screen.getByLabelText('SAVE CHANGES'));
+    await act(async () => {});
+    expect(mockSave).toHaveBeenCalledWith({}, 'user-1', expect.objectContaining({ address: '123 Main St, Chicago, IL' }));
+    jest.useRealTimers();
+  });
+
+  it('keeps manual business address entry when lookup fails and cancel discards it', async () => {
+    mockAddressFetch.mockResolvedValue({ status: 'error', code: 'unavailable' });
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const onBack = jest.fn();
+    const screen = render(<BusinessSettingsScreen typography={typography} mode="business" onBack={onBack} />);
+    const address = await screen.findByLabelText('Address');
+    jest.useFakeTimers();
+    fireEvent(address, 'focus', { nativeEvent: { target: 1 } });
+    fireEvent.changeText(address, '123 Main');
+    await act(async () => { jest.advanceTimersByTime(300); });
+    expect(screen.queryByText('Searching…')).toBeNull();
+    expect(screen.queryByText('No results')).toBeNull();
+    expect(screen.getByLabelText('Address').props.value).toBe('123 Main');
+    fireEvent.press(screen.getByLabelText('Back'));
+    const buttons = alert.mock.calls[0]?.[2];
+    buttons?.find((button) => button.text === 'Discard')?.onPress?.();
+    expect(onBack).toHaveBeenCalledTimes(1);
+    expect(mockSave).not.toHaveBeenCalled();
+    alert.mockRestore();
+    jest.useRealTimers();
+  });
+
+  it.each(['Default material markup', 'Tax rate'])('shows zero as empty on %s focus without making settings dirty', async (label) => {
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const onBack = jest.fn();
+    const screen = render(<BusinessSettingsScreen typography={typography} mode="settings" onBack={onBack} />);
+    const field = await screen.findByLabelText(label);
+    fireEvent(field, 'focus', { nativeEvent: { target: 1 } });
+    expect(screen.getByLabelText(label).props.value).toBe('');
+    fireEvent.press(screen.getByLabelText('Back'));
+    expect(onBack).toHaveBeenCalledTimes(1);
+    expect(alert).not.toHaveBeenCalled();
+    fireEvent(field, 'blur', { nativeEvent: { target: 1 } });
+    expect(screen.getByLabelText(label).props.value).toMatch(/^0%/);
+    alert.mockRestore();
+  });
+
+  it('accepts decimals after zero focus, preserves nonzero focus, and restores cleared percentages to zero', async () => {
+    mockFetch.mockResolvedValueOnce({ ...DEFAULT_BUSINESS_SETTINGS, materialMarkupBps: 1250 });
+    const screen = render(<BusinessSettingsScreen typography={typography} mode="settings" onBack={() => {}} />);
+    const markup = await screen.findByLabelText('Default material markup');
+    fireEvent(markup, 'focus', { nativeEvent: { target: 1 } });
+    expect(screen.getByLabelText('Default material markup').props.value).toBe('12.5');
+    fireEvent.changeText(markup, '');
+    fireEvent(markup, 'blur', { nativeEvent: { target: 1 } });
+    expect(screen.getByLabelText('Default material markup').props.value).toBe('0% Default Markup');
+    const tax = screen.getByLabelText('Tax rate');
+    fireEvent(tax, 'focus', { nativeEvent: { target: 1 } });
+    fireEvent.changeText(tax, '8.25');
+    fireEvent(tax, 'blur', { nativeEvent: { target: 1 } });
+    fireEvent.press(screen.getByLabelText('SAVE CHANGES'));
+    await waitFor(() => expect(mockSave).toHaveBeenCalledWith({}, 'user-1', expect.objectContaining({ materialMarkupBps: 0, taxRateBps: 825 })));
+  });
+
+  it('saves an empty focused percentage as zero and keeps a typed fractional zero', async () => {
+    mockFetch.mockResolvedValueOnce({ ...DEFAULT_BUSINESS_SETTINGS, materialMarkupBps: 1250 });
+    const screen = render(<BusinessSettingsScreen typography={typography} mode="settings" onBack={() => {}} />);
+    const markup = await screen.findByLabelText('Default material markup');
+    fireEvent(markup, 'focus', { nativeEvent: { target: 1 } });
+    fireEvent.changeText(markup, '');
+    const tax = screen.getByLabelText('Tax rate');
+    fireEvent(tax, 'focus', { nativeEvent: { target: 2 } });
+    fireEvent.changeText(tax, '0');
+    expect(screen.getByLabelText('Tax rate').props.value).toBe('0');
+    fireEvent.changeText(tax, '0.25');
+    fireEvent.press(screen.getByLabelText('SAVE CHANGES'));
+    await waitFor(() => expect(mockSave).toHaveBeenCalledWith({}, 'user-1', expect.objectContaining({ materialMarkupBps: 0, taxRateBps: 25 })));
+  });
+
 });

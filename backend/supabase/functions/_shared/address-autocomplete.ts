@@ -27,7 +27,7 @@ export type AddressAutocompleteResponse =
 const MAX_QUERY_LENGTH = 120;
 const MIN_QUERY_LENGTH = 5;
 const MAX_LIMIT = 4;
-const UPSTREAM_TIMEOUT_MS = 5000;
+const UPSTREAM_TIMEOUT_MS = 12000;
 
 export function validateAddressAutocompleteRequest(
   input: unknown,
@@ -155,4 +155,15 @@ export function redactAddressAutocompleteError(error: unknown): AddressAutocompl
     return 'rate_limited';
   }
   return 'unavailable';
+}
+
+/** Safe operational diagnostics; never return upstream text, query, URL or key. */
+export function addressAutocompleteFailureReason(error: unknown): string {
+  if (!(error instanceof Error)) return 'unknown';
+  if (error.name === 'AbortError' || error.name === 'TimeoutError') return 'provider_timeout';
+  if (/^geoapify_status_(401|403)$/.test(error.message)) return 'provider_auth';
+  if (error.message === 'geoapify_status_429') return 'provider_rate_limited';
+  if (/^geoapify_status_\d{3}$/.test(error.message)) return 'provider_http_error';
+  if (error instanceof TypeError) return 'provider_network';
+  return 'unknown';
 }

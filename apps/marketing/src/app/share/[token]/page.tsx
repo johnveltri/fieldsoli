@@ -1,7 +1,12 @@
 import type { Metadata } from "next";
 
 import { loadSharedDocument } from "../../../lib/load-shared-document";
-import { shareCard, shareDocumentHtml } from "../../../lib/share-document";
+import {
+  OUTAGE_DOCUMENT_MESSAGE,
+  UNAVAILABLE_DOCUMENT_MESSAGE,
+  shareCard,
+  shareDocumentHtml,
+} from "../../../lib/share-document";
 
 export const dynamic = "force-dynamic";
 
@@ -13,20 +18,25 @@ export async function generateMetadata({ params }: SharePageProps): Promise<Meta
   const { token } = await params;
   const document = await loadSharedDocument(token);
   if (document.status !== "ok") {
+    const message = document.status === "unavailable"
+      ? UNAVAILABLE_DOCUMENT_MESSAGE
+      : OUTAGE_DOCUMENT_MESSAGE;
     return {
-      title: "Document",
-      robots: { index: false, follow: false },
+      title: { absolute: message },
+      description: message,
+      robots: { index: false, follow: false, noarchive: true },
+      openGraph: { title: message, description: message },
     };
   }
   const card = shareCard(document);
   return {
-    title: card.title,
+    title: { absolute: card.title },
     description: card.shortDescription,
-    robots: { index: false, follow: false },
+    robots: { index: false, follow: false, noarchive: true },
     openGraph: {
       title: card.title,
       description: card.shortDescription,
-      siteName: "fieldsoli.com",
+      siteName: document.payload.businessName,
     },
   };
 }

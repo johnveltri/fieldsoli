@@ -596,6 +596,7 @@ jest.mock('../components/invoicing/InvoicingJobControls', () => {
         getPendingPreferences: () => null,
         discardPendingControls: jest.fn(),
       }));
+      if (mode === 'launcher') return React.createElement(View, { testID: 'document-modal-host' });
       return React.createElement(View, null,
         React.createElement(Text, null, 'Docs'),
         React.createElement(Text, { accessibilityLabel: mode === 'view' ? 'Manage documents' : 'Generate new', onPress: onManageDocs }, mode === 'view' ? 'Saved document' : 'Generate new'));

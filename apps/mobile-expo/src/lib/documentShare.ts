@@ -1,3 +1,6 @@
+import { normalizePhoneE164 } from '@fieldsolo/api-client';
+import { formatUsdCombined } from './formatUsd';
+
 export function documentNumberLabel(type: 'estimate' | 'invoice', number: number): string {
   const title = type === 'estimate' ? 'Estimate' : 'Invoice';
   return `${title} #${String(number).padStart(5, '0')}`;
@@ -5,11 +8,12 @@ export function documentNumberLabel(type: 'estimate' | 'invoice', number: number
 
 export function documentLinkText(input: {
   type: 'estimate' | 'invoice';
-  number: number;
+  totalCents: number;
   businessName: string;
   url: string;
 }): string {
-  return `${documentNumberLabel(input.type, input.number)} from ${input.businessName}\n${input.url}`;
+  const title = input.type === 'estimate' ? 'Estimate' : 'Invoice';
+  return `${title} for ${formatUsdCombined(input.totalCents)} from ${input.businessName}\n${input.url}`;
 }
 
 export function gmailSubject(input: {
@@ -48,14 +52,14 @@ export function gmailUrl(input: { email: string | null; subject: string; body: s
 }
 
 export function smsUrl(phone: string | null, body: string): string {
-  const digits = (phone ?? '').replace(/[^\d+]/g, '');
-  const address = digits.length >= 8 ? digits : '';
+  const address = documentSmsRecipient(phone) ?? '';
   return `sms:${address}?body=${encodeURIComponent(body)}`;
 }
 
 export function pdfFileName(
   type: 'estimate' | 'invoice',
   number: number,
+  totalCents: number,
   businessName?: string | null,
 ): string {
   const title = type === 'estimate' ? 'Estimate' : 'Invoice';
@@ -66,9 +70,10 @@ export function pdfFileName(
     .replace(/\s+/g, ' ')
     .replace(/[. ]+$/g, '')
     .slice(0, 80);
+  const documentTitle = `${title} #${base} for ${formatUsdCombined(totalCents)}`;
   return safeBusinessName
-    ? `${safeBusinessName} - ${title} ${base}.pdf`
-    : `${title}-${base}.pdf`;
+    ? `${documentTitle} from ${safeBusinessName}.pdf`
+    : `${documentTitle}.pdf`;
 }
 
 export function defaultDocumentType(workStatus: string): 'estimate' | 'invoice' {
@@ -87,4 +92,10 @@ const GAP_LABELS: Record<string, string> = {
 
 export function gapLabels(gaps: string[]): string[] {
   return gaps.map((gap) => GAP_LABELS[gap] ?? gap);
+}
+
+/** Names or malformed snapshot values must never become Messages recipients. */
+export function documentSmsRecipient(phone: string | null): string | null {
+  if (!phone || !/^\+?[\d\s().-]+$/.test(phone.trim())) return null;
+  return normalizePhoneE164(phone);
 }

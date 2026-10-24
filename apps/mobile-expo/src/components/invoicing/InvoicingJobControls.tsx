@@ -3,6 +3,7 @@ import {
   useCallback,
   useEffect,
   useImperativeHandle,
+  useMemo,
   useRef,
   useState,
 } from 'react';
@@ -74,6 +75,7 @@ import { EditSwipeableRow } from '../ds/edit-mode/EditSwipeableRow';
 import {
   defaultDocumentType,
   documentLinkText,
+  documentSmsRecipient,
   documentNumberLabel,
   gapLabels,
   gmailSubject,
@@ -106,6 +108,7 @@ import {
   type BusinessSettingsScreenHandle,
 } from '../../screens/BusinessSettingsScreen';
 import { BottomSheetShell } from '../ds/BottomSheetShell';
+import { usePreparedDocumentPreview } from './usePreparedDocumentPreview';
 import { ActionSummaryCard } from '../ds/ActionSummaryCard';
 import { FullWidthFab } from '../ds/FullWidthFab';
 import { ProfileRowsCard } from '../ds/ProfileRowsCard';
@@ -119,7 +122,12 @@ type Props = {
   jobId: string;
   workStatus: string;
   typography: TextStyles;
-  mode: 'view' | 'edit';
+  mode: 'view' | 'edit' | 'launcher';
+  onPreviewDocument?: (documentId: string) => void;
+  refreshKey?: number;
+  /** Current Job source identity, used to invalidate the speculative preview. */
+  previewRevision?: unknown;
+  onDocumentsChanged?: () => void;
   active?: boolean;
   onEditDetails: () => void;
   onManageDocs?: () => void;
@@ -159,6 +167,9 @@ function loadPreviewFontData(): Promise<PreviewFontData> {
         new File(displayAsset.localUri).base64(),
       ]);
       return { body, bodyBold, label, display };
+    }).catch((error) => {
+      previewFontDataPromise = null;
+      throw error;
     });
   }
   return previewFontDataPromise;
@@ -204,8 +215,13 @@ const REPORT_PREVIEW_HEIGHT = `
   const report = () => window.ReactNativeWebView.postMessage(JSON.stringify({
     type: 'preview-height', height: Math.ceil(page.getBoundingClientRect().height)
   }));
-  new ResizeObserver(report).observe(page);
-  if (document.fonts) document.fonts.ready.then(report);
+  if (window.ResizeObserver) new ResizeObserver(report).observe(page);
+  const ready = () => requestAnimationFrame(() => requestAnimationFrame(() => {
+    report();
+    window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'preview-ready', previewToken: __PREVIEW_TOKEN__ }));
+  }));
+  if (document.fonts) document.fonts.ready.then(ready);
+  else ready();
   report();
 })();
 true;
@@ -249,6 +265,10 @@ export const InvoicingJobControls = forwardRef<
     onFinalized,
     onFinalizationClosed,
     onRevenueInvoiceChanged,
+    onPreviewDocument,
+    refreshKey,
+    previewRevision,
+    onDocumentsChanged,
   }: Props,
   ref,
 ) {
@@ -256,6 +276,10 @@ export const InvoicingJobControls = forwardRef<
   const { columnStyle } = useContentColumn();
   const businessScreenRef = useRef<BusinessSettingsScreenHandle>(null);
   const previewRequestRef = useRef(0);
+  const savedPreviewIdRef = useRef<string | null>(null);
+  const [previewFailure, setPreviewFailure] = useState(false);
+  const [webViewGeneration, setWebViewGeneration] = useState(0);
+  useEffect(() => () => { previewRequestRef.current += 1; }, []);
   const archivingRef = useRef(false);
   const [documents, setDocuments] = useState<FinancialDocumentRecord[]>([]);
   const [pendingControls, setPendingControls] = useState<Record<string, { archived: boolean; linkEnabled: boolean }>>({});
@@ -268,11 +292,15 @@ export const InvoicingJobControls = forwardRef<
     defaultDocumentType(workStatus),
   );
   const [saved, setSaved] = useState<FinancialDocumentRecord | null>(null);
+  useEffect(() => {
+    if (saved) savedPreviewIdRef.current = saved.id;
+  }, [saved]);
   const [savedWorkStatus, setSavedWorkStatus] = useState(workStatus);
   const [refreshingSaved, setRefreshingSaved] = useState(false);
   const workStatusRef = useRef(workStatus);
   workStatusRef.current = workStatus;
   const [previewOpen, setPreviewOpenState] = useState(false);
+  const previewVisibleRef = useRef(false);
   const { height: previewWindowHeight } = useWindowDimensions();
   const previewTranslateY = useRef(new Animated.Value(previewWindowHeight)).current;
   useEffect(() => () => previewTranslateY.stopAnimation(), [previewTranslateY]);
@@ -286,12 +314,16 @@ export const InvoicingJobControls = forwardRef<
     }).start();
   }, [previewTranslateY, reduceMotion]);
   const setPreviewOpen = useCallback((open: boolean, afterClose?: () => void) => {
+    if (open && previewVisibleRef.current) return;
     previewTranslateY.stopAnimation();
     if (open) {
+      previewVisibleRef.current = true;
+      setWebViewGeneration((value) => value + 1);
       previewTranslateY.setValue(previewWindowHeight);
       setPreviewOpenState(true);
       return;
     }
+    previewVisibleRef.current = false;
     Animated.timing(previewTranslateY, {
       toValue: previewWindowHeight,
       duration: reduceMotion ? 0 : 210,
@@ -318,7 +350,7 @@ export const InvoicingJobControls = forwardRef<
   const [busy, setBusy] = useState<string | null>(null);
   const [copySuccess, setCopySuccess] = useState(false);
   const [offline, setOffline] = useState(false);
-  const [recoveringIntent, setRecoveringIntent] = useState(true);
+  const [recoveringIntent, setRecoveringIntent] = useState(!onPreviewDocument);
   const recoveryBlockedRef = useRef(false);
   const recoveryScopeRef = useRef<string | null>(null);
   const creationRunningRef = useRef(false);
@@ -344,10 +376,9 @@ export const InvoicingJobControls = forwardRef<
   );
 
   useEffect(() => {
-    if (!previewOpen) return;
+    if (!previewOpen && !(isActive && mode === 'launcher')) return;
     let cancelled = false;
-    setPreviewFontsReady(false);
-    void loadPreviewFontData()
+    void boundedDocumentRead(loadPreviewFontData())
       .then((fonts) => {
         if (!cancelled) {
           setPreviewFonts(fonts);
@@ -363,14 +394,24 @@ export const InvoicingJobControls = forwardRef<
     return () => {
       cancelled = true;
     };
-  }, [previewOpen]);
+  }, [isActive, mode, previewOpen]);
+
+  const preparedRevision = useMemo(
+    () => [previewRevision, refreshKey, workStatus],
+    [previewRevision, refreshKey, workStatus],
+  );
+  const { read: readPreparedPreview, invalidate: invalidatePreparedPreview } = usePreparedDocumentPreview({
+    client, ownerId, jobId, type: defaultDocumentType(workStatus),
+    revision: preparedRevision,
+    enabled: mode === 'launcher' && previewRevision !== undefined && isActive && !!ownerId && !recoveringIntent,
+  });
 
   const reload = useCallback(async () => {
     setRefreshingSaved(true);
     setLoading(true);
     setError(null);
     try {
-      const nextDocuments = await listFinancialDocuments(client, jobId);
+      const nextDocuments = await readDocuments(client, jobId);
       setDocuments(nextDocuments);
       setRevenueDocumentDraft(nextDocuments.find((doc) => doc.isRevenueSource)?.id ?? null);
       setSaved((current) => current
@@ -389,7 +430,7 @@ export const InvoicingJobControls = forwardRef<
   }, [client, jobId]);
 
   const refreshDocument = useCallback(async (documentId: string) => {
-    const fresh = (await listFinancialDocuments(client, jobId)).find((item) => item.id === documentId);
+    const fresh = (await readDocuments(client, jobId)).find((item) => item.id === documentId);
     if (!fresh) throw new Error('financial_document_not_available');
     setDocuments((current) => current.map((item) => item.id === fresh.id ? fresh : item));
     setOffline(false);
@@ -403,6 +444,7 @@ export const InvoicingJobControls = forwardRef<
       setSavedWorkStatus(workStatus);
       openShareSheet();
     } catch {
+      setPreviewFailure(true);
       setSaved(null);
       setOffline(true);
       Alert.alert('Could not refresh this document.', 'Reconnect before sharing it.');
@@ -411,7 +453,7 @@ export const InvoicingJobControls = forwardRef<
 
   const executeIntent = useCallback(async (intent: FinancialDocumentIntent) => {
     if (intent.kind === 'create') {
-      return intent.type === 'invoice'
+      const created = await (intent.type === 'invoice'
         ? createAndSelectFinancialDocument(client, {
             jobId: intent.jobId,
             fingerprint: intent.fingerprint,
@@ -425,9 +467,11 @@ export const InvoicingJobControls = forwardRef<
             fingerprint: intent.fingerprint,
             timezone: intent.timezone,
             requestKey: intent.requestKey,
-          });
+          }));
+      onDocumentsChanged?.();
+      return created;
     }
-    return finalizeJobWithInvoice(client, {
+    const finalized = await finalizeJobWithInvoice(client, {
       jobId: intent.jobId,
       status: intent.status,
       documentId: intent.documentId,
@@ -436,7 +480,9 @@ export const InvoicingJobControls = forwardRef<
       requestKey: intent.requestKey,
       confirmedPaidTotalCents: intent.confirmedPaidTotalCents,
     });
-  }, [client]);
+    onDocumentsChanged?.();
+    return finalized;
+  }, [client, onDocumentsChanged]);
 
   const clearIntent = useCallback(async (requestKey: string | undefined) => {
     if (!ownerId || !requestKey) return;
@@ -484,7 +530,7 @@ export const InvoicingJobControls = forwardRef<
 
   useEffect(() => {
     const scope = `${ownerId}:${jobId}`;
-    if (!isActive || !ownerId || recoveryScopeRef.current === scope) return;
+    if (!isActive || !ownerId || onPreviewDocument || recoveryScopeRef.current === scope) return;
     recoveryScopeRef.current = scope;
     recoveryBlockedRef.current = false;
     let cancelled = false;
@@ -526,59 +572,53 @@ export const InvoicingJobControls = forwardRef<
       cancelled = true;
       if (recoveryScopeRef.current === scope) recoveryScopeRef.current = null;
     };
-  }, [client, executeIntent, isActive, jobId, onFinalized, onRevenueInvoiceChanged, ownerId, reload]);
+  }, [client, executeIntent, isActive, jobId, onFinalized, onPreviewDocument, onRevenueInvoiceChanged, ownerId, reload]);
 
   useEffect(() => {
     if (isActive && !recoveringIntent) void reload();
-  }, [isActive, recoveringIntent, reload, workStatus]);
+  }, [isActive, recoveringIntent, refreshKey, reload, workStatus]);
 
-  useEffect(() => {
-    const subscription = AppState.addEventListener('change', (state) => {
-      if (state === 'active' && isActive && !recoveringIntent) void reload();
-    });
-    return () => subscription.remove();
-  }, [isActive, recoveringIntent, reload]);
 
   const openUnsaved = useCallback(async () => {
     if (beforeOpen) {
       const ok = await beforeOpen().catch(() => false);
       if (!ok) return;
     }
+    savedPreviewIdRef.current = null;
+    setPreviewFailure(false);
     setPreviewOpen(true);
     setSaved(null);
     setPreview(null);
     setOffline(false);
     const request = ++previewRequestRef.current;
-    setBusy('Loading');
+    setBusy('Loading…');
     setPreviewType(defaultDocumentType(workStatus));
     try {
-      const next = await previewFinancialDocument(client, {
-        jobId,
-        type: defaultDocumentType(workStatus),
-        timezone: deviceIanaTimeZone(),
-      });
+      const next = await readPreparedPreview();
       if (request === previewRequestRef.current) {
         setPreview(next);
         setOffline(false);
       }
     } catch {
       if (request === previewRequestRef.current) {
+        setPreviewFailure(true);
         setOffline(true);
         Alert.alert('Could not load this document.', 'Retry');
       }
     } finally {
       if (request === previewRequestRef.current) setBusy(null);
     }
-  }, [beforeOpen, client, jobId, workStatus, setPreviewOpen]);
+  }, [beforeOpen, readPreparedPreview, workStatus, setPreviewOpen]);
 
   const switchType = useCallback(
     async (type: 'estimate' | 'invoice') => {
       if (saved) return;
       const request = ++previewRequestRef.current;
+      setPreviewFailure(false);
       setPreviewType(type);
-      setBusy(null);
+      setBusy('Loading…');
       try {
-        const next = await previewFinancialDocument(client, {
+        const next = await readPreview(client, {
           jobId,
           type,
           timezone: deviceIanaTimeZone(),
@@ -590,8 +630,12 @@ export const InvoicingJobControls = forwardRef<
       } catch {
         if (request === previewRequestRef.current) {
           setPreviewType(preview?.payload.documentType ?? defaultDocumentType(workStatus));
+          setPreviewFailure(true);
+          setOffline(true);
           Alert.alert('Could not load this document.', 'Retry');
         }
+      } finally {
+        if (request === previewRequestRef.current) setBusy(null);
       }
     },
     [client, jobId, preview, saved, workStatus],
@@ -649,7 +693,7 @@ export const InvoicingJobControls = forwardRef<
         Alert.alert(
           'This Job changed. Review the updated preview before sharing.',
         );
-        const next = await previewFinancialDocument(client, {
+        const next = await readPreview(client, {
           jobId,
           type: previewType,
           timezone: deviceIanaTimeZone(),
@@ -680,23 +724,72 @@ export const InvoicingJobControls = forwardRef<
   const displaySaved = saved && !refreshingSaved && savedWorkStatus === workStatus
     ? saved
     : null;
+  // Prepare immutable saved content while the Documents list is already loaded.
+  const preparedSavedHtml = useMemo(() => {
+    const result = new Map<string, { record: FinancialDocumentRecord; html: string }>();
+    if (!previewFontsReady) return result;
+    for (const record of documents) {
+      if (!record.archived) result.set(record.id, {
+        record, html: htmlFor(record, 'preview', previewFonts ?? undefined),
+      });
+    }
+    return result;
+  }, [documents, previewFonts, previewFontsReady]);
+  const previewHtml = useMemo(() => {
+    if (!previewFontsReady) return null;
+    if (displaySaved) {
+      const prepared = preparedSavedHtml.get(displaySaved.id);
+      return prepared?.record === displaySaved
+        ? prepared.html : htmlFor(displaySaved, 'preview', previewFonts ?? undefined);
+    }
+    if (preview) return htmlFor(preview, 'preview', previewFonts ?? undefined, true);
+    return null;
+  }, [displaySaved, preparedSavedHtml, preview, previewFonts, previewFontsReady]);
+  // An identical owner refresh must not restart an already painted WebView.
+  const previewSource = useMemo(() => previewHtml === null ? null : { html: previewHtml }, [previewHtml]);
+  const paintSequence = useRef(0);
+  const paintToken = useMemo(() => ++paintSequence.current, [previewSource, webViewGeneration]);
+  const previewScript = useMemo(
+    () => REPORT_PREVIEW_HEIGHT.replace('__PREVIEW_TOKEN__', String(paintToken)),
+    [paintToken],
+  );
+  const [paintedPreview, setPaintedPreview] = useState<{
+    source: typeof previewSource; generation: number;
+  } | null>(null);
+  const previewPainted = paintedPreview?.source === previewSource &&
+    paintedPreview?.generation === webViewGeneration;
+  useEffect(() => {
+    if (!previewOpen || !previewSource || previewFailure || previewPainted) return;
+    const timeout = setTimeout(() => setPreviewFailure(true), 15_000);
+    return () => clearTimeout(timeout);
+  }, [previewOpen, previewSource, previewFailure, previewPainted, webViewGeneration]);
+
   const active = displaySaved;
 
   const performQueuedHandoff = useCallback(async () => {
     const action = queuedHandoffRef.current;
+    if (!previewVisibleRef.current) { queuedHandoffRef.current = null; return; }
     if (!active || !action || handoffRunningRef.current) return;
     queuedHandoffRef.current = null;
     handoffRunningRef.current = true;
-    let fallbackAlertOpen = false;
-    let handoffFailed = false;
+    const handoffRequest = previewRequestRef.current;
     let handoffDocument = active;
     if (action.kind !== 'pdf') {
       try {
         handoffDocument = await refreshDocument(active.id);
+        if (handoffRequest !== previewRequestRef.current || !previewVisibleRef.current) {
+          handoffRunningRef.current = false;
+          return;
+        }
         if (!handoffDocument.linkEnabled) throw new Error('link_disabled');
         setSaved(handoffDocument);
         setSavedWorkStatus(workStatus);
       } catch {
+        if (handoffRequest !== previewRequestRef.current || !previewVisibleRef.current) {
+          handoffRunningRef.current = false;
+          return;
+        }
+        setPreviewFailure(true);
         setSaved(null);
         setOffline(true);
         handoffRunningRef.current = false;
@@ -707,25 +800,24 @@ export const InvoicingJobControls = forwardRef<
     const handoffUrl = shareDocumentUrl(handoffDocument.token);
     const handoffText = documentLinkText({
       type: handoffDocument.documentType,
-      number: handoffDocument.documentNumber,
+      totalCents: handoffDocument.payload.totalCents,
       businessName: handoffDocument.payload.businessName,
       url: handoffUrl,
     });
     try {
       if (action.kind === 'text') {
         if (!(await SMS.isAvailableAsync())) {
-          fallbackAlertOpen = true;
           Alert.alert('Messages is unavailable on this device.', undefined, [
-            { text: 'Cancel', style: 'cancel', onPress: () => setPreviewOpen(true) },
+            { text: 'Cancel', style: 'cancel' },
             { text: 'Share link…', onPress: () => {
               void Share.share({ message: handoffText, title: documentNumberLabel(handoffDocument.documentType, handoffDocument.documentNumber) })
-                .catch(() => Alert.alert('Could not share this link. Try again.'))
-                .finally(() => setPreviewOpen(true));
+                .catch(() => Alert.alert('Could not share this link. Try again.'));
             } },
           ]);
           return;
         }
-        await SMS.sendSMSAsync(handoffDocument.payload.customerPhone ?? '', handoffText);
+        const recipient = documentSmsRecipient(handoffDocument.payload.customerPhone);
+        await SMS.sendSMSAsync(recipient ? [recipient] : [], handoffText);
       } else if (action.kind === 'email') {
         const subject = gmailSubject({
           type: handoffDocument.documentType,
@@ -748,13 +840,11 @@ export const InvoicingJobControls = forwardRef<
                 : [],
             });
           } else {
-            fallbackAlertOpen = true;
             Alert.alert('Email is unavailable on this device.', undefined, [
-              { text: 'Cancel', style: 'cancel', onPress: () => setPreviewOpen(true) },
+              { text: 'Cancel', style: 'cancel' },
               { text: 'Share link…', onPress: () => {
                 void Share.share({ message: handoffText, title: documentNumberLabel(handoffDocument.documentType, handoffDocument.documentNumber) })
-                  .catch(() => Alert.alert('Could not share this link. Try again.'))
-                  .finally(() => setPreviewOpen(true));
+                  .catch(() => Alert.alert('Could not share this link. Try again.'));
               } },
             ]);
             return;
@@ -775,48 +865,49 @@ export const InvoicingJobControls = forwardRef<
         });
       }
     } catch {
-      handoffFailed = true;
       const message = action.kind === 'browser'
         ? 'Could not open this document. Try again.'
         : action.kind === 'pdf'
           ? 'Could not share the PDF. Try again.'
           : 'Could not open the share option. Try again.';
       Alert.alert(message, undefined, [
-        { text: 'Close', style: 'cancel', onPress: () => setPreviewOpen(true) },
+        { text: 'Close', style: 'cancel' },
         { text: 'Try again', onPress: () => { if (active) void openFreshShareSheet(active.id); } },
       ]);
     } finally {
       handoffRunningRef.current = false;
       setBusy(null);
-      if (!fallbackAlertOpen && !handoffFailed) setPreviewOpen(true);
     }
-  }, [active, openFreshShareSheet, refreshDocument, setPreviewOpen, workStatus]);
-
-  const closePreviewForHandoff = useCallback(() => {
-    if (!queuedHandoffRef.current) return;
-    setPreviewOpen(false, () => {
-      if (Platform.OS !== 'ios') {
-        requestAnimationFrame(() => requestAnimationFrame(() => void performQueuedHandoff()));
-      }
-    });
-  }, [performQueuedHandoff, setPreviewOpen]);
+  }, [active, openFreshShareSheet, refreshDocument, workStatus]);
 
   const onShareSheetClosed = useCallback(() => {
     setShareModalMounted(false);
+    // Dismiss only the options sheet. The preview stays mounted as the native
+    // share/composer presenter and retains its painted document and scroll state.
     if (Platform.OS !== 'ios' && queuedHandoffRef.current) {
-      requestAnimationFrame(() => requestAnimationFrame(closePreviewForHandoff));
+      requestAnimationFrame(() => requestAnimationFrame(() => void performQueuedHandoff()));
     }
-  }, [closePreviewForHandoff]);
+  }, [performQueuedHandoff]);
 
   const requestHandoff = useCallback(async (
     kind: 'text' | 'email' | 'share' | 'browser' | 'pdf',
   ) => {
     if (!active || handoffRunningRef.current || queuedHandoffRef.current) return;
     handoffRunningRef.current = true;
+    const handoffRequest = previewRequestRef.current;
     let fresh: FinancialDocumentRecord;
     try {
       fresh = await refreshDocument(active.id);
+      if (handoffRequest !== previewRequestRef.current || !previewVisibleRef.current) {
+        handoffRunningRef.current = false;
+        return;
+      }
     } catch {
+      if (handoffRequest !== previewRequestRef.current || !previewVisibleRef.current) {
+        handoffRunningRef.current = false;
+        return;
+      }
+      setPreviewFailure(true);
       setSaved(null);
       setOffline(true);
       handoffRunningRef.current = false;
@@ -846,6 +937,7 @@ export const InvoicingJobControls = forwardRef<
         const filename = pdfFileName(
           fresh.documentType,
           fresh.documentNumber,
+          fresh.payload.totalCents,
           fresh.payload.businessName,
         );
         const namedFile = new File(Paths.cache, filename);
@@ -872,6 +964,7 @@ export const InvoicingJobControls = forwardRef<
     try {
       fresh = await refreshDocument(active.id);
     } catch {
+      setPreviewFailure(true);
       setSaved(null);
       setOffline(true);
       Alert.alert('Could not refresh this document.', 'Reconnect before copying its link.');
@@ -912,10 +1005,15 @@ export const InvoicingJobControls = forwardRef<
     }
   };
 
-  const openDocument = useCallback((documentId: string) => {
+  const openDocument = useCallback((documentId: string, forceRefresh = false, preserveContent = false) => {
+    savedPreviewIdRef.current = documentId;
+    setPreviewFailure(false);
     previewRequestRef.current += 1;
     const request = previewRequestRef.current;
-    setSaved(null);
+    const cached = (!forceRefresh || preserveContent) && !refreshingSaved && savedWorkStatus === workStatus
+      ? documents.find((record) => record.id === documentId && !record.archived) ?? null
+      : null;
+    setSaved(cached);
     setPreview(null);
     setPreviewOpen(true);
     setOffline(false);
@@ -930,6 +1028,7 @@ export const InvoicingJobControls = forwardRef<
       .catch(() => {
         if (request === previewRequestRef.current) {
           setSaved(null);
+          setPreviewFailure(true);
           setOffline(true);
           Alert.alert('Could not refresh this document.', 'Connect and retry before viewing or sharing it.');
         }
@@ -937,22 +1036,27 @@ export const InvoicingJobControls = forwardRef<
       .finally(() => {
         if (request === previewRequestRef.current) setBusy(null);
       });
-  }, [refreshDocument, setPreviewOpen, workStatus]);
+  }, [documents, refreshingSaved, savedWorkStatus, refreshDocument, setPreviewOpen, workStatus]);
 
   const openFinalization = useCallback(async (status: 'completed' | 'paid') => {
+    const request = ++previewRequestRef.current;
+    const wasOpen = previewVisibleRef.current;
+    setPreviewFailure(false);
+    setOffline(false);
     setBusy('Reviewing…');
     try {
-      const nextDocuments = await listFinancialDocuments(client, jobId);
+      const nextDocuments = await readDocuments(client, jobId);
+      if (request !== previewRequestRef.current) return;
       setDocuments(nextDocuments);
       const selected = nextDocuments.find((doc) => doc.isRevenueSource) ?? null;
-      const nextPreview = selected ? null : await previewFinancialDocument(client, {
+      const nextPreview = selected ? null : await readPreview(client, {
         jobId,
         type: 'invoice',
         timezone: deviceIanaTimeZone(),
       });
+      if (request !== previewRequestRef.current) return;
       setRevenueDocumentDraft(selected?.id ?? null);
       setFinalization({ status, selected, preview: nextPreview });
-      previewRequestRef.current += 1;
       setSaved(selected);
       setSavedWorkStatus(workStatus);
       setPreview(nextPreview);
@@ -960,10 +1064,13 @@ export const InvoicingJobControls = forwardRef<
       setShareOpen(false);
       setPreviewOpen(true);
     } catch {
+      if (request !== previewRequestRef.current) return;
+      setPreviewFailure(true);
+      setOffline(true);
       Alert.alert('Could not review this invoice. Try again.');
-      onFinalizationClosed?.();
+      if (!wasOpen) onFinalizationClosed?.();
     } finally {
-      setBusy(null);
+      if (request === previewRequestRef.current) setBusy(null);
     }
   }, [client, jobId, onFinalizationClosed, setPreviewOpen, workStatus]);
 
@@ -973,6 +1080,7 @@ export const InvoicingJobControls = forwardRef<
   }, []);
 
   const closeBusinessSettings = useCallback(() => {
+    invalidatePreparedPreview();
     setBusinessOpen(false);
     const returnTo = businessReturnRef.current;
     businessReturnRef.current = null;
@@ -981,7 +1089,43 @@ export const InvoicingJobControls = forwardRef<
     } else if (returnTo?.kind === 'preview') {
       void switchType(previewType);
     }
-  }, [openFinalization, previewType, switchType]);
+  }, [invalidatePreparedPreview, openFinalization, previewType, switchType]);
+
+  const retryPreview = useCallback(() => {
+    setWebViewGeneration((value) => value + 1);
+    if (finalization) {
+      void openFinalization(finalization.status);
+    } else if (savedPreviewIdRef.current) {
+      openDocument(savedPreviewIdRef.current, true);
+    } else {
+      void switchType(previewType);
+    }
+  }, [finalization, openDocument, openFinalization, previewType, switchType]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state !== 'active' || !isActive || recoveringIntent) return;
+      // The inline list owns its rows even when another instance presents previews.
+      if (onPreviewDocument) {
+        void reload();
+        return;
+      }
+      // Native sharing can emit active/inactive without suspending the preview.
+      // Do not replace its WebView or start a competing read during the handoff.
+      if (handoffRunningRef.current || queuedHandoffRef.current) return;
+      invalidatePreparedPreview();
+      if (previewVisibleRef.current && !businessOpen && !creationRunningRef.current) {
+        if (!finalization && savedPreviewIdRef.current) {
+          openDocument(savedPreviewIdRef.current, true, true);
+        } else {
+          retryPreview();
+        }
+      } else {
+        void reload();
+      }
+    });
+    return () => subscription.remove();
+  }, [businessOpen, finalization, invalidatePreparedPreview, isActive, onPreviewDocument, openDocument, previewOpen, recoveringIntent, reload, retryPreview]);
 
   const confirmFinalization = useCallback(async () => {
     if (!finalization || creationRunningRef.current || recoveringIntent) return;
@@ -1049,7 +1193,10 @@ export const InvoicingJobControls = forwardRef<
   }, [clearIntent, executeIntent, finalization, jobId, onFinalized, openFinalization, ownerId, recoveringIntent, reload, retryPendingIntent, setPreviewOpen]);
 
   const closeInvoicePreview = () => {
-    if (busy) return;
+    if (busy && busy !== 'Loading' && busy !== 'Loading…' && busy !== 'Reviewing…') return;
+    previewRequestRef.current += 1;
+    queuedHandoffRef.current = null;
+    setBusy(null);
     setPreviewOpen(false);
     if (finalization) {
       setFinalization(null);
@@ -1102,7 +1249,8 @@ export const InvoicingJobControls = forwardRef<
   const jobGaps = preview?.gaps.filter((gap) => gap !== 'business_name') ?? [];
 
   return (
-    <View style={styles.block}>
+    <View style={mode === 'launcher' ? undefined : styles.block}>
+      {mode !== 'launcher' ? <>
       {mode === 'view' ? (
         <Text
           accessibilityRole="header"
@@ -1155,7 +1303,7 @@ export const InvoicingJobControls = forwardRef<
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={`Preview ${documentNumberLabel(doc.documentType, doc.documentNumber)}, ${doc.issueDate}, ${formatUsdCombined(doc.payload.totalCents)}`}
-                onPress={() => openDocument(doc.id)}
+                onPress={() => (onPreviewDocument ?? openDocument)(doc.id)}
                 style={({ pressed }) => [styles.row, pressed && styles.pressed]}
               >
                 <View style={styles.rowLabel}>
@@ -1175,7 +1323,7 @@ export const InvoicingJobControls = forwardRef<
                 accessibilityLabel={doc.archived ? 'Un-Archive to Preview' : 'Preview and Share'}
                 accessibilityState={{ disabled: doc.archived }}
                 disabled={doc.archived}
-                onPress={() => openDocument(doc.id)}
+                onPress={() => (onPreviewDocument ?? openDocument)(doc.id)}
                 style={({ pressed }) => [
                   styles.documentPreviewRow,
                   pressed && !doc.archived && styles.pressed,
@@ -1201,7 +1349,7 @@ export const InvoicingJobControls = forwardRef<
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={`Preview ${documentNumberLabel(doc.documentType, doc.documentNumber)}, ${doc.issueDate}`}
-                  onPress={() => openDocument(doc.id)}
+                  onPress={() => (onPreviewDocument ?? openDocument)(doc.id)}
                   style={({ pressed }) => [
                     styles.documentDetailsRow,
                     pressed && styles.pressed,
@@ -1266,14 +1414,12 @@ export const InvoicingJobControls = forwardRef<
         </Text>
       ) : null}
 
+      </> : null}
       <Modal
         visible={previewOpen}
         transparent
         animationType="none"
         onShow={animatePreviewIn}
-        onDismiss={() => {
-          if (Platform.OS === 'ios') void performQueuedHandoff();
-        }}
         onRequestClose={closeInvoicePreview}
       >
         <Animated.View
@@ -1311,13 +1457,13 @@ export const InvoicingJobControls = forwardRef<
                   ]}
                   onValueChange={(type) => void switchType(type)}
                   labelStyle={typography.statusPillLabel}
-                  disabled={busy != null && busy !== 'Loading'}
+                  disabled={busy != null && busy !== 'Loading' && busy !== 'Loading…'}
                   fill={false}
                   style={styles.previewSelector}
                 />
               </View>
             ) : null}
-            {busy ? (
+            {busy && busy !== 'Loading' && busy !== 'Loading…' && busy !== 'Reviewing…' ? (
               <Text
                 accessibilityLiveRegion="polite"
                 style={[typography.bodySmall, styles.loadingLabel]}
@@ -1354,51 +1500,61 @@ export const InvoicingJobControls = forwardRef<
                 ) : null}
               </View>
             ) : null}
+            {previewFailure ? (
+              <Pressable accessibilityRole="button" accessibilityLabel="Retry document preview" onPress={retryPreview} style={styles.message}>
+                <Text style={typography.body}>Could not load this document.</Text>
+                <Text style={typography.bodyBold}>Retry</Text>
+              </Pressable>
+            ) : null}
             <View style={styles.paperWrap}>
               <View style={styles.paper}>
-                {previewFontsReady ? (
-                  <WebView
-                    testID="document-preview-html"
-                    originWhitelist={['*']}
-                    source={{
-                      html: displaySaved
-                        ? htmlFor(displaySaved, 'preview', previewFonts ?? undefined)
-                        : preview
-                          ? htmlFor(
-                              {
-                                ...preview,
-                                paymentProjection: preview.paymentProjection,
-                              },
-                              'preview',
-                              previewFonts ?? undefined,
-                              true,
-                            )
-                          : '<html><body></body></html>',
-                    }}
-                    scrollEnabled={false}
-                    containerStyle={{ flex: 0, height: previewHeight }}
-                    injectedJavaScript={REPORT_PREVIEW_HEIGHT}
-                    onMessage={(event) => {
-                      try {
-                        const message = JSON.parse(event.nativeEvent.data);
-                        if (message.type === 'preview-height' &&
-                            Number.isFinite(message.height) && message.height > 0) {
-                          setPreviewHeight((height) =>
-                            Math.abs(height - message.height) > 1 ? message.height : height);
+                {previewSource && !previewFailure ? (
+                  <>
+                    <WebView
+                      key={paintToken}
+                      onContentProcessDidTerminate={() => setWebViewGeneration((value) => value + 1)}
+                      onRenderProcessGone={() => setWebViewGeneration((value) => value + 1)}
+                      onError={() => setPreviewFailure(true)}
+                      testID="document-preview-html"
+                      originWhitelist={['*']}
+                      source={previewSource}
+                      scrollEnabled={false}
+                      containerStyle={{ flex: 0, height: previewHeight }}
+                      injectedJavaScript={previewScript}
+                      onMessage={(event) => {
+                        try {
+                          const message = JSON.parse(event.nativeEvent.data);
+                          if (message.type === 'preview-ready' && message.previewToken === paintToken) {
+                            setPaintedPreview({ source: previewSource, generation: webViewGeneration });
+                          }
+                          if (message.type === 'preview-height' &&
+                              Number.isFinite(message.height) && message.height > 0) {
+                            setPreviewHeight((height) =>
+                              Math.abs(height - message.height) > 1 ? message.height : height);
+                          }
+                        } catch {
+                          // Ignore messages unrelated to document sizing.
                         }
-                      } catch {
-                        // Ignore messages unrelated to document sizing.
-                      }
-                    }}
-                    style={[styles.web, { height: previewHeight }]}
-                  />
-                ) : (
-                  <ActivityIndicator size="small" color={fg.primary} />
+                      }}
+                      style={[styles.web, { height: previewHeight, opacity: previewPainted ? 1 : 0 }]}
+                    />
+                    {!previewPainted ? (
+                      <View style={styles.previewLoading} testID="document-preview-paint-loading">
+                        <ActivityIndicator size="small" color={fg.primary} />
+                        <Text style={[typography.body, styles.loadingLabel]}>Loading document preview…</Text>
+                      </View>
+                    ) : null}
+                  </>
+                ) : previewFailure ? null : (
+                  <View style={styles.previewInitialLoading} testID="document-preview-data-loading">
+                    <ActivityIndicator size="small" color={fg.primary} />
+                    <Text style={[typography.body, styles.loadingLabel]}>Loading document preview…</Text>
+                  </View>
                 )}
               </View>
             </View>
           </ScrollView>
-          {!finalization && !displaySaved && preview && preview.gaps.length === 0 ? (
+          {!previewFailure && !offline && !finalization && !displaySaved && preview && preview.gaps.length === 0 ? (
             <View pointerEvents="box-none" style={styles.fabOverlay}>
               <FullWidthFab
                 typography={typography}
@@ -1415,7 +1571,7 @@ export const InvoicingJobControls = forwardRef<
               />
             </View>
           ) : null}
-          {!finalization && displaySaved ? (
+          {!previewFailure && !offline && !finalization && displaySaved ? (
             <View pointerEvents="box-none" style={styles.fabOverlay}>
               <FullWidthFab
                 typography={typography}
@@ -1425,11 +1581,12 @@ export const InvoicingJobControls = forwardRef<
                     : 'SHARE INVOICE'
                 }
                 onPress={() => void openFreshShareSheet(displaySaved.id)}
+                disabled={!!busy}
                 includeSafeArea
               />
             </View>
           ) : null}
-          {finalization && (finalization.selected || finalization.preview?.gaps.length === 0) ? (
+          {!previewFailure && !offline && finalization && (finalization.selected || finalization.preview?.gaps.length === 0) ? (
             <View pointerEvents="box-none" style={styles.fabOverlay}>
               <FullWidthFab
                 typography={typography}
@@ -1459,7 +1616,7 @@ export const InvoicingJobControls = forwardRef<
             animationType="none"
             statusBarTranslucent
             onDismiss={() => {
-              if (Platform.OS === 'ios') closePreviewForHandoff();
+              if (Platform.OS === 'ios') void performQueuedHandoff();
             }}
             onRequestClose={closeShareSheet}
           >
@@ -1583,6 +1740,27 @@ export const InvoicingJobControls = forwardRef<
   );
 });
 
+/** Only reads time out here; financial mutations retain their durable recovery key. */
+async function boundedDocumentRead<T>(read: Promise<T>): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      read,
+      new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error('document_read_timeout')), 15000); }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+function readDocuments(client: FieldSoloSupabaseClient, jobId: string) {
+  return boundedDocumentRead(listFinancialDocuments(client, jobId));
+}
+
+function readPreview(client: FieldSoloSupabaseClient, input: Parameters<typeof previewFinancialDocument>[1]) {
+  return boundedDocumentRead(previewFinancialDocument(client, input));
+}
+
 function newRequestKey(): string {
   const bytes = new Uint8Array(16);
   const cryptoObj = globalThis.crypto;
@@ -1667,6 +1845,8 @@ const styles = StyleSheet.create({
   previewSelector: { width: 320, maxWidth: '100%', alignSelf: 'center' },
   loadingLabel: { color: fg.secondary, textAlign: 'center' },
   gapWrap: { flexShrink: 1, gap: space('Spacing/12') },
+  previewInitialLoading: { alignItems: 'center', paddingTop: space('Spacing/24'), gap: space('Spacing/12') },
+  previewLoading: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, alignItems: 'center', paddingTop: space('Spacing/24'), gap: space('Spacing/12') },
   paperWrap: { width: '100%' },
   paper: {
     overflow: 'hidden',

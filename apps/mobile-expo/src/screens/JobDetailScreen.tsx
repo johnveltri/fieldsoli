@@ -91,6 +91,7 @@ import {
   deleteSession,
   deleteJobById,
   endLiveSession,
+  fetchBusinessSettings,
   fetchFirstJobIdForCurrentUser,
   fetchJobDetail,
   updateJobById,
@@ -392,6 +393,8 @@ export function JobDetailScreen({
   const [editSheetVisible, setEditSheetVisible] = useState(false);
   type DetailMode = 'view' | 'edit';
   const documentControlsRef = useRef<InvoicingJobControlsHandle>(null);
+  const [documentListRevision, setDocumentListRevision] = useState(0);
+  const onDocumentsChanged = useCallback(() => setDocumentListRevision((value) => value + 1), []);
   const editDocumentControlsRef = useRef<InvoicingJobControlsHandle>(null);
   const [detailMode, setDetailMode] = useState<DetailMode>('view');
   const [pendingWizardFinalization, setPendingWizardFinalization] = useState<'completed' | 'paid' | null>(null);
@@ -406,6 +409,21 @@ export function JobDetailScreen({
   // remain available without briefly exposing the rollout UI.
   const showInvoicing = invoicingReady && invoicingEnabled;
   const editApi = useJobEditDraft(job, { invoicingEnabled: showInvoicing });
+  const [materialMarkupBps, setMaterialMarkupBps] = useState<number | undefined>();
+  useEffect(() => {
+    let cancelled = false;
+    // Hide charges until the current owner's settings have been read successfully.
+    setMaterialMarkupBps(undefined);
+    if (!showInvoicing || !supabaseReady || !sessionUserId || detailMode !== 'view') return;
+    void fetchBusinessSettings(supabase, sessionUserId)
+      .then((settings) => {
+        if (!cancelled) setMaterialMarkupBps(settings.materialMarkupBps);
+      })
+      .catch(() => {
+        // The cost remains readable; a failed settings read must not invent a price.
+      });
+    return () => { cancelled = true; };
+  }, [detailMode, loadKey, sessionUserId, showInvoicing, supabaseReady]);
   useEffect(() => {
     jobRef.current = job;
   }, [job]);
@@ -3268,6 +3286,7 @@ export function JobDetailScreen({
       ) : (
         <ViewMaterialsBuckets
           buckets={job.materialBuckets}
+          materialMarkupBps={showInvoicing ? materialMarkupBps : undefined}
           typography={typography}
           emphasizeCriticalEmpty={simplifiedView}
           onCardPress={
@@ -3360,7 +3379,8 @@ export function JobDetailScreen({
       )}
       {showInvoicing ? (
         <InvoicingJobControls
-          ref={documentControlsRef}
+          refreshKey={documentListRevision}
+          onPreviewDocument={(id) => documentControlsRef.current?.openDocument(id)}
           client={supabase}
           jobId={job.id}
           ownerId={sessionUserId ?? ''}
@@ -3491,6 +3511,8 @@ export function JobDetailScreen({
                       workStatus={job.workStatus}
                       typography={typography}
                       mode="edit"
+                      refreshKey={documentListRevision}
+                      onDocumentsChanged={onDocumentsChanged}
                       active={detailMode === 'edit'}
                       onEditDetails={() => undefined}
                       beforeOpen={() => saveEditDraft(false)}
@@ -3532,6 +3554,8 @@ export function JobDetailScreen({
                 workStatus={job.workStatus}
                 typography={typography}
                 mode="edit"
+                refreshKey={documentListRevision}
+                onDocumentsChanged={onDocumentsChanged}
                 active={detailMode === 'edit'}
                 onEditDetails={() => undefined}
                 beforeOpen={() => saveEditDraft(false)}
@@ -3546,6 +3570,27 @@ export function JobDetailScreen({
         viewScroll
       )}
 
+      {/* Keep the modal presenter outside the scroll/crossfade panes. The
+          document section may be off-screen when the FAB is used. */}
+      {showInvoicing ? (
+        <InvoicingJobControls
+          ref={documentControlsRef}
+          client={supabase}
+          jobId={job.id}
+          ownerId={sessionUserId ?? ''}
+          workStatus={job.workStatus}
+          typography={typography}
+          mode="launcher"
+          previewRevision={job}
+          refreshKey={documentListRevision}
+          onDocumentsChanged={onDocumentsChanged}
+          active={detailMode === 'view'}
+          onEditDetails={onEdit}
+          onFinalized={onInvoiceFinalized}
+          onFinalizationClosed={onFinalizationClosed}
+          onRevenueInvoiceChanged={onRevenueInvoiceChanged}
+        />
+      ) : null}
       {showInvoicing && detailMode === 'view' ? (
         <JobDocumentFab bottomInset={bottomInset} onShare={() => documentControlsRef.current?.openPreview()} />
       ) : null}

@@ -1,6 +1,6 @@
-import React, { createRef } from 'react';
+import React, { createRef, useCallback, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Animated, AppState, StyleSheet } from 'react-native';
+import { Alert, Animated, AppState, Modal, Share, StyleSheet } from 'react-native';
 import { act, fireEvent, render, waitFor, within } from '@testing-library/react-native';
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { color } from '@fieldsolo/design-system/lib/tokens';
@@ -27,6 +27,8 @@ const mockCreateAndSelect =
   jest.fn<(...args: unknown[]) => Promise<FinancialDocumentRecord>>();
 const mockPrintToFile = jest.fn<(...args: unknown[]) => Promise<{ uri: string }>>();
 const mockPdfSharingAvailable = jest.fn<() => Promise<boolean>>();
+const mockSendSms = jest.fn<(...args: unknown[]) => Promise<unknown>>();
+let mockShareSheetClosed: (() => void) | undefined;
 
 jest.mock('@fieldsolo/api-client', () => ({
   ...jest.requireActual<object>('@fieldsolo/api-client'),
@@ -41,6 +43,7 @@ jest.mock('@fieldsolo/api-client', () => ({
 jest.mock('react-native-webview', () => ({
   WebView: require('react-native').View,
 }));
+jest.mock('expo-sms', () => ({ isAvailableAsync: async () => true, sendSMSAsync: (...args: unknown[]) => mockSendSms(...args) }));
 jest.mock('expo-clipboard', () => ({ setStringAsync: jest.fn() }));
 jest.mock('expo-mail-composer', () => ({ isAvailableAsync: jest.fn() }));
 jest.mock('expo-print', () => ({ printToFileAsync: (...args: unknown[]) => mockPrintToFile(...args) }));
@@ -64,7 +67,7 @@ jest.mock('../../screens/BusinessSettingsScreen', () => ({
   },
 }));
 jest.mock('../ds/BottomSheetShell', () => ({
-  BottomSheetShell: ({ children }: { children: React.ReactNode }) => children,
+  BottomSheetShell: ({ children, onClosed }: { children: React.ReactNode; onClosed: () => void }) => { mockShareSheetClosed = onClosed; return children; },
 }));
 jest.mock('@fieldsolo/document-renderer', () => ({
   RENDERER_VERSION: 1,
@@ -127,6 +130,7 @@ describe('InvoicingJobControls', () => {
     mockCreateAndSelect.mockResolvedValue(doc);
     mockPrintToFile.mockResolvedValue({ uri: 'file:///generated.pdf' });
     mockPdfSharingAvailable.mockResolvedValue(true);
+    mockSendSms.mockResolvedValue({ result: 'cancelled' });
     mockPreview.mockResolvedValue({
       payload,
       gaps: ['labor'],
@@ -152,6 +156,45 @@ describe('InvoicingJobControls', () => {
     expect(await screen.findByLabelText('SHARE ESTIMATE')).toBeTruthy();
     expect(screen.queryByText('Estimate #00002')).toBeNull();
     expect(mockPreview).not.toHaveBeenCalled();
+  });
+
+  it('shows a prepared saved document during revalidation and preserves its painted source when unchanged', async () => {
+    mockList.mockResolvedValue([doc]);
+    const screen = render(<InvoicingJobControls {...props} mode="view" />);
+    const row = await screen.findByLabelText(/^Preview Estimate #00001,/);
+    let resolveRefresh!: (value: FinancialDocumentRecord[]) => void;
+    mockList.mockImplementationOnce(() => new Promise((resolve) => { resolveRefresh = resolve; }));
+    fireEvent.press(row);
+    const web = await screen.findByTestId('document-preview-html');
+    const source = web.props.source;
+    const token = Number(web.props.injectedJavaScript.match(/previewToken: (\d+)/)[1]);
+    expect(screen.queryByTestId('document-preview-data-loading')).toBeNull();
+    expect(screen.getByLabelText('SHARE ESTIMATE').props.accessibilityState.disabled).toBe(true);
+    const readCount = mockList.mock.calls.length;
+    fireEvent.press(screen.getByLabelText('SHARE ESTIMATE'));
+    expect(mockList).toHaveBeenCalledTimes(readCount);
+    expect(screen.getAllByText('Loading document preview…')).toHaveLength(1);
+    fireEvent(web, 'onMessage', { nativeEvent: { data: JSON.stringify({ type: 'preview-ready', previewToken: token }) } });
+    expect(screen.queryByText('Loading document preview…')).toBeNull();
+    await act(async () => resolveRefresh([{ ...doc }]));
+    expect(screen.getByTestId('document-preview-html').props.source).toBe(source);
+    expect(screen.getByLabelText('SHARE ESTIMATE').props.accessibilityState.disabled).toBe(false);
+    expect(screen.queryByText('Loading document preview…')).toBeNull();
+  });
+
+  it('uses one loading presentation through data and renderer preparation', async () => {
+    const ref = createRef<InvoicingJobControlsHandle>();
+    const screen = render(<InvoicingJobControls {...props} ref={ref} mode="launcher" />);
+    await waitFor(() => expect(mockList).toHaveBeenCalled());
+    let resolvePreview!: (value: DocumentPreview) => void;
+    mockPreview.mockImplementationOnce(() => new Promise((resolve) => { resolvePreview = resolve; }));
+    act(() => ref.current?.openPreview());
+    expect(screen.getAllByText('Loading document preview…')).toHaveLength(1);
+    expect(screen.queryByText('Loading…')).toBeNull();
+    await act(async () => resolvePreview({ payload, gaps: [], rendererVersion: 1 } as DocumentPreview));
+    await screen.findByTestId('document-preview-html');
+    expect(screen.getAllByText('Loading document preview…')).toHaveLength(1);
+    expect(screen.queryByText('Loading…')).toBeNull();
   });
 
   it('refreshes saved payment status before rendering a preview', async () => {
@@ -191,6 +234,36 @@ describe('InvoicingJobControls', () => {
     await waitFor(() => expect(screen.getByText('Offline — payment status may be out of date.')).toBeTruthy());
     expect(screen.queryByLabelText('SHARE ESTIMATE')).toBeNull();
     expect(screen.queryByText('paid')).toBeNull();
+  });
+
+  it.each(['share', 'copy'] as const)('retries the same saved document after a failed %s owner read', async (action) => {
+    jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    const screen = render(<InvoicingJobControls {...props} mode="view" />);
+    fireEvent.press(await screen.findByLabelText(/^Preview Estimate #00001,/));
+    await waitFor(() => expect(screen.getByLabelText('SHARE ESTIMATE').props.accessibilityState.disabled).toBe(false));
+    if (action === 'copy') {
+      await act(async () => fireEvent.press(screen.getByLabelText('SHARE ESTIMATE')));
+      await screen.findByRole('button', { name: 'Copy link' });
+    }
+
+    mockList.mockRejectedValueOnce(new Error('offline'));
+    await act(async () => fireEvent.press(action === 'share'
+      ? screen.getByLabelText('SHARE ESTIMATE')
+      : screen.getByRole('button', { name: 'Copy link' })));
+    if (action === 'copy') {
+      const shareModal = screen.UNSAFE_getAllByType(Modal).find((modal) => modal.props.statusBarTranslucent)!;
+      act(() => shareModal.props.onRequestClose());
+      act(() => mockShareSheetClosed?.());
+    }
+
+    expect(screen.queryByTestId('document-preview-data-loading')).toBeNull();
+    expect(screen.queryByLabelText('SHARE ESTIMATE')).toBeNull();
+    fireEvent.press(await screen.findByLabelText('Retry document preview'));
+    await waitFor(() => expect(screen.getByLabelText('SHARE ESTIMATE').props.accessibilityState.disabled).toBe(false));
+    expect(screen.queryByLabelText('Retry document preview')).toBeNull();
+    expect(mockPreview).not.toHaveBeenCalled();
+    expect(mockCreate).not.toHaveBeenCalled();
+    expect(mockCreateAndSelect).not.toHaveBeenCalled();
   });
 
   it('renders the freshly read payment status into a requested PDF', async () => {
@@ -638,4 +711,370 @@ describe('InvoicingJobControls', () => {
     expect(await screen.findByRole('button', { name: 'Copied' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Share document' })).toBeTruthy();
   });
+  it.each([['paid', 'invoice'], ['inProgress', 'estimate']])('opens FAB previews on %s jobs without changing financial state', async (workStatus, type) => {
+    const ref = createRef<InvoicingJobControlsHandle>();
+    const screen = render(<InvoicingJobControls {...props} ref={ref} mode="launcher" workStatus={workStatus} />);
+    await waitFor(() => expect(mockList).toHaveBeenCalled());
+    await act(async () => { ref.current?.openPreview(); });
+    expect(mockPreview).toHaveBeenLastCalledWith({}, expect.objectContaining({ type }));
+    expect(await screen.findByTestId('document-preview-html')).toBeTruthy();
+    expect(screen.queryByText('Documents')).toBeNull();
+    expect(mockCreate).not.toHaveBeenCalled();
+    expect(mockCreateAndSelect).not.toHaveBeenCalled();
+    expect(mockFinalize).not.toHaveBeenCalled();
+  });
+
+  it('reuses the prepared Job preview when the FAB opens', async () => {
+    const ref = createRef<InvoicingJobControlsHandle>();
+    const revision = {};
+    const screen = render(<InvoicingJobControls {...props} ref={ref} mode="launcher" previewRevision={revision} />);
+    await waitFor(() => expect(mockPreview).toHaveBeenCalledTimes(1));
+    await act(async () => { ref.current?.openPreview(); });
+    expect(await screen.findByTestId('document-preview-html')).toBeTruthy();
+    expect(mockPreview).toHaveBeenCalledTimes(1);
+    expect(mockCreate).not.toHaveBeenCalled();
+    expect(mockCreateAndSelect).not.toHaveBeenCalled();
+  });
+
+  it('keeps the loader visible until first paint and resets it after a renderer restart', async () => {
+    const ref = createRef<InvoicingJobControlsHandle>();
+    const screen = render(<InvoicingJobControls {...props} ref={ref} mode="launcher" />);
+    await act(async () => { ref.current?.openPreview(); });
+    const web = await screen.findByTestId('document-preview-html');
+    expect(screen.getByTestId('document-preview-paint-loading')).toBeTruthy();
+    expect(StyleSheet.flatten(web.props.style).opacity).toBe(0);
+    fireEvent(web, 'onMessage', { nativeEvent: { data: JSON.stringify({ type: 'preview-height', height: 700 }) } });
+    expect(screen.getByTestId('document-preview-paint-loading')).toBeTruthy();
+    fireEvent(web, 'onMessage', { nativeEvent: { data: JSON.stringify({ type: 'preview-ready', previewToken: Number(web.props.injectedJavaScript.match(/previewToken: (\d+)/)[1]) }) } });
+    expect(screen.queryByTestId('document-preview-paint-loading')).toBeNull();
+    expect(StyleSheet.flatten(screen.getByTestId('document-preview-html').props.style).opacity).toBe(1);
+    fireEvent(screen.getByTestId('document-preview-html'), 'onContentProcessDidTerminate');
+    expect(screen.getByTestId('document-preview-paint-loading')).toBeTruthy();
+  });
+
+  it('ignores ready messages from a previous document source', async () => {
+    const ref = createRef<InvoicingJobControlsHandle>();
+    const screen = render(<InvoicingJobControls {...props} ref={ref} mode="launcher" />);
+    await act(async () => { ref.current?.openPreview(); });
+    const previous = await screen.findByTestId('document-preview-html');
+    const previousToken = Number(previous.props.injectedJavaScript.match(/previewToken: (\d+)/)[1]);
+    mockPreview.mockResolvedValueOnce({ payload: { ...payload, documentType: 'invoice' }, gaps: [], rendererVersion: 1, paymentProjection: 'paid' } as DocumentPreview);
+    await act(async () => fireEvent.press(screen.getByRole('button', { name: 'Invoice' })));
+    const current = screen.getByTestId('document-preview-html');
+    const currentToken = Number(current.props.injectedJavaScript.match(/previewToken: (\d+)/)[1]);
+    expect(currentToken).not.toBe(previousToken);
+    fireEvent(current, 'onMessage', { nativeEvent: { data: JSON.stringify({ type: 'preview-ready', previewToken: previousToken }) } });
+    expect(screen.getByTestId('document-preview-paint-loading')).toBeTruthy();
+    fireEvent(current, 'onMessage', { nativeEvent: { data: JSON.stringify({ type: 'preview-ready', previewToken: currentToken }) } });
+    expect(screen.queryByTestId('document-preview-paint-loading')).toBeNull();
+  });
+
+  it('offers Retry when the renderer never reports first paint', async () => {
+    const ref = createRef<InvoicingJobControlsHandle>();
+    const screen = render(<InvoicingJobControls {...props} ref={ref} mode="launcher" />);
+    await act(async () => { ref.current?.openPreview(); });
+    await screen.findByTestId('document-preview-html');
+    jest.useFakeTimers();
+    try {
+      fireEvent(screen.getByTestId('document-preview-html'), 'onContentProcessDidTerminate');
+      await act(async () => { jest.advanceTimersByTime(15_000); });
+      expect(screen.getByLabelText('Retry document preview')).toBeTruthy();
+      expect(screen.queryByTestId('document-preview-html')).toBeNull();
+      fireEvent.press(screen.getByLabelText('Retry document preview'));
+      await act(async () => {});
+      expect(screen.getByTestId('document-preview-html')).toBeTruthy();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('refreshes the selected unsaved type after app switching and recovers a failed read inline', async () => {
+    const listener = jest.fn<(state: string) => void>();
+    jest.spyOn(AppState, 'addEventListener').mockImplementation((_event, callback) => {
+      listener.mockImplementation(callback as (state: string) => void);
+      return { remove: jest.fn() } as never;
+    });
+    jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    const ref = createRef<InvoicingJobControlsHandle>();
+    const screen = render(<InvoicingJobControls {...props} ref={ref} mode="launcher" />);
+    await waitFor(() => expect(mockList).toHaveBeenCalled());
+    await act(async () => { ref.current?.openPreview(); });
+    mockPreview.mockResolvedValue({ payload: { ...payload, documentType: 'invoice' }, gaps: [], rendererVersion: 1 } as DocumentPreview);
+    await act(async () => fireEvent.press(screen.getByRole('button', { name: 'Invoice' })));
+    await screen.findByLabelText('CREATE & SHARE INVOICE');
+    mockPreview.mockRejectedValueOnce(new Error('offline'));
+    act(() => listener('background'));
+    act(() => listener('active'));
+    const retry = await screen.findByLabelText('Retry document preview');
+    expect(screen.queryByLabelText('CREATE & SHARE INVOICE')).toBeNull();
+    fireEvent.press(retry);
+    await waitFor(() => expect(screen.queryByLabelText('Retry document preview')).toBeNull());
+    expect(mockPreview).toHaveBeenLastCalledWith({}, expect.objectContaining({ type: 'invoice' }));
+    expect(screen.getByLabelText('Close preview')).toBeTruthy();
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
+  it('ignores a superseded preview response after foreground refresh', async () => {
+    const listener = jest.fn<(state: string) => void>();
+    jest.spyOn(AppState, 'addEventListener').mockImplementation((_event, callback) => {
+      listener.mockImplementation(callback as (state: string) => void);
+      return { remove: jest.fn() } as never;
+    });
+    const ref = createRef<InvoicingJobControlsHandle>();
+    const screen = render(<InvoicingJobControls {...props} ref={ref} mode="launcher" />);
+    await waitFor(() => expect(mockList).toHaveBeenCalled());
+    let resolveOld!: (value: DocumentPreview) => void;
+    mockPreview.mockImplementationOnce(() => new Promise((resolve) => { resolveOld = resolve; }));
+    act(() => ref.current?.openPreview());
+    mockPreview.mockResolvedValueOnce({ payload, gaps: [], rendererVersion: 1, paymentProjection: 'paid' } as DocumentPreview);
+    act(() => listener('active'));
+    await waitFor(() => expect(screen.getByTestId('document-preview-html').props.source.html).toBe('paid'));
+    await act(async () => resolveOld({ payload, gaps: [], rendererVersion: 1, paymentProjection: 'unpaid' } as DocumentPreview));
+    expect(screen.getByTestId('document-preview-html').props.source.html).toBe('paid');
+  });
+
+  it('retries a saved document identity after a WebView error without creating another document', async () => {
+    const ref = createRef<InvoicingJobControlsHandle>();
+    const screen = render(<InvoicingJobControls {...props} ref={ref} mode="launcher" />);
+    await waitFor(() => expect(mockList).toHaveBeenCalled());
+    act(() => ref.current?.openDocument(doc.id));
+    const html = await screen.findByTestId('document-preview-html');
+    fireEvent(html, 'onError');
+    fireEvent.press(await screen.findByLabelText('Retry document preview'));
+    expect(await screen.findByLabelText('SHARE ESTIMATE')).toBeTruthy();
+    expect(mockPreview).not.toHaveBeenCalled();
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
+  it('allows closing a pending read and ignores its late completion', async () => {
+    const ref = createRef<InvoicingJobControlsHandle>();
+    const screen = render(<InvoicingJobControls {...props} ref={ref} mode="launcher" />);
+    await waitFor(() => expect(mockList).toHaveBeenCalled());
+    let resolveRead!: (value: DocumentPreview) => void;
+    mockPreview.mockImplementationOnce(() => new Promise((resolve) => { resolveRead = resolve; }));
+    act(() => ref.current?.openPreview());
+    fireEvent.press(await screen.findByLabelText('Close preview'));
+    await act(async () => resolveRead({ payload, gaps: [], rendererVersion: 1 } as DocumentPreview));
+    expect(screen.queryByTestId('document-preview-scroll')).toBeNull();
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
+  it('recovers a finalization renderer error on Retry', async () => {
+    const ref = createRef<InvoicingJobControlsHandle>();
+    const screen = render(<InvoicingJobControls {...props} ref={ref} mode="launcher" />);
+    await waitFor(() => expect(mockList).toHaveBeenCalled());
+    await act(async () => ref.current?.openFinalization('completed'));
+    fireEvent(await screen.findByTestId('document-preview-html'), 'onError');
+    fireEvent.press(await screen.findByLabelText('Retry document preview'));
+    expect(await screen.findByTestId('document-preview-html')).toBeTruthy();
+    expect(screen.queryByLabelText('Retry document preview')).toBeNull();
+    expect(mockFinalize).not.toHaveBeenCalled();
+  });
+
+  it('refreshes the visible Documents list after a FAB estimate is created', async () => {
+    const ref = createRef<InvoicingJobControlsHandle>();
+    function Harness() {
+      const [revision, setRevision] = useState(0);
+      const changed = useCallback(() => setRevision((value) => value + 1), []);
+      return <>
+        <InvoicingJobControls {...props} mode="view" refreshKey={revision} onPreviewDocument={(id) => ref.current?.openDocument(id)} />
+        <InvoicingJobControls {...props} ref={ref} mode="launcher" refreshKey={revision} onDocumentsChanged={changed} />
+      </>;
+    }
+    mockList.mockResolvedValue([]);
+    mockPreview.mockResolvedValue({ payload, gaps: [], rendererVersion: 1, fingerprint: 'new-estimate' } as DocumentPreview);
+    mockCreate.mockImplementationOnce(async () => { mockList.mockResolvedValue([doc]); return doc; });
+    const screen = render(<Harness />);
+    await screen.findByText('No documents yet');
+    await act(async () => ref.current?.openPreview());
+    fireEvent.press(await screen.findByLabelText('CREATE & SHARE ESTIMATE'));
+    expect(await screen.findByLabelText(/^Preview Estimate #00001,/)).toBeTruthy();
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+  });
+
+  it('refreshes the visible split Documents list on foreground without opening a preview', async () => {
+    const listeners = new Set<(state: string) => void>();
+    jest.spyOn(AppState, 'addEventListener').mockImplementation((_event, callback) => {
+      const listener = callback as (state: string) => void;
+      listeners.add(listener);
+      return { remove: () => listeners.delete(listener) } as never;
+    });
+    const ref = createRef<InvoicingJobControlsHandle>();
+    const screen = render(<>
+      <InvoicingJobControls {...props} mode="view" onPreviewDocument={(id) => ref.current?.openDocument(id)} />
+      <InvoicingJobControls {...props} ref={ref} mode="launcher" />
+    </>);
+    await screen.findByLabelText(/^Preview Estimate #00001,/);
+    await act(async () => {});
+    mockList.mockResolvedValue([
+      { ...doc, archived: true, linkEnabled: false },
+      { ...doc, id: 'doc-2', documentNumber: 2 },
+    ]);
+
+    act(() => { for (const listener of [...listeners]) listener('background'); });
+    await act(async () => { for (const listener of [...listeners]) listener('active'); });
+
+    expect(await screen.findByLabelText(/^Preview Estimate #00002,/)).toBeTruthy();
+    expect(screen.queryByLabelText(/^Preview Estimate #00001,/)).toBeNull();
+    expect(screen.queryByTestId('document-preview-scroll')).toBeNull();
+    expect(mockPreview).not.toHaveBeenCalled();
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
+  it('keeps the painted preview mounted behind native sharing and after cancellation', async () => {
+    const listener = jest.fn<(state: string) => void>();
+    jest.spyOn(AppState, 'addEventListener').mockImplementation((_event, callback) => {
+      listener.mockImplementation(callback as (state: string) => void);
+      return { remove: jest.fn() } as never;
+    });
+    let finishShare!: () => void;
+    const nativeShare = jest.spyOn(Share, 'share').mockImplementation(() => new Promise((resolve) => {
+      finishShare = () => resolve({ action: Share.dismissedAction });
+    }));
+    const ref = createRef<InvoicingJobControlsHandle>();
+    const screen = render(<InvoicingJobControls {...props} ref={ref} mode="launcher" />);
+    await waitFor(() => expect(mockList).toHaveBeenCalled());
+    await act(async () => ref.current?.openDocument(doc.id));
+    const web = await screen.findByTestId('document-preview-html');
+    const source = web.props.source;
+    const token = Number(web.props.injectedJavaScript.match(/previewToken: (\d+)/)[1]);
+    fireEvent(web, 'onMessage', { nativeEvent: { data: JSON.stringify({ type: 'preview-ready', previewToken: token }) } });
+    fireEvent.press(await screen.findByLabelText('SHARE ESTIMATE'));
+    await screen.findByRole('button', { name: 'Share document' });
+    const shareModal = screen.UNSAFE_getAllByType(Modal).find((modal) => modal.props.statusBarTranslucent)!;
+    await act(async () => fireEvent.press(screen.getByRole('button', { name: 'Share document' })));
+    act(() => mockShareSheetClosed?.());
+    await act(async () => shareModal.props.onDismiss());
+    await waitFor(() => expect(nativeShare).toHaveBeenCalledTimes(1));
+    const assertPreviewPreserved = () => {
+      expect(screen.UNSAFE_getAllByType(Modal).find((modal) => modal.props.onShow)!.props.visible).toBe(true);
+      expect(screen.getByTestId('document-preview-html').props.source).toBe(source);
+      expect(screen.getByTestId('document-preview-html').props.injectedJavaScript).toBe(web.props.injectedJavaScript);
+      expect(screen.queryByText('Loading document preview…')).toBeNull();
+    };
+    assertPreviewPreserved();
+    const readsDuringShare = mockList.mock.calls.length;
+    act(() => listener('inactive'));
+    act(() => listener('active'));
+    expect(mockList).toHaveBeenCalledTimes(readsDuringShare);
+    assertPreviewPreserved();
+    await act(async () => finishShare());
+    assertPreviewPreserved();
+    // Some native callbacks arrive after Share.share resolves; revalidate quietly.
+    await act(async () => listener('active'));
+    assertPreviewPreserved();
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
+  it.each(['dismissed', 'failed'])('cancels or recovers handoff preparation when %s', async (outcome) => {
+    jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    const nativeShare = jest.spyOn(Share, 'share').mockResolvedValue({ action: Share.dismissedAction });
+    const ref = createRef<InvoicingJobControlsHandle>();
+    const screen = render(<InvoicingJobControls {...props} ref={ref} mode="launcher" />);
+    await waitFor(() => expect(mockList).toHaveBeenCalled());
+    await act(async () => ref.current?.openDocument(doc.id));
+    fireEvent.press(await screen.findByLabelText('SHARE ESTIMATE'));
+    await screen.findByRole('button', { name: 'Share document' });
+    const shareModal = screen.UNSAFE_getAllByType(Modal).find((modal) => modal.props.statusBarTranslucent)!;
+    await act(async () => fireEvent.press(screen.getByRole('button', { name: 'Share document' })));
+    let finishRead!: () => void;
+    mockList.mockImplementationOnce(() => new Promise((resolve, reject) => {
+      finishRead = () => outcome === 'failed' ? reject(new Error('offline')) : resolve([doc]);
+    }));
+    act(() => mockShareSheetClosed?.());
+    act(() => shareModal.props.onDismiss());
+    if (outcome === 'dismissed') fireEvent.press(screen.getByLabelText('Close preview'));
+    await act(async () => finishRead());
+    expect(nativeShare).not.toHaveBeenCalled();
+    if (outcome === 'dismissed') {
+      expect(screen.UNSAFE_getAllByType(Modal).find((modal) => modal.props.onShow)!.props.visible).toBe(false);
+    } else {
+      expect(screen.getByLabelText('Retry document preview')).toBeTruthy();
+      expect(screen.queryByLabelText('SHARE ESTIMATE')).toBeNull();
+    }
+  });
+
+  it.each([['(419) 708-4470', ['+14197084470']], ['Buddy name', []], ['', []], [null, []]])('passes only snapshot phone recipients to the native composer: %s', async (phone, recipients) => {
+    const ref = createRef<InvoicingJobControlsHandle>();
+    mockList.mockResolvedValue([{ ...doc, payload: { ...payload, customerPhone: phone, totalCents: 123456 } } as FinancialDocumentRecord]);
+    const screen = render(<InvoicingJobControls {...props} ref={ref} mode="launcher" />);
+    await waitFor(() => expect(mockList).toHaveBeenCalled());
+    act(() => ref.current?.openDocument(doc.id));
+    fireEvent.press(await screen.findByLabelText('SHARE ESTIMATE'));
+    await screen.findByRole('button', { name: phone ? 'Text Customer' : 'Text' });
+    const modals = screen.UNSAFE_getAllByType(Modal);
+    const previewModal = modals.find((modal) => modal.props.onShow)!;
+    const shareModal = modals.find((modal) => modal.props.statusBarTranslucent)!;
+    await act(async () => fireEvent.press(screen.getByRole('button', { name: phone ? 'Text Customer' : 'Text' })));
+    act(() => mockShareSheetClosed?.());
+    act(() => shareModal.props.onDismiss());
+    expect(previewModal.props.visible).toBe(true);
+    await waitFor(() => expect(mockSendSms).toHaveBeenCalledWith(recipients, expect.stringContaining('Estimate for $1,234.56 from Example Business')));
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
+  it('settles a hung preview read into Retry without requiring close and reopen', async () => {
+    const ref = createRef<InvoicingJobControlsHandle>();
+    const screen = render(<InvoicingJobControls {...props} ref={ref} mode="launcher" />);
+    await waitFor(() => expect(mockList).toHaveBeenCalled());
+    jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    jest.useFakeTimers();
+    try {
+      mockPreview.mockImplementationOnce(() => new Promise(() => undefined));
+      act(() => ref.current?.openPreview());
+      await act(async () => { jest.advanceTimersByTime(15000); });
+      expect(screen.getByLabelText('Retry document preview')).toBeTruthy();
+      fireEvent.press(screen.getByLabelText('Retry document preview'));
+      await act(async () => undefined);
+      expect(screen.queryByLabelText('Retry document preview')).toBeNull();
+      expect(screen.getByTestId('document-preview-html')).toBeTruthy();
+      expect(mockCreate).not.toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('keeps finalization confirmation blocked when a foreground refresh fails', async () => {
+    const listener = jest.fn<(state: string) => void>();
+    jest.spyOn(AppState, 'addEventListener').mockImplementation((_event, callback) => {
+      listener.mockImplementation(callback as (state: string) => void);
+      return { remove: jest.fn() } as never;
+    });
+    jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    mockList.mockResolvedValue([{ ...doc, isRevenueSource: true } as FinancialDocumentRecord]);
+    const ref = createRef<InvoicingJobControlsHandle>();
+    const screen = render(<InvoicingJobControls {...props} ref={ref} mode="launcher" />);
+    await waitFor(() => expect(mockList).toHaveBeenCalled());
+    await act(async () => ref.current?.openFinalization('paid'));
+    await screen.findByLabelText('CONFIRM $0.00 PAID');
+    mockList.mockRejectedValueOnce(new Error('offline'));
+    act(() => listener('active'));
+    expect(await screen.findByLabelText('Retry document preview')).toBeTruthy();
+    expect(screen.queryByLabelText('CONFIRM $0.00 PAID')).toBeNull();
+    fireEvent.press(screen.getByLabelText('Retry document preview'));
+    expect(await screen.findByLabelText('CONFIRM $0.00 PAID')).toBeTruthy();
+    expect(mockFinalize).not.toHaveBeenCalled();
+  });
+
+  it('does not reopen a finalization dismissed during a foreground read', async () => {
+    const listener = jest.fn<(state: string) => void>();
+    jest.spyOn(AppState, 'addEventListener').mockImplementation((_event, callback) => {
+      listener.mockImplementation(callback as (state: string) => void);
+      return { remove: jest.fn() } as never;
+    });
+    mockList.mockResolvedValue([{ ...doc, isRevenueSource: true } as FinancialDocumentRecord]);
+    const ref = createRef<InvoicingJobControlsHandle>();
+    const screen = render(<InvoicingJobControls {...props} ref={ref} mode="launcher" />);
+    await waitFor(() => expect(mockList).toHaveBeenCalled());
+    await act(async () => ref.current?.openFinalization('paid'));
+    await screen.findByLabelText('CONFIRM $0.00 PAID');
+    let resolveRead!: (value: FinancialDocumentRecord[]) => void;
+    mockList.mockImplementationOnce(() => new Promise((resolve) => { resolveRead = resolve; }));
+    act(() => listener('active'));
+    fireEvent.press(screen.getByLabelText('Close preview'));
+    await act(async () => resolveRead([doc]));
+    expect(screen.queryByTestId('document-preview-scroll')).toBeNull();
+    expect(mockFinalize).not.toHaveBeenCalled();
+  });
+
 });

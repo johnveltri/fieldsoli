@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { escapeHtml, formatDocumentNumber, renderDocument, renderDocumentPreview, type DocumentPayload } from './render';
+import { escapeHtml, formatDocumentNumber, formatDocumentPhone, renderDocument, renderDocumentPreview, type DocumentPayload } from './render';
 
 const payload: DocumentPayload = {
   schemaVersion: 1,
@@ -35,6 +35,38 @@ const payload: DocumentPayload = {
 };
 
 describe('renderDocument', () => {
+  it.each([
+    ['3125550123', '(312) 555-0123'],
+    ['+13125550123', '(312) 555-0123'],
+    ['1 (312) 555-0123', '(312) 555-0123'],
+    ['(312) 555-0123', '(312) 555-0123'],
+    [null, null],
+    ['', ''],
+    ['555', '555'],
+    ['+44 20 7946 0123', '+44 20 7946 0123'],
+    ['+3125550123', '+3125550123'],
+    ['+1312555012', '+1312555012'],
+    ['3125550123 ext. 7', '3125550123 ext. 7'],
+    ['<3125550123>', '<3125550123>'],
+  ])('formats phone %s without discarding unsupported content', (phone, expected) => {
+    expect(formatDocumentPhone(phone)).toBe(expected);
+  });
+
+  it('formats immutable business and customer phones across hosted, native preview and PDF output', () => {
+    const contactPayload = { ...payload, businessPhone: '+13125550123', customerPhone: '7735550199' };
+    const before = JSON.stringify(contactPayload);
+    for (const html of [
+      renderDocument(1, contactPayload, 'unpaid'),
+      renderDocumentPreview(1, contactPayload, 'unpaid'),
+      renderDocument(1, contactPayload, 'unpaid', undefined, 'pdf'),
+    ]) {
+      expect(html).toContain('(312) 555-0123');
+      expect(html).toContain('(773) 555-0199');
+    }
+    expect(JSON.stringify(contactPayload)).toBe(before);
+    expect(renderDocument(1, { ...payload, customerPhone: '<script>"&' }, null)).toContain('&lt;script&gt;&quot;&amp;');
+  });
+
   it('escapes text and uses one HTML document for unpaid invoices', () => {
     const html = renderDocument(1, payload, 'unpaid');
     expect(html).toContain('Invoice #00001');
