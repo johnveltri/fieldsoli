@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   mapGeoapifyFeatures,
+  addressAutocompleteFailureReason,
   mapGeoapifyResults,
   validateAddressAutocompleteRequest,
 } from './address-autocomplete';
@@ -80,4 +81,15 @@ describe('address-autocomplete shared contract', () => {
     expect(suggestions[0]?.displayAddress).toBe('Steuart Street, San Francisco, CA 94105');
     expect(suggestions[0]?.region).toBe('California');
   });
+});
+
+it('logs only bounded provider failure reasons, never upstream details', () => {
+  const aborted = new Error('URL with private key'); aborted.name = 'AbortError';
+  expect(addressAutocompleteFailureReason(aborted)).toBe('provider_timeout');
+  expect(addressAutocompleteFailureReason(new Error('geoapify_status_403'))).toBe('provider_auth');
+  expect(addressAutocompleteFailureReason(new Error('geoapify_status_429'))).toBe('provider_rate_limited');
+  expect(addressAutocompleteFailureReason(new Error('geoapify_status_503'))).toBe('provider_http_error');
+  expect(addressAutocompleteFailureReason(new TypeError('private address or URL'))).toBe('provider_network');
+  expect(addressAutocompleteFailureReason(new Error('private address or URL'))).toBe('unknown');
+  expect(addressAutocompleteFailureReason({ message: 'geoapify_status_403' })).toBe('unknown');
 });

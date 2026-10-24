@@ -78,3 +78,33 @@ Validation uses temporary Node 22.23.4, matching the repository's Node 22 requir
 3. On the reported physical iPhone/TestFlight build: actual address results, FAB paths, interrupted previews, native To field, fresh iMessage preview, keyboard, large text and VoiceOver. Exact original TestFlight build/iOS was not available in the report.
 4. Restore/identify the maintained Figma page before updating it. Existing pages 01–05 were preserved.
 5. Website deployment, mobile build/submission, Apple processing and public release remain separate authorized gates. This branch is implementation and automated evidence, not a production fix or a release receipt.
+
+## Hosted Dev address recovery — 2026-10-24
+
+After the simulator switched to hosted Dev, both pickers showed a brief search
+then manual-entry fallback. Read-only inspection found no deployed Edge Functions
+and no configured provider secret on `anypejjoovlatmrkrxvx`; budget RPCs and
+service-role-only execution permissions were already present.
+
+The user explicitly approved transferring the existing provider key to server-only
+Dev secrets, deploying `address-autocomplete`, and verifying both simulator
+pickers. Initial upstream requests timed out. Safe reason-code diagnostics were
+added without logging addresses, tokens, URLs or provider response bodies.
+The user then corrected the provider account and replaced the local key; that
+replacement was synchronized to the same approved Dev secret.
+
+Provider lookup is bounded at 12 seconds and the client at 18 seconds so the
+server's authentication/budget hop and provider lookup can complete. Timeouts
+remain tested and fall back to manual entry. JWT verification remains enabled.
+
+Observed on the selected iPhone 17 Pro / iOS 26.2, running this worktree on Metro
+8082 against Dev: Business Details and Job Edit each returned four real US
+suggestions for the synthetic query `1600 Pennsylvania Avenue`, with Geoapify /
+OpenStreetMap attribution. Temporary test drafts were discarded; no business or
+Job address was saved. This proves the Dev provider boundary; physical iPhone,
+SMS/iMessage and production gates remain separate.
+
+Focused API + Edge address tests: 12 passed. Complete Edge shared tests: 15 passed.
+Full workspace TypeScript: passed. Secrets stayed outside repository/mobile env;
+production was unchanged. Operational steps are maintained in
+`docs/ops/geoapify-address-autocomplete-runbook.md`.

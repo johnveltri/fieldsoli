@@ -35,7 +35,7 @@ describe('fetchAddressSuggestions', () => {
     vi.useFakeTimers();
     const invoke = vi.fn().mockImplementation(() => new Promise(() => {}));
     const pending = fetchAddressSuggestions(clientWith(invoke), '123 Main');
-    await vi.advanceTimersByTimeAsync(8000);
+    await vi.advanceTimersByTimeAsync(18000);
     expect(await pending).toEqual({ status: 'error', code: 'unavailable' });
     expect(invoke.mock.calls[0]?.[1].signal.aborted).toBe(true);
   });
@@ -44,7 +44,7 @@ describe('fetchAddressSuggestions', () => {
     vi.useFakeTimers();
     const invoke = vi.fn().mockResolvedValue({ data: null, error: { context: { json: () => new Promise(() => {}) } } });
     const pending = fetchAddressSuggestions(clientWith(invoke), '123 Main');
-    await vi.advanceTimersByTimeAsync(8000);
+    await vi.advanceTimersByTimeAsync(18000);
     expect(await pending).toEqual({ status: 'error', code: 'unavailable' });
   });
 });

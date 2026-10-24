@@ -1,7 +1,8 @@
 import type { FieldSoloSupabaseClient } from './client';
 
 export const ADDRESS_SUGGESTION_LIMIT = 4;
-const REQUEST_TIMEOUT_MS = 8000;
+// Allow the authenticated Edge hop and its bounded 12-second provider lookup.
+const REQUEST_TIMEOUT_MS = 18000;
 
 export type AddressSuggestion = {
   token: string;

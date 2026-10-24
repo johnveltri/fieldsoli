@@ -2,6 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
 
 import {
   fetchGeoapifySuggestions,
+  addressAutocompleteFailureReason,
   redactAddressAutocompleteError,
   validateAddressAutocompleteRequest,
   type AddressAutocompleteResponse,
@@ -70,7 +71,10 @@ Deno.serve(async (request) => {
     const suggestions = await fetchGeoapifySuggestions(apiKey, validated);
     return json({ status: 'ok', suggestions } satisfies AddressAutocompleteResponse, 200, CORS);
   } catch (error) {
-    console.error('address_autocomplete_unavailable', redactAddressAutocompleteError(error));
+    console.error('address_autocomplete_unavailable', {
+      code: redactAddressAutocompleteError(error),
+      reason: addressAutocompleteFailureReason(error),
+    });
     return json(
       { status: 'error', error: redactAddressAutocompleteError(error) } satisfies AddressAutocompleteResponse,
       503,
