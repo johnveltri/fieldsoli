@@ -223,3 +223,24 @@ as `October 24, 2026` in UTC so the date-only value cannot shift by timezone.
 Eleven hosted share/metadata/image tests passed; image assertions cover both types
 and confirm the old branding is absent. Both browser image tabs were refreshed;
 the Estimate image visibly shows `Issued October 24, 2026`.
+
+## PR #103 review fixes — 2026-10-24
+
+The inline Documents list now refreshes on foreground even when saved-preview
+presentation is delegated to the separate launcher. Server-side additions and
+archives update the visible rows without opening or restarting a preview.
+Failed saved-document Share and Copy link owner reads now enter the existing
+inline Retry state instead of leaving a permanent loading presentation. Retry
+refreshes the retained saved identity; it does not request an unsaved preview or
+create another document.
+
+Three new component regression cases failed before the fixes and passed after
+them. Validation under Node 22.13.1:
+
+- Preview component suite: 49 tests passed.
+- Complete mobile suite, run from `apps/mobile-expo`: 73 suites / 517 tests passed.
+- Full workspace TypeScript, design/product-context checks and fix diff whitespace
+  checks passed.
+
+No simulator or physical-device checks were run for this follow-up. Existing
+runtime release gates remain pending.

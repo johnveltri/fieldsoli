@@ -444,6 +444,7 @@ export const InvoicingJobControls = forwardRef<
       setSavedWorkStatus(workStatus);
       openShareSheet();
     } catch {
+      setPreviewFailure(true);
       setSaved(null);
       setOffline(true);
       Alert.alert('Could not refresh this document.', 'Reconnect before sharing it.');
@@ -963,6 +964,7 @@ export const InvoicingJobControls = forwardRef<
     try {
       fresh = await refreshDocument(active.id);
     } catch {
+      setPreviewFailure(true);
       setSaved(null);
       setOffline(true);
       Alert.alert('Could not refresh this document.', 'Reconnect before copying its link.');
@@ -1102,7 +1104,12 @@ export const InvoicingJobControls = forwardRef<
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
-      if (state !== 'active' || !isActive || recoveringIntent || onPreviewDocument) return;
+      if (state !== 'active' || !isActive || recoveringIntent) return;
+      // The inline list owns its rows even when another instance presents previews.
+      if (onPreviewDocument) {
+        void reload();
+        return;
+      }
       // Native sharing can emit active/inactive without suspending the preview.
       // Do not replace its WebView or start a competing read during the handoff.
       if (handoffRunningRef.current || queuedHandoffRef.current) return;

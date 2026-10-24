@@ -236,6 +236,36 @@ describe('InvoicingJobControls', () => {
     expect(screen.queryByText('paid')).toBeNull();
   });
 
+  it.each(['share', 'copy'] as const)('retries the same saved document after a failed %s owner read', async (action) => {
+    jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    const screen = render(<InvoicingJobControls {...props} mode="view" />);
+    fireEvent.press(await screen.findByLabelText(/^Preview Estimate #00001,/));
+    await waitFor(() => expect(screen.getByLabelText('SHARE ESTIMATE').props.accessibilityState.disabled).toBe(false));
+    if (action === 'copy') {
+      await act(async () => fireEvent.press(screen.getByLabelText('SHARE ESTIMATE')));
+      await screen.findByRole('button', { name: 'Copy link' });
+    }
+
+    mockList.mockRejectedValueOnce(new Error('offline'));
+    await act(async () => fireEvent.press(action === 'share'
+      ? screen.getByLabelText('SHARE ESTIMATE')
+      : screen.getByRole('button', { name: 'Copy link' })));
+    if (action === 'copy') {
+      const shareModal = screen.UNSAFE_getAllByType(Modal).find((modal) => modal.props.statusBarTranslucent)!;
+      act(() => shareModal.props.onRequestClose());
+      act(() => mockShareSheetClosed?.());
+    }
+
+    expect(screen.queryByTestId('document-preview-data-loading')).toBeNull();
+    expect(screen.queryByLabelText('SHARE ESTIMATE')).toBeNull();
+    fireEvent.press(await screen.findByLabelText('Retry document preview'));
+    await waitFor(() => expect(screen.getByLabelText('SHARE ESTIMATE').props.accessibilityState.disabled).toBe(false));
+    expect(screen.queryByLabelText('Retry document preview')).toBeNull();
+    expect(mockPreview).not.toHaveBeenCalled();
+    expect(mockCreate).not.toHaveBeenCalled();
+    expect(mockCreateAndSelect).not.toHaveBeenCalled();
+  });
+
   it('renders the freshly read payment status into a requested PDF', async () => {
     const paid = { ...doc, paymentProjection: 'paid' } as FinancialDocumentRecord;
     const unpaid = { ...doc, paymentProjection: 'unpaid' } as FinancialDocumentRecord;
@@ -860,6 +890,35 @@ describe('InvoicingJobControls', () => {
     fireEvent.press(await screen.findByLabelText('CREATE & SHARE ESTIMATE'));
     expect(await screen.findByLabelText(/^Preview Estimate #00001,/)).toBeTruthy();
     expect(mockCreate).toHaveBeenCalledTimes(1);
+  });
+
+  it('refreshes the visible split Documents list on foreground without opening a preview', async () => {
+    const listeners = new Set<(state: string) => void>();
+    jest.spyOn(AppState, 'addEventListener').mockImplementation((_event, callback) => {
+      const listener = callback as (state: string) => void;
+      listeners.add(listener);
+      return { remove: () => listeners.delete(listener) } as never;
+    });
+    const ref = createRef<InvoicingJobControlsHandle>();
+    const screen = render(<>
+      <InvoicingJobControls {...props} mode="view" onPreviewDocument={(id) => ref.current?.openDocument(id)} />
+      <InvoicingJobControls {...props} ref={ref} mode="launcher" />
+    </>);
+    await screen.findByLabelText(/^Preview Estimate #00001,/);
+    await act(async () => {});
+    mockList.mockResolvedValue([
+      { ...doc, archived: true, linkEnabled: false },
+      { ...doc, id: 'doc-2', documentNumber: 2 },
+    ]);
+
+    act(() => { for (const listener of [...listeners]) listener('background'); });
+    await act(async () => { for (const listener of [...listeners]) listener('active'); });
+
+    expect(await screen.findByLabelText(/^Preview Estimate #00002,/)).toBeTruthy();
+    expect(screen.queryByLabelText(/^Preview Estimate #00001,/)).toBeNull();
+    expect(screen.queryByTestId('document-preview-scroll')).toBeNull();
+    expect(mockPreview).not.toHaveBeenCalled();
+    expect(mockCreate).not.toHaveBeenCalled();
   });
 
   it('keeps the painted preview mounted behind native sharing and after cancellation', async () => {

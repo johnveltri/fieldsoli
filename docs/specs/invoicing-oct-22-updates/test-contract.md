@@ -45,3 +45,10 @@ cancellation and active callbacks both before and after completion. Dismissal
 during a delayed final owner read cancels presentation without reopening; a failed
 owner read offers Retry and blocks Share. SMS adapter assertions still cover
 validated snapshot recipients through the revised options-modal dismissal path.
+
+PR #103 review regressions: with separate inline-list and launcher instances,
+foreground refresh adds newly created documents and removes newly archived ones
+from the visible list without opening a preview. Failed saved-document Share and
+Copy link owner reads remove the loading presentation and expose Retry; reconnect
+reopens the same saved identity without requesting an unsaved preview or creating
+another document.
