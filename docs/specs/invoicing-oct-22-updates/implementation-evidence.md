@@ -108,3 +108,24 @@ Focused API + Edge address tests: 12 passed. Complete Edge shared tests: 15 pass
 Full workspace TypeScript: passed. Secrets stayed outside repository/mobile env;
 production was unchanged. Operational steps are maintained in
 `docs/ops/geoapify-address-autocomplete-runbook.md`.
+
+## Production address deployment — 2026-10-24
+
+The user explicitly requested the replacement production Geoapify key and then
+approved deploying the Dev-verified function. The production secret fingerprint
+was checked against the replacement key without revealing the value.
+
+Target `gfvqmxsiuhhujnckghpa` / FieldSoli was verified ACTIVE_HEALTHY. Deployed only
+`address-autocomplete` from source commit `e7ef41f`, using API bundling and the
+repository configuration with JWT verification enabled. The function is ACTIVE,
+version 1, with bundle SHA-256
+`93329db00d759f033dc0b66f806bd954d5dde7f606bdb0536611872c44457993`, identical to
+Dev's verified version 6. Existing budget RPC and service-role execution grant
+were verified; anonymous roles cannot execute the budget function.
+
+Unauthenticated POST to the live production endpoint returned HTTP 401 with
+`UNAUTHORIZED_NO_AUTH_HEADER`, confirming the authentication boundary. Focused
+address API/Edge regression suites passed 12 tests immediately before deployment.
+No database migration, user-data write or mobile/store release was performed.
+An authenticated production provider lookup through the user's TestFlight app
+remains the final runtime check; this receipt does not claim that it was run.
