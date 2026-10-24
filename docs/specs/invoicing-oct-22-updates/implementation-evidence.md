@@ -174,3 +174,29 @@ saved owner read, unchanged-source revalidation, and exactly one loading message
 through data and paint. Simulator QA for this follow-up was explicitly deferred
 to the user. Native WebView first rendering still occurs on opening; this update
 does not claim a fully pre-rendered preview or zero initial render latency.
+
+## Native sharing retains the rendered preview — 2026-10-24
+
+Removed the handoff sequence that closed the preview before native presentation
+and reopened it afterward. Only the options sheet dismisses; native sharing,
+composers, browser and PDF handoff retain the preview presenter underneath.
+App-state callbacks during a queued/running handoff do not refresh/remount it.
+Subsequent saved-preview foreground reads retain content during verification and
+preserve the source/paint state when HTML is unchanged. Actual renderer-loss
+callbacks still recover the WebView. Fresh owner/link checks remain in place.
+
+Independent review found dismissal during a pending owner read could still launch
+native UI and reopen the preview. Handoffs now check the preview request generation
+and visibility before presenting, and no completion/fallback forcibly reopens the
+preview. Failed current owner reads transition to Retry instead of a blank spinner.
+Review of those fixes found no remaining issues.
+
+Final automated validation: 513 mobile tests across 73 suites passed, including 45
+preview component tests. Added pending native Share/cancellation coverage verifies
+that preview visibility, source and paint token survive native active callbacks
+both before and after completion; delayed-owner-read dismissal cancels native
+presentation; failed owner reads expose Retry. SMS recipient tests continue to
+pass through the options-sheet-only dismissal path. Full workspace TypeScript and
+product HTML validation passed; product exports regenerated. No simulator QA was
+performed for this follow-up, per user instruction; native presentation remains
+for the user's runtime verification.

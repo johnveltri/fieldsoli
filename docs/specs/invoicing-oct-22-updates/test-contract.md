@@ -38,3 +38,10 @@ revalidation remains pending; identical HTML keeps the same WebView source and
 ready state; read and paint phases expose exactly one loading message. Failed
 owner revalidation and fresh-read sharing/PDF regression checks remain covered.
 Follow-up simulator execution is assigned to the user.
+
+Native handoff regression assertions: the preview Modal stays visible behind a
+pending native Share promise; source and paint token remain unchanged after
+cancellation and active callbacks both before and after completion. Dismissal
+during a delayed final owner read cancels presentation without reopening; a failed
+owner read offers Retry and blocks Share. SMS adapter assertions still cover
+validated snapshot recipients through the revised options-modal dismissal path.

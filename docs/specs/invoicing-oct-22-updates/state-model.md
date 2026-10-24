@@ -39,3 +39,16 @@ still removes the preview and offers Retry. Foreground and Retry force a fresh
 read rather than using the optimistic saved content. Sharing/PDF remain gated by
 fresh owner reads. Native WebView first rendering is still performed on opening;
 this is data/font/HTML preparation, not a fully rendered off-screen WebView.
+
+### Native handoff preserves the preview
+
+Choosing Text, Email, Share, browser or PDF dismisses only the document options
+sheet. After that sheet has dismissed, native UI presents over the still-mounted
+preview. Completing/cancelling native UI does not close/reopen the preview or
+restart its painted WebView. Active callbacks during queued/running handoff do
+not start competing refreshes; later saved-preview foreground reads preserve
+content while revalidating. Actual renderer-loss callbacks still remount/recover.
+Fresh owner/link checks remain mandatory before native handoff. Closing the
+preview during a pending check cancels that handoff; late success/failure cannot
+launch native UI or reopen the dismissed preview. A failed current owner check
+shows Retry and blocks sharing rather than leaving a blank loading surface.

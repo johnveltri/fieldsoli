@@ -767,19 +767,28 @@ export const InvoicingJobControls = forwardRef<
 
   const performQueuedHandoff = useCallback(async () => {
     const action = queuedHandoffRef.current;
+    if (!previewVisibleRef.current) { queuedHandoffRef.current = null; return; }
     if (!active || !action || handoffRunningRef.current) return;
     queuedHandoffRef.current = null;
     handoffRunningRef.current = true;
-    let fallbackAlertOpen = false;
-    let handoffFailed = false;
+    const handoffRequest = previewRequestRef.current;
     let handoffDocument = active;
     if (action.kind !== 'pdf') {
       try {
         handoffDocument = await refreshDocument(active.id);
+        if (handoffRequest !== previewRequestRef.current || !previewVisibleRef.current) {
+          handoffRunningRef.current = false;
+          return;
+        }
         if (!handoffDocument.linkEnabled) throw new Error('link_disabled');
         setSaved(handoffDocument);
         setSavedWorkStatus(workStatus);
       } catch {
+        if (handoffRequest !== previewRequestRef.current || !previewVisibleRef.current) {
+          handoffRunningRef.current = false;
+          return;
+        }
+        setPreviewFailure(true);
         setSaved(null);
         setOffline(true);
         handoffRunningRef.current = false;
@@ -797,13 +806,11 @@ export const InvoicingJobControls = forwardRef<
     try {
       if (action.kind === 'text') {
         if (!(await SMS.isAvailableAsync())) {
-          fallbackAlertOpen = true;
           Alert.alert('Messages is unavailable on this device.', undefined, [
-            { text: 'Cancel', style: 'cancel', onPress: () => setPreviewOpen(true) },
+            { text: 'Cancel', style: 'cancel' },
             { text: 'Share link…', onPress: () => {
               void Share.share({ message: handoffText, title: documentNumberLabel(handoffDocument.documentType, handoffDocument.documentNumber) })
-                .catch(() => Alert.alert('Could not share this link. Try again.'))
-                .finally(() => setPreviewOpen(true));
+                .catch(() => Alert.alert('Could not share this link. Try again.'));
             } },
           ]);
           return;
@@ -832,13 +839,11 @@ export const InvoicingJobControls = forwardRef<
                 : [],
             });
           } else {
-            fallbackAlertOpen = true;
             Alert.alert('Email is unavailable on this device.', undefined, [
-              { text: 'Cancel', style: 'cancel', onPress: () => setPreviewOpen(true) },
+              { text: 'Cancel', style: 'cancel' },
               { text: 'Share link…', onPress: () => {
                 void Share.share({ message: handoffText, title: documentNumberLabel(handoffDocument.documentType, handoffDocument.documentNumber) })
-                  .catch(() => Alert.alert('Could not share this link. Try again.'))
-                  .finally(() => setPreviewOpen(true));
+                  .catch(() => Alert.alert('Could not share this link. Try again.'));
               } },
             ]);
             return;
@@ -859,48 +864,49 @@ export const InvoicingJobControls = forwardRef<
         });
       }
     } catch {
-      handoffFailed = true;
       const message = action.kind === 'browser'
         ? 'Could not open this document. Try again.'
         : action.kind === 'pdf'
           ? 'Could not share the PDF. Try again.'
           : 'Could not open the share option. Try again.';
       Alert.alert(message, undefined, [
-        { text: 'Close', style: 'cancel', onPress: () => setPreviewOpen(true) },
+        { text: 'Close', style: 'cancel' },
         { text: 'Try again', onPress: () => { if (active) void openFreshShareSheet(active.id); } },
       ]);
     } finally {
       handoffRunningRef.current = false;
       setBusy(null);
-      if (!fallbackAlertOpen && !handoffFailed) setPreviewOpen(true);
     }
-  }, [active, openFreshShareSheet, refreshDocument, setPreviewOpen, workStatus]);
-
-  const closePreviewForHandoff = useCallback(() => {
-    if (!queuedHandoffRef.current) return;
-    setPreviewOpen(false, () => {
-      if (Platform.OS !== 'ios') {
-        requestAnimationFrame(() => requestAnimationFrame(() => void performQueuedHandoff()));
-      }
-    });
-  }, [performQueuedHandoff, setPreviewOpen]);
+  }, [active, openFreshShareSheet, refreshDocument, workStatus]);
 
   const onShareSheetClosed = useCallback(() => {
     setShareModalMounted(false);
+    // Dismiss only the options sheet. The preview stays mounted as the native
+    // share/composer presenter and retains its painted document and scroll state.
     if (Platform.OS !== 'ios' && queuedHandoffRef.current) {
-      requestAnimationFrame(() => requestAnimationFrame(closePreviewForHandoff));
+      requestAnimationFrame(() => requestAnimationFrame(() => void performQueuedHandoff()));
     }
-  }, [closePreviewForHandoff]);
+  }, [performQueuedHandoff]);
 
   const requestHandoff = useCallback(async (
     kind: 'text' | 'email' | 'share' | 'browser' | 'pdf',
   ) => {
     if (!active || handoffRunningRef.current || queuedHandoffRef.current) return;
     handoffRunningRef.current = true;
+    const handoffRequest = previewRequestRef.current;
     let fresh: FinancialDocumentRecord;
     try {
       fresh = await refreshDocument(active.id);
+      if (handoffRequest !== previewRequestRef.current || !previewVisibleRef.current) {
+        handoffRunningRef.current = false;
+        return;
+      }
     } catch {
+      if (handoffRequest !== previewRequestRef.current || !previewVisibleRef.current) {
+        handoffRunningRef.current = false;
+        return;
+      }
+      setPreviewFailure(true);
       setSaved(null);
       setOffline(true);
       handoffRunningRef.current = false;
@@ -996,12 +1002,12 @@ export const InvoicingJobControls = forwardRef<
     }
   };
 
-  const openDocument = useCallback((documentId: string, forceRefresh = false) => {
+  const openDocument = useCallback((documentId: string, forceRefresh = false, preserveContent = false) => {
     savedPreviewIdRef.current = documentId;
     setPreviewFailure(false);
     previewRequestRef.current += 1;
     const request = previewRequestRef.current;
-    const cached = !forceRefresh && !refreshingSaved && savedWorkStatus === workStatus
+    const cached = (!forceRefresh || preserveContent) && !refreshingSaved && savedWorkStatus === workStatus
       ? documents.find((record) => record.id === documentId && !record.archived) ?? null
       : null;
     setSaved(cached);
@@ -1096,17 +1102,22 @@ export const InvoicingJobControls = forwardRef<
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
       if (state !== 'active' || !isActive || recoveringIntent || onPreviewDocument) return;
+      // Native sharing can emit active/inactive without suspending the preview.
+      // Do not replace its WebView or start a competing read during the handoff.
+      if (handoffRunningRef.current || queuedHandoffRef.current) return;
       invalidatePreparedPreview();
-      // WKWebView content can be discarded while the app is suspended.
-      setWebViewGeneration((value) => value + 1);
-      if (previewVisibleRef.current && !businessOpen && !creationRunningRef.current && !handoffRunningRef.current) {
-        retryPreview();
+      if (previewVisibleRef.current && !businessOpen && !creationRunningRef.current) {
+        if (!finalization && savedPreviewIdRef.current) {
+          openDocument(savedPreviewIdRef.current, true, true);
+        } else {
+          retryPreview();
+        }
       } else {
         void reload();
       }
     });
     return () => subscription.remove();
-  }, [businessOpen, invalidatePreparedPreview, isActive, onPreviewDocument, previewOpen, recoveringIntent, reload, retryPreview]);
+  }, [businessOpen, finalization, invalidatePreparedPreview, isActive, onPreviewDocument, openDocument, previewOpen, recoveringIntent, reload, retryPreview]);
 
   const confirmFinalization = useCallback(async () => {
     if (!finalization || creationRunningRef.current || recoveringIntent) return;
@@ -1176,6 +1187,7 @@ export const InvoicingJobControls = forwardRef<
   const closeInvoicePreview = () => {
     if (busy && busy !== 'Loading' && busy !== 'Loading…' && busy !== 'Reviewing…') return;
     previewRequestRef.current += 1;
+    queuedHandoffRef.current = null;
     setBusy(null);
     setPreviewOpen(false);
     if (finalization) {
@@ -1400,9 +1412,6 @@ export const InvoicingJobControls = forwardRef<
         transparent
         animationType="none"
         onShow={animatePreviewIn}
-        onDismiss={() => {
-          if (Platform.OS === 'ios') void performQueuedHandoff();
-        }}
         onRequestClose={closeInvoicePreview}
       >
         <Animated.View
@@ -1599,7 +1608,7 @@ export const InvoicingJobControls = forwardRef<
             animationType="none"
             statusBarTranslucent
             onDismiss={() => {
-              if (Platform.OS === 'ios') closePreviewForHandoff();
+              if (Platform.OS === 'ios') void performQueuedHandoff();
             }}
             onRequestClose={closeShareSheet}
           >

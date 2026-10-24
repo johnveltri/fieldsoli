@@ -1,6 +1,6 @@
 import React, { createRef, useCallback, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Alert, Animated, AppState, Modal, StyleSheet } from 'react-native';
+import { Alert, Animated, AppState, Modal, Share, StyleSheet } from 'react-native';
 import { act, fireEvent, render, waitFor, within } from '@testing-library/react-native';
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { color } from '@fieldsolo/design-system/lib/tokens';
@@ -862,6 +862,79 @@ describe('InvoicingJobControls', () => {
     expect(mockCreate).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps the painted preview mounted behind native sharing and after cancellation', async () => {
+    const listener = jest.fn<(state: string) => void>();
+    jest.spyOn(AppState, 'addEventListener').mockImplementation((_event, callback) => {
+      listener.mockImplementation(callback as (state: string) => void);
+      return { remove: jest.fn() } as never;
+    });
+    let finishShare!: () => void;
+    const nativeShare = jest.spyOn(Share, 'share').mockImplementation(() => new Promise((resolve) => {
+      finishShare = () => resolve({ action: Share.dismissedAction });
+    }));
+    const ref = createRef<InvoicingJobControlsHandle>();
+    const screen = render(<InvoicingJobControls {...props} ref={ref} mode="launcher" />);
+    await waitFor(() => expect(mockList).toHaveBeenCalled());
+    await act(async () => ref.current?.openDocument(doc.id));
+    const web = await screen.findByTestId('document-preview-html');
+    const source = web.props.source;
+    const token = Number(web.props.injectedJavaScript.match(/previewToken: (\d+)/)[1]);
+    fireEvent(web, 'onMessage', { nativeEvent: { data: JSON.stringify({ type: 'preview-ready', previewToken: token }) } });
+    fireEvent.press(await screen.findByLabelText('SHARE ESTIMATE'));
+    await screen.findByRole('button', { name: 'Share document' });
+    const shareModal = screen.UNSAFE_getAllByType(Modal).find((modal) => modal.props.statusBarTranslucent)!;
+    await act(async () => fireEvent.press(screen.getByRole('button', { name: 'Share document' })));
+    act(() => mockShareSheetClosed?.());
+    await act(async () => shareModal.props.onDismiss());
+    await waitFor(() => expect(nativeShare).toHaveBeenCalledTimes(1));
+    const assertPreviewPreserved = () => {
+      expect(screen.UNSAFE_getAllByType(Modal).find((modal) => modal.props.onShow)!.props.visible).toBe(true);
+      expect(screen.getByTestId('document-preview-html').props.source).toBe(source);
+      expect(screen.getByTestId('document-preview-html').props.injectedJavaScript).toBe(web.props.injectedJavaScript);
+      expect(screen.queryByText('Loading document preview…')).toBeNull();
+    };
+    assertPreviewPreserved();
+    const readsDuringShare = mockList.mock.calls.length;
+    act(() => listener('inactive'));
+    act(() => listener('active'));
+    expect(mockList).toHaveBeenCalledTimes(readsDuringShare);
+    assertPreviewPreserved();
+    await act(async () => finishShare());
+    assertPreviewPreserved();
+    // Some native callbacks arrive after Share.share resolves; revalidate quietly.
+    await act(async () => listener('active'));
+    assertPreviewPreserved();
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
+  it.each(['dismissed', 'failed'])('cancels or recovers handoff preparation when %s', async (outcome) => {
+    jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    const nativeShare = jest.spyOn(Share, 'share').mockResolvedValue({ action: Share.dismissedAction });
+    const ref = createRef<InvoicingJobControlsHandle>();
+    const screen = render(<InvoicingJobControls {...props} ref={ref} mode="launcher" />);
+    await waitFor(() => expect(mockList).toHaveBeenCalled());
+    await act(async () => ref.current?.openDocument(doc.id));
+    fireEvent.press(await screen.findByLabelText('SHARE ESTIMATE'));
+    await screen.findByRole('button', { name: 'Share document' });
+    const shareModal = screen.UNSAFE_getAllByType(Modal).find((modal) => modal.props.statusBarTranslucent)!;
+    await act(async () => fireEvent.press(screen.getByRole('button', { name: 'Share document' })));
+    let finishRead!: () => void;
+    mockList.mockImplementationOnce(() => new Promise((resolve, reject) => {
+      finishRead = () => outcome === 'failed' ? reject(new Error('offline')) : resolve([doc]);
+    }));
+    act(() => mockShareSheetClosed?.());
+    act(() => shareModal.props.onDismiss());
+    if (outcome === 'dismissed') fireEvent.press(screen.getByLabelText('Close preview'));
+    await act(async () => finishRead());
+    expect(nativeShare).not.toHaveBeenCalled();
+    if (outcome === 'dismissed') {
+      expect(screen.UNSAFE_getAllByType(Modal).find((modal) => modal.props.onShow)!.props.visible).toBe(false);
+    } else {
+      expect(screen.getByLabelText('Retry document preview')).toBeTruthy();
+      expect(screen.queryByLabelText('SHARE ESTIMATE')).toBeNull();
+    }
+  });
+
   it.each([['(419) 708-4470', ['+14197084470']], ['Buddy name', []], [null, []]])('passes only snapshot phone recipients to the native composer: %s', async (phone, recipients) => {
     const ref = createRef<InvoicingJobControlsHandle>();
     mockList.mockResolvedValue([{ ...doc, payload: { ...payload, customerPhone: phone, totalCents: 123456 } } as FinancialDocumentRecord]);
@@ -876,7 +949,7 @@ describe('InvoicingJobControls', () => {
     await act(async () => fireEvent.press(screen.getByRole('button', { name: phone ? 'Text Customer' : 'Text' })));
     act(() => mockShareSheetClosed?.());
     act(() => shareModal.props.onDismiss());
-    await act(async () => previewModal.props.onDismiss());
+    expect(previewModal.props.visible).toBe(true);
     await waitFor(() => expect(mockSendSms).toHaveBeenCalledWith(recipients, expect.stringContaining('Estimate for $1,234.56 from Example Business')));
     expect(mockCreate).not.toHaveBeenCalled();
   });
