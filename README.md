@@ -269,7 +269,7 @@ Current stack:
 - Supabase
 - Postgres
 - Tailwind / Native styling
-- Figma design system
+- Shared design system; design exploration and review in ChatGPT
 
 ---
 
