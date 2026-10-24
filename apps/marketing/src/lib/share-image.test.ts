@@ -14,7 +14,7 @@ vi.mock("next/og", () => ({
 }));
 
 const payload = {
-  documentType: "estimate", documentNumber: 123, businessName: "A very long business name ".repeat(12),
+  issueDate: "2026-10-24", documentType: "estimate", documentNumber: 123, businessName: "A very long business name ".repeat(12),
   shortDescription: "Job title ".repeat(40), totalCents: 123456,
   customerName: "Private Customer", customerEmail: "private@example.test", serviceAddress: "Private address",
   longDescription: "Private notes",
@@ -28,16 +28,16 @@ const inspect = (response: unknown) => {
 afterEach(() => vi.resetAllMocks());
 
 describe("shared document image", () => {
-  it("keeps type and amount visible around bounded business/job text and secondary branding", async () => {
-    vi.mocked(loadSharedDocument).mockResolvedValue({ status: "ok", rendererVersion: 1, paymentProjection: null, payload });
+  it.each(["estimate", "invoice"] as const)("shows the %s issue date beneath bounded business/job text and amount", async (documentType) => {
+    vi.mocked(loadSharedDocument).mockResolvedValue({ status: "ok", rendererVersion: 1, paymentProjection: null, payload: { ...payload, documentType } });
     const { html, headers } = inspect(await ShareCardImage(props));
-    expect(html).toContain("Estimate");
+    expect(html).toContain(documentType === "estimate" ? "Estimate" : "Invoice");
     expect(html).toContain("$1,234.56");
     expect(html).toContain(payload.businessName);
     expect(html).toContain(payload.shortDescription);
     expect(html.match(/text-overflow:ellipsis/g)).toHaveLength(2);
-    expect(html).toContain('font-size:24px;color:#737373">Shared with FieldSoli');
-    expect(html).not.toMatch(/Private|private@example|000123|synthetic-token/);
+    expect(html).toContain('font-size:24px;color:#737373">Issued October 24, 2026');
+    expect(html).not.toMatch(/Private|private@example|000123|synthetic-token|Shared with FieldSoli/);
     expect(headers["Cache-Control"]).toBe("private, no-store");
   });
 

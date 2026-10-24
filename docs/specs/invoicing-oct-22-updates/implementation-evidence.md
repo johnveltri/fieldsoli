@@ -214,3 +214,12 @@ No app code or pre-fix repository history contains a fabricated Buddy contact.
 The existing branch fix passes `[]` for absent/empty/invalid phones, or one
 normalized valid phone. Added the explicit empty-string case to the native-adapter
 regression test; physical-device confirmation remains assigned to the user.
+
+## Rich-preview issue date footer — 2026-10-24
+
+User replaced the FieldSoli footer with `Issued {issue date}` on both Invoice and
+Estimate images. The date comes from the immutable document payload, formatted
+as `October 24, 2026` in UTC so the date-only value cannot shift by timezone.
+Eleven hosted share/metadata/image tests passed; image assertions cover both types
+and confirm the old branding is absent. Both browser image tabs were refreshed;
+the Estimate image visibly shows `Issued October 24, 2026`.

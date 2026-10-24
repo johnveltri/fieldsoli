@@ -69,7 +69,7 @@ export default async function ShareCardImage({
           </div>
         </div>
         <div style={{ display: "flex", fontSize: 72 }}>{card.amount}</div>
-        <div style={{ display: "flex", fontSize: 24, color: "#737373" }}>Shared with FieldSoli</div>
+        <div style={{ display: "flex", fontSize: 24, color: "#737373" }}>{card.issuedLabel}</div>
       </div>
     ),
     { ...size, headers: { "Cache-Control": "private, no-store" } },
