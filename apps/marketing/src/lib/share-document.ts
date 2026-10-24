@@ -55,7 +55,7 @@ export const SHARE_RESPONSE_HEADERS = {
 } as const;
 
 function pageShell(title: string, message: string, retry = false): string {
-  return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8" /><meta name="robots" content="noindex,nofollow" /><title>${title}</title></head><body><article><h1>${message}</h1>${retry ? '<a href="">Retry</a>' : ''}</article></body></html>`;
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8" /><meta name="robots" content="noindex,nofollow" /><title>${title}</title><style>.shared-document-message h1 { font-size: 18px; line-height: 1.5; }</style></head><body><article class="shared-document-message"><h1>${message}</h1>${retry ? '<a href="">Retry</a>' : ''}</article></body></html>`;
 }
 
 export function parseResolveResult(value: unknown): SharedDocument {
