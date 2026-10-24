@@ -50,6 +50,8 @@
     "db:reset": "npx supabase db reset --local --workdir backend",
     "db:verify": "npm run db:reset && npm run test:db",
     "screenshots:reset": "node scripts/seed-app-store-demo.mjs",
+    "screenshots:reset:dev": "node scripts/seed-app-store-demo-dev.mjs",
+    "test:screenshots:dev": "node --test scripts/seed-app-store-demo-dev.test.mjs",
     "db:deploy:staging:plan": "node scripts/supabase-deploy.mjs staging",
     "db:deploy:staging": "node scripts/supabase-deploy.mjs staging --apply",
     "db:deploy:production:plan": "node scripts/supabase-deploy.mjs production",
