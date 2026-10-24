@@ -1,3 +1,5 @@
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { ImageResponse } from "next/og";
 
 import { loadSharedDocument } from "../../../lib/load-shared-document";
@@ -44,6 +46,11 @@ export default async function ShareCardImage({
     );
   }
   const card = shareCard(document);
+  const [bodyFont, bodyBoldFont, businessFont] = await Promise.all([
+    readFile(join(process.cwd(), "public/fonts/Ubuntu-Regular.ttf")),
+    readFile(join(process.cwd(), "public/fonts/Ubuntu-Medium.ttf")),
+    readFile(join(process.cwd(), "public/fonts/PTSerif-Bold.ttf")),
+  ]);
   return new ImageResponse(
     (
       <div
@@ -57,11 +64,12 @@ export default async function ShareCardImage({
           justifyContent: "space-between",
           padding: 64,
           fontSize: 36,
+          fontFamily: "Ubuntu",
         }}
       >
-        <div style={{ display: "flex", fontSize: 32 }}>{card.typeLabel}</div>
+        <div style={{ display: "flex", fontSize: 32, fontWeight: 500 }}>{card.typeLabel}</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <div style={{ display: "block", fontSize: 56, whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden" }}>
+          <div style={{ display: "block", fontSize: 56, fontFamily: "PT Serif", fontWeight: 700, whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden" }}>
             {card.businessName}
           </div>
           <div style={{ display: "block", color: "#525252", whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden" }}>
@@ -72,6 +80,14 @@ export default async function ShareCardImage({
         <div style={{ display: "flex", fontSize: 24, color: "#737373" }}>{card.issuedLabel}</div>
       </div>
     ),
-    { ...size, headers: { "Cache-Control": "private, no-store" } },
+    {
+      ...size,
+      fonts: [
+        { name: "Ubuntu", data: bodyFont, weight: 400, style: "normal" },
+        { name: "Ubuntu", data: bodyBoldFont, weight: 500, style: "normal" },
+        { name: "PT Serif", data: businessFont, weight: 700, style: "normal" },
+      ],
+      headers: { "Cache-Control": "private, no-store" },
+    },
   );
 }
