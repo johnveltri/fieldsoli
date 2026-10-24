@@ -2,6 +2,10 @@
 
 Status: implemented and deployed to hosted Dev; selected iOS simulator checks completed, including business-address fallback with a qualifying city-level result. No production/store release claimed.
 
+## iOS binary validation correction
+
+Apple rejected iOS 1.2.0 build 22 with ITMS-90683 because `motionUsagePermission: false` omitted `NSMotionUsageDescription` while Expo Location still linked Core Motion APIs. The config now supplies an explicit description explaining the location-services dependency and that motion/fitness data is not requested or collected. No motion APIs were added to the application. Release validation must inspect the generated native plist for this key; successful EAS upload alone does not establish Apple processing acceptance.
+
 ## PR review focus correction
 
 Address input focus is tracked separately from retained suggestion visibility in both Customer fields and Business Details. Blur ends location resolution and ignores pending autocomplete responses while keeping completed suggestions tappable. Cache invalidation on foreground return cannot start another lookup until the input is focused again.

@@ -43,7 +43,7 @@
           "locationWhenInUsePermission": "Allow FieldSoli to use your location to suggest nearby addresses.",
           "locationAlwaysPermission": false,
           "locationAlwaysAndWhenInUsePermission": false,
-          "motionUsagePermission": false,
+          "motionUsagePermission": "FieldSoli uses location services for nearby address suggestions. Motion and fitness data is not requested or collected.",
           "isIosBackgroundLocationEnabled": false,
           "isAndroidBackgroundLocationEnabled": false,
           "isAndroidForegroundServiceEnabled": false
