@@ -39,6 +39,8 @@ export {
 export {
   ADDRESS_SUGGESTION_LIMIT,
   fetchAddressSuggestions,
+  resolveBusinessProximity,
+  type AddressProximity,
   type AddressSuggestion,
   type AddressAutocompleteErrorCode,
   type AddressAutocompleteResult,

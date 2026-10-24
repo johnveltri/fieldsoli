@@ -5,11 +5,19 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { DEFAULT_BUSINESS_SETTINGS } from '@fieldsolo/api-client';
 import { createTextStyles } from '../theme/nativeTokens';
 import { BusinessSettingsScreen } from './BusinessSettingsScreen';
+import { deviceAddressProximity } from '../lib/addressLocation';
 
 const mockFetch =
   jest.fn<(...args: unknown[]) => Promise<typeof DEFAULT_BUSINESS_SETTINGS>>();
 const mockAddressFetch = jest.fn<(...args: unknown[]) => Promise<unknown>>();
 const mockSave = jest.fn<(...args: unknown[]) => Promise<void>>();
+
+jest.mock('../lib/addressLocation', () => ({
+  deviceAddressProximity: jest.fn<() => Promise<null>>().mockResolvedValue(null),
+  businessAddressProximity: jest.fn<() => Promise<null>>().mockResolvedValue(null),
+  subscribeAddressProximity: () => () => {},
+  invalidateAddressProximity: jest.fn(),
+}));
 
 jest.mock('@fieldsolo/api-client', () => ({
   ...jest.requireActual<object>('@fieldsolo/api-client'),
@@ -155,6 +163,20 @@ describe('BusinessSettingsScreen', () => {
     );
     expect(onBack).toHaveBeenCalledTimes(1);
   });
+  it('ends business address location resolution on blur and resumes only on refocus', async () => {
+    jest.mocked(deviceAddressProximity).mockImplementationOnce(() => new Promise(() => {}));
+    const screen = render(<BusinessSettingsScreen typography={typography} mode="business" onBack={jest.fn()} />);
+    const address = await screen.findByLabelText('Address');
+    fireEvent(address, 'focus', { nativeEvent: { target: 1 } });
+    await waitFor(() => expect(deviceAddressProximity).toHaveBeenCalledTimes(1));
+    const signal = jest.mocked(deviceAddressProximity).mock.calls[0][0];
+    fireEvent(address, 'blur');
+    expect(signal.aborted).toBe(true);
+    expect(deviceAddressProximity).toHaveBeenCalledTimes(1);
+    fireEvent(address, 'focus', { nativeEvent: { target: 1 } });
+    await waitFor(() => expect(deviceAddressProximity).toHaveBeenCalledTimes(2));
+  });
+
   it('looks up a business address without saving until Save Changes', async () => {
     mockAddressFetch.mockResolvedValue({
       status: 'ok', suggestions: [{ token: 'g0', displayAddress: '123 Main St, Chicago, IL' }],
@@ -165,6 +187,7 @@ describe('BusinessSettingsScreen', () => {
     fireEvent(address, 'focus', { nativeEvent: { target: 1 } });
     fireEvent.changeText(address, '123 Main');
     await act(async () => { jest.advanceTimersByTime(300); });
+    fireEvent(address, 'blur');
     fireEvent.press(screen.getByRole('button', { name: '123 Main St, Chicago, IL' }));
     expect(screen.getByLabelText('Address').props.value).toBe('123 Main St, Chicago, IL');
     expect(screen.queryByText('Powered by Geoapify · © OpenStreetMap contributors')).toBeNull();

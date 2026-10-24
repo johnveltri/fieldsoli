@@ -107,6 +107,8 @@ Existing title/description Live Session persistence may keep its own debounce be
 
 `Add from Contacts` remains a row-level action underneath the fields on both surfaces. Merely opening Job Edit or Live Session must not request access.
 
+Privacy Choices → Device permissions also exposes a Contacts switch matching the Analytics and Address suggestions switches. It shows actual OS access (including limited access), requests native permission on the first explicit tap if not yet requested, and opens FieldSoli's app-specific Settings for subsequent changes. Merely opening Privacy Choices never requests access or reads contacts.
+
 On tap:
 
 1. Open the least-privilege native single-contact picker.

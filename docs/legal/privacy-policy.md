@@ -1,8 +1,8 @@
 # FieldSoli Privacy Policy
 
-**Effective date:** September 20, 2026
+**Effective date:** October 24, 2026
 
-**Policy version:** 2026-09-20
+**Policy version:** 2026-10-24
 
 FieldSoli™ is a product operated by **Veltri Ventures LLC, an Illinois limited liability company** ("FieldSoli," "we," "us," or "our"). This Privacy Policy explains how we collect, use, disclose, retain, and protect personal information when you use:
 
@@ -146,13 +146,23 @@ When you enter or import customer details for a Job, we store the customer name,
 
 If you tap **Add from Contacts**, the app requests read-only access to your device contacts at that moment only. FieldSoli does not sync your address book, bulk-import contacts, or retain native contact identifiers. We copy only the values you select for the current Job draft.
 
-When you type in the Address field, FieldSoli may send your typed query to our server, which forwards a redacted autocomplete request to Geoapify so we can show up to four U.S. address suggestions. We do not store Geoapify place identifiers, coordinates, or the full provider response with your Job. Address suggestion requests are subject to per-user daily limits and are not logged with the full query text.
+When you type in an Address field for a Job or Business Details, FieldSoli may send your typed query to our server, which forwards the address search to Geoapify so we can show up to four U.S. address suggestions.
+
+The first time you focus an Address field, FieldSoli requests optional foreground device-location permission. If you allow access, we obtain a single location reading during address entry and round its latitude and longitude to two decimal places on your device before sending it through our server to Geoapify to favor nearby suggestions. Approximate location permission is sufficient. We do not track location in the background, and we do not use device location for analytics or advertising.
+
+If you decline access or device location is unavailable, we may send your previously saved business address to Geoapify to derive an approximate location for ranking suggestions. If there is no usable saved business address, we show suggestions without an added proximity preference. You can always enter an address manually.
+
+FieldSoli does not persist device or derived business coordinates in account records or on your device. We temporarily cache a device location in app memory for up to one minute and a business-address location for up to five minutes. These caches are cleared when you sign out, switch accounts, or background the app; the business cache is also invalidated after saving Business Details. Coordinates, full address queries, provider request URLs, and full provider responses are excluded from application logs and analytics. We do not store Geoapify place identifiers, coordinates, or the full provider response with your Job. Requests are subject to per-user daily limits.
+
+Geoapify processes the address queries, saved business addresses when needed, and approximate coordinates we send. Its privacy policy describes retention of API request data for access control, usage counting, troubleshooting, and service improvement; successful request data is generally retained for no longer than 24 hours. See [Geoapify’s Privacy Policy](https://www.geoapify.com/privacy-policy/). Our server does not forward your account identifier, authentication token, or device IP address to Geoapify.
+
+You can manage location permission through **Privacy Choices → Location → Address suggestions** or your device Settings. Turning location access off stops future device-location use and leaves business-address fallback and manual entry available.
 
 Job Summary CSV exports may include job-snapshot customer phone and email columns when present.
 
 ### K. Information FieldSoli does not currently collect through the mobile app
 
-The current FieldSoli mobile app does not request or collect precise GPS location, calendars, camera or photo-library content, audio recordings, microphone data, email-inbox content, payment-card numbers, or bank-account credentials. FieldSoli does not request write access to your contacts.
+The current FieldSoli mobile app does not request or collect calendars, camera or photo-library content, audio recordings, microphone data, email-inbox content, payment-card numbers, or bank-account credentials. FieldSoli does not request write access to your contacts.
 
 ## 3. How We Use Information
 
@@ -188,7 +198,8 @@ Providers process information for us to perform specific functions. Current mate
 
 - **Supabase**, for authentication, database hosting, file storage, backend functions, and related cloud infrastructure;
 - **Vercel**, for website hosting, operation, security, and website analytics;
-- **PostHog**, for optional in-app product analytics when it is configured and you have enabled analytics; and
+- **PostHog**, for optional in-app product analytics when it is configured and you have enabled analytics;
+- **Geoapify**, for address suggestions and geocoding, including proximity ranking using optional approximate device location or your saved business address; and
 - **Resend**, for transactional email, including account and authentication messages and Job Summary export delivery notifications.
 
 We also use providers for customer support and other operational functions. We provide these providers with information reasonably necessary to perform their services and require appropriate protection through contracts or other applicable safeguards.

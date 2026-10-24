@@ -1,6 +1,7 @@
 import type { FieldSoloSupabaseClient } from './client';
 
 export const ADDRESS_SUGGESTION_LIMIT = 4;
+export type AddressProximity = { latitude: number; longitude: number };
 // Allow the authenticated Edge hop and its bounded 12-second provider lookup.
 const REQUEST_TIMEOUT_MS = 18000;
 
@@ -27,7 +28,7 @@ export type AddressAutocompleteResult =
 export async function fetchAddressSuggestions(
   client: FieldSoloSupabaseClient,
   query: string,
-  options?: { countryCode?: 'us'; limit?: number },
+  options?: { countryCode?: 'us'; limit?: number; proximity?: AddressProximity },
 ): Promise<AddressAutocompleteResult> {
   // Bound the complete lookup, including error response parsing. Native fetch or
   // an unavailable endpoint must never leave the address panel searching forever.
@@ -43,6 +44,7 @@ export async function fetchAddressSuggestions(
             query,
             countryCode: options?.countryCode ?? 'us',
             limit: options?.limit ?? ADDRESS_SUGGESTION_LIMIT,
+            ...(options?.proximity ? { proximity: options.proximity } : {}),
           },
         });
         const fromData = resultFromPayload(data);
@@ -58,6 +60,41 @@ export async function fetchAddressSuggestions(
     ]);
   } catch {
     return unavailable;
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
+}
+
+/** Resolves only the authenticated user's saved business address on the server. */
+export async function resolveBusinessProximity(
+  client: FieldSoloSupabaseClient,
+): Promise<AddressProximity | null> {
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      (async () => {
+        const { data, error } = await client.functions.invoke('address-autocomplete', {
+          signal: controller.signal,
+          body: { action: 'resolve_business_proximity' },
+        });
+        const point = data?.proximity;
+        if (error || data?.status !== 'ok' || !point
+          || typeof point.latitude !== 'number' || !Number.isFinite(point.latitude)
+          || Math.abs(point.latitude) > 90
+          || typeof point.longitude !== 'number' || !Number.isFinite(point.longitude)
+          || Math.abs(point.longitude) > 180) return null;
+        return {
+          latitude: Math.round(point.latitude * 100) / 100,
+          longitude: Math.round(point.longitude * 100) / 100,
+        };
+      })(),
+      new Promise<null>((resolve) => {
+        timer = setTimeout(() => { controller.abort(); resolve(null); }, REQUEST_TIMEOUT_MS);
+      }),
+    ]);
+  } catch {
+    return null;
   } finally {
     if (timer !== undefined) clearTimeout(timer);
   }

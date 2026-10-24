@@ -33,8 +33,9 @@ jest.mock('./useCustomerSuggestions', () => ({
   useCustomerSuggestions: () => mockCustomerSuggestionsState,
 }));
 
+const mockAddressLookup = jest.fn((..._args: unknown[]) => mockAddressLookupState);
 jest.mock('./useAddressAutocomplete', () => ({
-  useAddressAutocomplete: () => mockAddressLookupState,
+  useAddressAutocomplete: (...args: unknown[]) => mockAddressLookup(...args),
 }));
 
 jest.mock('../edit-mode/EditSwipeableRow', () => {
@@ -146,7 +147,9 @@ describe('CustomerFieldsBlock optional fields and focus', () => {
 
     const address = screen.getByLabelText('Address');
     fireEvent(address, 'focus', { nativeEvent: { target: 1 } });
+    expect(mockAddressLookup).toHaveBeenLastCalledWith(supabase, '45 Oak', true, true);
     fireEvent(address, 'blur');
+    expect(mockAddressLookup).toHaveBeenLastCalledWith(supabase, '45 Oak', true, false);
     expect(onFocusChange).toHaveBeenLastCalledWith(false);
     fireEvent.press(screen.getByLabelText('45 Oak Ave, Chicago, IL'));
 

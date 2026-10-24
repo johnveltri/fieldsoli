@@ -39,4 +39,12 @@ describe("website privacy policy", () => {
     expect(markdownSource).toContain("Resend");
     expect(markdownSource).toContain("Export Job Summary");
   });
+
+  it("discloses optional approximate location, fallback geocoding, and provider retention", () => {
+    expect(markdownSource).toContain("two decimal places");
+    expect(markdownSource).toContain("previously saved business address");
+    expect(markdownSource).toContain("no longer than 24 hours");
+    expect(markdownSource).toContain("Privacy Choices → Location → Address suggestions");
+    expect(markdownSource).not.toContain("does not request or collect precise GPS location");
+  });
 });

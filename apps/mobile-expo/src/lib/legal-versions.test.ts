@@ -7,6 +7,7 @@ import {
   REQUIRED_PRIVACY_VERSION,
   REQUIRED_TERMS_VERSION,
 } from './legal-versions';
+import { needsLegalReacceptance } from '@fieldsolo/api-client';
 
 const privacyMarkdown = readFileSync(
   path.resolve(__dirname, '../../../../docs/legal/privacy-policy.md'),
@@ -18,6 +19,11 @@ const termsMarkdown = readFileSync(
 );
 
 describe('legal document versions', () => {
+  it('requires the normal gate for the prior privacy version and accepts the current one', () => {
+    const required = { privacyVersion: REQUIRED_PRIVACY_VERSION, termsVersion: REQUIRED_TERMS_VERSION };
+    expect(needsLegalReacceptance({ privacyPolicyVersion: '2026-09-20', termsVersion: REQUIRED_TERMS_VERSION }, required)).toBe(true);
+    expect(needsLegalReacceptance({ privacyPolicyVersion: REQUIRED_PRIVACY_VERSION, termsVersion: REQUIRED_TERMS_VERSION }, required)).toBe(false);
+  });
   it('matches the canonical privacy policy version', () => {
     const markdownVersion = privacyMarkdown.match(/\*\*Policy version:\*\* ([\d-]+)/)?.[1];
     expect(REQUIRED_PRIVACY_VERSION).toBe(markdownVersion);

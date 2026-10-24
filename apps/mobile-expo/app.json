@@ -10,6 +10,9 @@
     "ios": {
       "bundleIdentifier": "com.veltriventures.fieldsoli",
       "supportsTablet": false,
+      "infoPlist": {
+        "NSLocationDefaultAccuracyReduced": true
+      },
       "icon": {
         "light": "./assets/brand/fieldsoli-solo-notch-light.png",
         "dark": "./assets/brand/fieldsoli-solo-notch-dark.png"
@@ -19,6 +22,7 @@
       }
     },
     "android": {
+      "blockedPermissions": ["android.permission.ACCESS_FINE_LOCATION"],
       "package": "com.veltriventures.fieldsoli",
       "icon": "./assets/brand/fieldsoli-solo-notch-light.png",
       "adaptiveIcon": {
@@ -33,6 +37,18 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Allow FieldSoli to use your location to suggest nearby addresses.",
+          "locationAlwaysPermission": false,
+          "locationAlwaysAndWhenInUsePermission": false,
+          "motionUsagePermission": false,
+          "isIosBackgroundLocationEnabled": false,
+          "isAndroidBackgroundLocationEnabled": false,
+          "isAndroidForegroundServiceEnabled": false
+        }
+      ],
       "@react-native-community/datetimepicker",
       [
         "expo-contacts",

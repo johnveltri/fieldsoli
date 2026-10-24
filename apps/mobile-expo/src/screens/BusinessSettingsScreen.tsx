@@ -40,6 +40,7 @@ import {
 
 import { AddressSuggestionPanel } from '../components/ds/customer/AddressSuggestionPanel';
 import { useAddressAutocomplete } from '../components/ds/customer/useAddressAutocomplete';
+import { invalidateAddressProximity } from '../lib/addressLocation';
 
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -113,12 +114,14 @@ export const BusinessSettingsScreen = forwardRef<
   const [markupZeroPlaceholder, setMarkupZeroPlaceholder] = useState(false);
   const [taxZeroPlaceholder, setTaxZeroPlaceholder] = useState(false);
   const [addressFocused, setAddressFocused] = useState(false);
+  const [addressInputFocused, setAddressInputFocused] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savedSettings, setSavedSettings] = useState<BusinessSettings | null>(null);
   const [failed, setFailed] = useState(false);
   const addressLookup = useAddressAutocomplete(
     supabase, draft.address ?? '', mode === 'business' && addressFocused && !saving,
+    addressInputFocused,
   );
   const showAddressSuggestions = addressFocused && addressLookup.showPanel;
 
@@ -173,6 +176,7 @@ export const BusinessSettingsScreen = forwardRef<
         materialMarkupBps: markup,
         taxRateBps: tax,
       });
+      invalidateAddressProximity();
       setSavedSettings({ ...draft, materialMarkupBps: markup, taxRateBps: tax });
       onBack();
     } catch {
@@ -315,7 +319,8 @@ export const BusinessSettingsScreen = forwardRef<
                           accessibilityLabel="Address"
                           value={draft.address ?? ''}
                           onChangeText={(value) => updateBusinessField('address', value.replace(/[\r\n]+/g, ' '))}
-                          onFocus={() => setAddressFocused(true)}
+                          onFocus={() => { setAddressFocused(true); setAddressInputFocused(true); }}
+                          onBlur={() => setAddressInputFocused(false)}
                           returnKeyType="done"
                           onSubmitEditing={() => setAddressFocused(false)}
                           editable={!saving}

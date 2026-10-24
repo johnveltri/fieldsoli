@@ -64,6 +64,7 @@ type ProfileRowLinkWithIconVariant = {
 type ProfileRowToggleVariant = {
   kind: 'toggle';
   label: string;
+  accessibilityHint?: string;
   sublabel?: string;
   value: boolean;
   onValueChange: (next: boolean) => void;
@@ -269,6 +270,7 @@ function Row({
         <Switch
           accessibilityRole="switch"
           accessibilityLabel={row.label}
+          accessibilityHint={row.accessibilityHint}
           value={row.value}
           onValueChange={row.onValueChange}
           disabled={row.disabled}
