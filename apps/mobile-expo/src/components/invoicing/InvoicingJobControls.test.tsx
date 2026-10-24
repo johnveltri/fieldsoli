@@ -935,7 +935,7 @@ describe('InvoicingJobControls', () => {
     }
   });
 
-  it.each([['(419) 708-4470', ['+14197084470']], ['Buddy name', []], [null, []]])('passes only snapshot phone recipients to the native composer: %s', async (phone, recipients) => {
+  it.each([['(419) 708-4470', ['+14197084470']], ['Buddy name', []], ['', []], [null, []]])('passes only snapshot phone recipients to the native composer: %s', async (phone, recipients) => {
     const ref = createRef<InvoicingJobControlsHandle>();
     mockList.mockResolvedValue([{ ...doc, payload: { ...payload, customerPhone: phone, totalCents: 123456 } } as FinancialDocumentRecord]);
     const screen = render(<InvoicingJobControls {...props} ref={ref} mode="launcher" />);

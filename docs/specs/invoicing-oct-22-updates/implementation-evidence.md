@@ -200,3 +200,17 @@ pass through the options-sheet-only dismissal path. Full workspace TypeScript an
 product HTML validation passed; product exports regenerated. No simulator QA was
 performed for this follow-up, per user instruction; native presentation remains
 for the user's runtime verification.
+
+## SMS “Buddy Name” recipient diagnosis — 2026-10-24
+
+The original handoff called `SMS.sendSMSAsync(customerPhone ?? '', body)`.
+Installed Expo SMS converts a scalar string to a one-element array, so an absent
+phone became `['']`; its iOS module assigns that array directly to
+`MFMessageComposeViewController.recipients`. An empty recipient element is distinct
+from an empty recipient list. This exact empty-string array input and “Buddy Name”
+symptom are reported in the firsthand reproduction at
+https://stackoverflow.com/questions/29150994/mfmessagecomposeviewcontroller-remove-buddy-name.
+No app code or pre-fix repository history contains a fabricated Buddy contact.
+The existing branch fix passes `[]` for absent/empty/invalid phones, or one
+normalized valid phone. Added the explicit empty-string case to the native-adapter
+regression test; physical-device confirmation remains assigned to the user.
