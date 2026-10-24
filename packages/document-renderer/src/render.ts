@@ -197,7 +197,7 @@ h1, h2, p { margin: 0; }
 h1, h2, th { font-weight: normal; }
 p { overflow-wrap: anywhere; }
 .header { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; align-items: start; }
-.business h1 { font-family: var(--font-display); font-size: 20px; font-weight: normal; line-height: 1; margin-bottom: 10px; }
+.business h1 { font-family: var(--font-display); font-size: 20px; font-weight: ${fonts ? "normal" : "700"}; line-height: 1; margin-bottom: 10px; }
 .business p, .recipient p { margin-top: 2px; white-space: pre-wrap; }
 .recipient { margin-top: 24px; }
 h2 { font-family: var(--font-body); font-size: 14px; font-weight: normal; line-height: 1.4; margin-bottom: 7px; }
@@ -233,6 +233,7 @@ td.amount.with-details { vertical-align: middle; }
 .totals .summary-row { padding: 8px 10px; border-bottom: 1px solid #e5e5e5; }
 .totals .summary-row:nth-last-child(2) { border-bottom: 0; }
 .totals .final { font-family: var(--font-bold); font-size: 18px; line-height: 1.4; border-top: 2px solid #333; border-bottom: 0; margin-top: 3px; padding-top: 12px; }
+${fonts ? "" : ".recipient h2, .document-title h2, .services h2, th, .summary-total, .totals .final { font-weight: 700; }"}
 @media (max-width: 540px) {
   .page { padding: 22px 18px 150px; }
   .header { grid-template-columns: minmax(0, 1fr); gap: 22px; }
