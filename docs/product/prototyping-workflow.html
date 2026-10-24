@@ -8,11 +8,11 @@
     <li>Create <code>prototype/&lt;feature-slug&gt;</code> from a clean, current <code>main</code> and add a worktree under <code>/tmp/fieldsolo-prototypes/&lt;feature-slug&gt;</code>.</li>
     <li>Reuse real navigation, tokens, and components. Put branch-only data behind fixtures or mock adapters; production writes must be disabled.</li>
     <li>Compare alternatives on Expo Web and a physical phone. Record the exact viewport/device and test scenario.</li>
-    <li>Copy finalists into Figma page <strong>08 Experiments</strong> as new nodes named <code>YYYY-MM-DD / feature-slug / variant</code>.</li>
-    <li>Move the label from Exploring to Finalist, Approved, or Rejected. Never move or edit archive content.</li>
+    <li>Explore and review finalists in ChatGPT. Save the selected design artifacts locally and link them from the decision note using <code>YYYY-MM-DD / feature-slug / variant</code> labels.</li>
+    <li>Move the label from Exploring to Finalist, Approved, or Rejected. Preserve historical design references.</li>
     <li>Record the decision in <code>docs/product/decisions/</code> using the template.</li>
     <li>Remove the disposable worktree and branch after the decision is safely recorded.</li>
-    <li>Implement the winner afresh from the decision note and maintained Figma node; do not merge prototype shortcuts.</li>
+    <li>Implement the winner afresh from the decision note and approved ChatGPT design artifacts; do not merge prototype shortcuts.</li>
   </ol>
   <h2>Worktree commands</h2>
   <pre>git fetch origin
@@ -27,7 +27,7 @@ git branch -d prototype/&lt;feature-slug&gt;</pre>
     <li>No production credentials, write-capable adapters, migrations, or analytics emission.</li>
     <li>Fixtures are obviously labeled and live only on the prototype branch.</li>
     <li>Approval means design approval, not shipped functionality.</li>
-    <li>Figma Make is optional for unconstrained web concepts; it is not the Expo implementation baseline.</li>
+    <li>Design work happens in ChatGPT. Figma sync, page maintenance, mapping updates, and verification are not required.</li>
   </ul>
 </body>
 </html>

@@ -2,11 +2,12 @@ Treat only content marked data-status="shipped" in fieldsolo-current-product.htm
 
 For product-state answers, report the fieldsolo-source-commit and fieldsolo-reviewed-at values from the HTML.
 
-Distinguish:
-- Figma pages 01–05: immutable historical archive.
-- Figma page 07: maintained current app.
-- Figma page 08: experiments, not shipped functionality.
-- Figma page 09: next-generation design-system work, not shipped unless the HTML says otherwise.
+Design work happens in ChatGPT as of 2026-10-24. Figma Pro has been cancelled.
+Do not automatically sync to Figma, maintain Figma pages or figma-map.json, or require Figma verification. Existing Figma links, exports, and mappings are historical references and may be stale.
+
+Distinguish shipped behavior from approved but unshipped designs and exploring ChatGPT concepts. A design approval does not mean the feature has shipped.
+
+For meaningful shipped changes, update docs/product/current-product.html, run npm run product:export and npm run design:check, and refresh local visual assets when the UI changes. These checks run locally without Figma access.
 
 Use fieldsolo-core-screens.png for visual questions about canonical screens.
 Use fieldsolo-states-and-overlays.png for visual questions about alternate states, secondary screens, consent gates, and destructive actions.

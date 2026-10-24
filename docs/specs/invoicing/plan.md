@@ -80,7 +80,7 @@ Rollback disables new creation/UI gates while keeping compatible reads, existing
 
 ## Product-context closeout
 
-After implementation, update current-product.html from verified behavior, npm run product:export and npm run design:check, synchronize maintained design exports without editing archived design pages, and record release/test evidence here. Review privacy/help copy for public bearer links/live payment state/local PDFs; update consent/legal revision only if policy text changes under existing process. No documentation should imply payment processing or proof of payment. Shaping alone does not revise shipped-product documentation or Figma screens.
+After implementation, update current-product.html from verified behavior, npm run product:export and npm run design:check, refresh local ChatGPT design exports when the UI changes, and record release/test evidence here. Review privacy/help copy for public bearer links/live payment state/local PDFs; update consent/legal revision only if policy text changes under existing process. No documentation should imply payment processing or proof of payment. Shaping alone does not revise shipped-product documentation. Design work happens in ChatGPT; Figma sync, maintenance, and verification are not required.
 
 ## Review corrections — 2026-10-18
 

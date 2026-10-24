@@ -1,5 +1,8 @@
 # Learnings (FieldSoli / Figma / tooling)
 
+> Historical tooling notes: as of 2026-10-24, design work happens in ChatGPT and Figma Pro is cancelled. The Figma-first workflow below is superseded. Do not automatically sync, maintain, or verify Figma; follow `AGENTS.md` and `CONTEXT.md` for current product-context maintenance.
+
+
 Short, durable notes from integration work so we do not repeat slow failures.
 
 ## Figma MCP (`use_figma`)
