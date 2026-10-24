@@ -70,7 +70,7 @@ export function pdfFileName(
     .replace(/\s+/g, ' ')
     .replace(/[. ]+$/g, '')
     .slice(0, 80);
-  const documentTitle = `${title} ${base} for ${formatUsdCombined(totalCents)}`;
+  const documentTitle = `${title} #${base} for ${formatUsdCombined(totalCents)}`;
   return safeBusinessName
     ? `${documentTitle} from ${safeBusinessName}.pdf`
     : `${documentTitle}.pdf`;
