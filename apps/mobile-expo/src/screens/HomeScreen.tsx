@@ -39,7 +39,7 @@ import {
   SectionHeader,
   type JobsOpenSectionKind,
 } from '../components/ds';
-import { IconSettings } from '@tabler/icons-react-native';
+import { IconUser } from '@tabler/icons-react-native';
 import { PlatformHeaderAction, platformHeaderActionIconColor } from '../components/platform/PlatformHeaderAction';
 import {
   platformHeaderDisplayTitleStyle,
@@ -306,7 +306,7 @@ export function HomeScreen({
                   variant="primary"
                   onPress={onOpenProfile}
                 >
-                  <IconSettings color={platformHeaderActionIconColor} size={20} />
+                  <IconUser color={platformHeaderActionIconColor} size={20} />
                 </PlatformHeaderAction>
               </View>
             </View>
