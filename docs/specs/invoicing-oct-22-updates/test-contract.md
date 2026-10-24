@@ -21,3 +21,14 @@ Before merge: focused tests above, typecheck, relevant existing regression suite
 Before release: record exact source, app version/build/iOS, website and function deployment revision; physical iPhone 17 Pro Max covers TEST-01/02/03/06/08/09; small screen and large type cover layout risk. Keep build, submission, Apple processing and release verification separate. Prior snapshot/control tests remain required if affected. No financial migration expected; if one becomes necessary, extend the approved data/plan/test contracts before applying it.
 
 Highest risks: hidden deployment/provider defect (01), async blank preview or stale sharing (02/03), wrong recipient/privacy exposure (06/07/08), financial display drift (04/05). No functional requirement intentionally untested; native/device checks are manual because simulator SMS and mocks cannot prove those boundaries.
+
+## Preview preparation regression coverage
+
+- Prepared FAB opening performs no second preview request and no document mutation.
+- Hook coverage includes shared in-flight reads, expiry, failed speculative reads,
+  timeout, invalidation, owner/Job/type/source changes, disabled mode and unmount.
+- Loader persists through sizing messages until first paint, resets after renderer
+  termination, and offers Retry if rendering never signals readiness.
+- Simulator smoke: current unsaved Estimate and Invoice render, close/reopen works,
+  and existing saved Estimate remains accessible. This does not replace physical
+  TestFlight resume/first-paint checks or establish a measured latency target.

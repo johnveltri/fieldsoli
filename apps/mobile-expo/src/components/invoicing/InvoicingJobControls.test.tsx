@@ -655,6 +655,70 @@ describe('InvoicingJobControls', () => {
     expect(mockFinalize).not.toHaveBeenCalled();
   });
 
+  it('reuses the prepared Job preview when the FAB opens', async () => {
+    const ref = createRef<InvoicingJobControlsHandle>();
+    const revision = {};
+    const screen = render(<InvoicingJobControls {...props} ref={ref} mode="launcher" previewRevision={revision} />);
+    await waitFor(() => expect(mockPreview).toHaveBeenCalledTimes(1));
+    await act(async () => { ref.current?.openPreview(); });
+    expect(await screen.findByTestId('document-preview-html')).toBeTruthy();
+    expect(mockPreview).toHaveBeenCalledTimes(1);
+    expect(mockCreate).not.toHaveBeenCalled();
+    expect(mockCreateAndSelect).not.toHaveBeenCalled();
+  });
+
+  it('keeps the loader visible until first paint and resets it after a renderer restart', async () => {
+    const ref = createRef<InvoicingJobControlsHandle>();
+    const screen = render(<InvoicingJobControls {...props} ref={ref} mode="launcher" />);
+    await act(async () => { ref.current?.openPreview(); });
+    const web = await screen.findByTestId('document-preview-html');
+    expect(screen.getByTestId('document-preview-paint-loading')).toBeTruthy();
+    expect(StyleSheet.flatten(web.props.style).opacity).toBe(0);
+    fireEvent(web, 'onMessage', { nativeEvent: { data: JSON.stringify({ type: 'preview-height', height: 700 }) } });
+    expect(screen.getByTestId('document-preview-paint-loading')).toBeTruthy();
+    fireEvent(web, 'onMessage', { nativeEvent: { data: JSON.stringify({ type: 'preview-ready', previewToken: Number(web.props.injectedJavaScript.match(/previewToken: (\d+)/)[1]) }) } });
+    expect(screen.queryByTestId('document-preview-paint-loading')).toBeNull();
+    expect(StyleSheet.flatten(screen.getByTestId('document-preview-html').props.style).opacity).toBe(1);
+    fireEvent(screen.getByTestId('document-preview-html'), 'onContentProcessDidTerminate');
+    expect(screen.getByTestId('document-preview-paint-loading')).toBeTruthy();
+  });
+
+  it('ignores ready messages from a previous document source', async () => {
+    const ref = createRef<InvoicingJobControlsHandle>();
+    const screen = render(<InvoicingJobControls {...props} ref={ref} mode="launcher" />);
+    await act(async () => { ref.current?.openPreview(); });
+    const previous = await screen.findByTestId('document-preview-html');
+    const previousToken = Number(previous.props.injectedJavaScript.match(/previewToken: (\d+)/)[1]);
+    mockPreview.mockResolvedValueOnce({ payload: { ...payload, documentType: 'invoice' }, gaps: [], rendererVersion: 1 } as DocumentPreview);
+    await act(async () => fireEvent.press(screen.getByRole('button', { name: 'Invoice' })));
+    const current = screen.getByTestId('document-preview-html');
+    const currentToken = Number(current.props.injectedJavaScript.match(/previewToken: (\d+)/)[1]);
+    expect(currentToken).not.toBe(previousToken);
+    fireEvent(current, 'onMessage', { nativeEvent: { data: JSON.stringify({ type: 'preview-ready', previewToken: previousToken }) } });
+    expect(screen.getByTestId('document-preview-paint-loading')).toBeTruthy();
+    fireEvent(current, 'onMessage', { nativeEvent: { data: JSON.stringify({ type: 'preview-ready', previewToken: currentToken }) } });
+    expect(screen.queryByTestId('document-preview-paint-loading')).toBeNull();
+  });
+
+  it('offers Retry when the renderer never reports first paint', async () => {
+    const ref = createRef<InvoicingJobControlsHandle>();
+    const screen = render(<InvoicingJobControls {...props} ref={ref} mode="launcher" />);
+    await act(async () => { ref.current?.openPreview(); });
+    await screen.findByTestId('document-preview-html');
+    jest.useFakeTimers();
+    try {
+      fireEvent(screen.getByTestId('document-preview-html'), 'onContentProcessDidTerminate');
+      await act(async () => { jest.advanceTimersByTime(15_000); });
+      expect(screen.getByLabelText('Retry document preview')).toBeTruthy();
+      expect(screen.queryByTestId('document-preview-html')).toBeNull();
+      fireEvent.press(screen.getByLabelText('Retry document preview'));
+      await act(async () => {});
+      expect(screen.getByTestId('document-preview-html')).toBeTruthy();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('refreshes the selected unsaved type after app switching and recovers a failed read inline', async () => {
     const listener = jest.fn<(state: string) => void>();
     jest.spyOn(AppState, 'addEventListener').mockImplementation((_event, callback) => {

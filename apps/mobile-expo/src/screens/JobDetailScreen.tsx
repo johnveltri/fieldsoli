@@ -3581,6 +3581,7 @@ export function JobDetailScreen({
           workStatus={job.workStatus}
           typography={typography}
           mode="launcher"
+          previewRevision={job}
           refreshKey={documentListRevision}
           onDocumentsChanged={onDocumentsChanged}
           active={detailMode === 'view'}

@@ -12,3 +12,10 @@
 No migration/backfill expected. If runtime diagnosis identifies a missing existing migration or function, compare exact deployed state and plan authorized deployment; never invent a schema workaround. Preserve old-client compatibility.
 
 Dependency envelope, verified sources, budget and free-tier fallback are recorded in decision-packet.md. Actual traffic/plan unknown; shared DB daily budget does not itself prove compliance with provider per-second limits. No raw address/contact/token/amount diagnostic logging; safe bounded status codes and aggregate counts suffice.
+
+Live preview preparation stores only the existing authenticated preview response in
+component memory for at most 30 seconds after successful completion. It is isolated
+by owner/Job/source and discarded on scope changes; it is never persisted to disk.
+No device location, telemetry field, document creation or number reservation is
+added. Saved sharing controls/payment reads and server creation fingerprint checks
+remain authoritative.

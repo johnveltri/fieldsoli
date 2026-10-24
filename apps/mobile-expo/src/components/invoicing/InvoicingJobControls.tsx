@@ -3,6 +3,7 @@ import {
   useCallback,
   useEffect,
   useImperativeHandle,
+  useMemo,
   useRef,
   useState,
 } from 'react';
@@ -107,6 +108,7 @@ import {
   type BusinessSettingsScreenHandle,
 } from '../../screens/BusinessSettingsScreen';
 import { BottomSheetShell } from '../ds/BottomSheetShell';
+import { usePreparedDocumentPreview } from './usePreparedDocumentPreview';
 import { ActionSummaryCard } from '../ds/ActionSummaryCard';
 import { FullWidthFab } from '../ds/FullWidthFab';
 import { ProfileRowsCard } from '../ds/ProfileRowsCard';
@@ -123,6 +125,8 @@ type Props = {
   mode: 'view' | 'edit' | 'launcher';
   onPreviewDocument?: (documentId: string) => void;
   refreshKey?: number;
+  /** Current Job source identity, used to invalidate the speculative preview. */
+  previewRevision?: unknown;
   onDocumentsChanged?: () => void;
   active?: boolean;
   onEditDetails: () => void;
@@ -163,6 +167,9 @@ function loadPreviewFontData(): Promise<PreviewFontData> {
         new File(displayAsset.localUri).base64(),
       ]);
       return { body, bodyBold, label, display };
+    }).catch((error) => {
+      previewFontDataPromise = null;
+      throw error;
     });
   }
   return previewFontDataPromise;
@@ -208,8 +215,13 @@ const REPORT_PREVIEW_HEIGHT = `
   const report = () => window.ReactNativeWebView.postMessage(JSON.stringify({
     type: 'preview-height', height: Math.ceil(page.getBoundingClientRect().height)
   }));
-  new ResizeObserver(report).observe(page);
-  if (document.fonts) document.fonts.ready.then(report);
+  if (window.ResizeObserver) new ResizeObserver(report).observe(page);
+  const ready = () => requestAnimationFrame(() => requestAnimationFrame(() => {
+    report();
+    window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'preview-ready', previewToken: __PREVIEW_TOKEN__ }));
+  }));
+  if (document.fonts) document.fonts.ready.then(ready);
+  else ready();
   report();
 })();
 true;
@@ -255,6 +267,7 @@ export const InvoicingJobControls = forwardRef<
     onRevenueInvoiceChanged,
     onPreviewDocument,
     refreshKey,
+    previewRevision,
     onDocumentsChanged,
   }: Props,
   ref,
@@ -305,6 +318,7 @@ export const InvoicingJobControls = forwardRef<
     previewTranslateY.stopAnimation();
     if (open) {
       previewVisibleRef.current = true;
+      setWebViewGeneration((value) => value + 1);
       previewTranslateY.setValue(previewWindowHeight);
       setPreviewOpenState(true);
       return;
@@ -362,9 +376,8 @@ export const InvoicingJobControls = forwardRef<
   );
 
   useEffect(() => {
-    if (!previewOpen) return;
+    if (!previewOpen && !(isActive && mode === 'launcher')) return;
     let cancelled = false;
-    setPreviewFontsReady(false);
     void boundedDocumentRead(loadPreviewFontData())
       .then((fonts) => {
         if (!cancelled) {
@@ -381,7 +394,17 @@ export const InvoicingJobControls = forwardRef<
     return () => {
       cancelled = true;
     };
-  }, [previewOpen]);
+  }, [isActive, mode, previewOpen]);
+
+  const preparedRevision = useMemo(
+    () => [previewRevision, refreshKey, workStatus],
+    [previewRevision, refreshKey, workStatus],
+  );
+  const { read: readPreparedPreview, invalidate: invalidatePreparedPreview } = usePreparedDocumentPreview({
+    client, ownerId, jobId, type: defaultDocumentType(workStatus),
+    revision: preparedRevision,
+    enabled: mode === 'launcher' && previewRevision !== undefined && isActive && !!ownerId && !recoveringIntent,
+  });
 
   const reload = useCallback(async () => {
     setRefreshingSaved(true);
@@ -570,11 +593,7 @@ export const InvoicingJobControls = forwardRef<
     setBusy('Loading…');
     setPreviewType(defaultDocumentType(workStatus));
     try {
-      const next = await readPreview(client, {
-        jobId,
-        type: defaultDocumentType(workStatus),
-        timezone: deviceIanaTimeZone(),
-      });
+      const next = await readPreparedPreview();
       if (request === previewRequestRef.current) {
         setPreview(next);
         setOffline(false);
@@ -588,7 +607,7 @@ export const InvoicingJobControls = forwardRef<
     } finally {
       if (request === previewRequestRef.current) setBusy(null);
     }
-  }, [beforeOpen, client, jobId, workStatus, setPreviewOpen]);
+  }, [beforeOpen, readPreparedPreview, workStatus, setPreviewOpen]);
 
   const switchType = useCallback(
     async (type: 'estimate' | 'invoice') => {
@@ -704,6 +723,29 @@ export const InvoicingJobControls = forwardRef<
   const displaySaved = saved && !refreshingSaved && savedWorkStatus === workStatus
     ? saved
     : null;
+  const previewSource = useMemo(() => {
+    if (!previewFontsReady) return null;
+    if (displaySaved) return { html: htmlFor(displaySaved, 'preview', previewFonts ?? undefined) };
+    if (preview) return { html: htmlFor(preview, 'preview', previewFonts ?? undefined, true) };
+    return null;
+  }, [displaySaved, preview, previewFonts, previewFontsReady]);
+  const paintSequence = useRef(0);
+  const paintToken = useMemo(() => ++paintSequence.current, [previewSource, webViewGeneration]);
+  const previewScript = useMemo(
+    () => REPORT_PREVIEW_HEIGHT.replace('__PREVIEW_TOKEN__', String(paintToken)),
+    [paintToken],
+  );
+  const [paintedPreview, setPaintedPreview] = useState<{
+    source: typeof previewSource; generation: number;
+  } | null>(null);
+  const previewPainted = paintedPreview?.source === previewSource &&
+    paintedPreview?.generation === webViewGeneration;
+  useEffect(() => {
+    if (!previewOpen || !previewSource || previewFailure || previewPainted) return;
+    const timeout = setTimeout(() => setPreviewFailure(true), 15_000);
+    return () => clearTimeout(timeout);
+  }, [previewOpen, previewSource, previewFailure, previewPainted, webViewGeneration]);
+
   const active = displaySaved;
 
   const performQueuedHandoff = useCallback(async () => {
@@ -1009,6 +1051,7 @@ export const InvoicingJobControls = forwardRef<
   }, []);
 
   const closeBusinessSettings = useCallback(() => {
+    invalidatePreparedPreview();
     setBusinessOpen(false);
     const returnTo = businessReturnRef.current;
     businessReturnRef.current = null;
@@ -1017,9 +1060,10 @@ export const InvoicingJobControls = forwardRef<
     } else if (returnTo?.kind === 'preview') {
       void switchType(previewType);
     }
-  }, [openFinalization, previewType, switchType]);
+  }, [invalidatePreparedPreview, openFinalization, previewType, switchType]);
 
   const retryPreview = useCallback(() => {
+    setWebViewGeneration((value) => value + 1);
     if (finalization) {
       void openFinalization(finalization.status);
     } else if (savedPreviewIdRef.current) {
@@ -1032,6 +1076,7 @@ export const InvoicingJobControls = forwardRef<
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
       if (state !== 'active' || !isActive || recoveringIntent || onPreviewDocument) return;
+      invalidatePreparedPreview();
       // WKWebView content can be discarded while the app is suspended.
       setWebViewGeneration((value) => value + 1);
       if (previewVisibleRef.current && !businessOpen && !creationRunningRef.current && !handoffRunningRef.current) {
@@ -1041,7 +1086,7 @@ export const InvoicingJobControls = forwardRef<
       }
     });
     return () => subscription.remove();
-  }, [businessOpen, isActive, onPreviewDocument, previewOpen, recoveringIntent, reload, retryPreview]);
+  }, [businessOpen, invalidatePreparedPreview, isActive, onPreviewDocument, previewOpen, recoveringIntent, reload, retryPreview]);
 
   const confirmFinalization = useCallback(async () => {
     if (!finalization || creationRunningRef.current || recoveringIntent) return;
@@ -1426,46 +1471,43 @@ export const InvoicingJobControls = forwardRef<
             ) : null}
             <View style={styles.paperWrap}>
               <View style={styles.paper}>
-                {previewFontsReady && (displaySaved || preview) && !previewFailure ? (
-                  <WebView
-                    key={webViewGeneration}
-                    onContentProcessDidTerminate={() => setWebViewGeneration((value) => value + 1)}
-                    onRenderProcessGone={() => setWebViewGeneration((value) => value + 1)}
-                    onError={() => setPreviewFailure(true)}
-                    testID="document-preview-html"
-                    originWhitelist={['*']}
-                    source={{
-                      html: displaySaved
-                        ? htmlFor(displaySaved, 'preview', previewFonts ?? undefined)
-                        : preview
-                          ? htmlFor(
-                              {
-                                ...preview,
-                                paymentProjection: preview.paymentProjection,
-                              },
-                              'preview',
-                              previewFonts ?? undefined,
-                              true,
-                            )
-                          : '<html><body></body></html>',
-                    }}
-                    scrollEnabled={false}
-                    containerStyle={{ flex: 0, height: previewHeight }}
-                    injectedJavaScript={REPORT_PREVIEW_HEIGHT}
-                    onMessage={(event) => {
-                      try {
-                        const message = JSON.parse(event.nativeEvent.data);
-                        if (message.type === 'preview-height' &&
-                            Number.isFinite(message.height) && message.height > 0) {
-                          setPreviewHeight((height) =>
-                            Math.abs(height - message.height) > 1 ? message.height : height);
+                {previewSource && !previewFailure ? (
+                  <>
+                    <WebView
+                      key={paintToken}
+                      onContentProcessDidTerminate={() => setWebViewGeneration((value) => value + 1)}
+                      onRenderProcessGone={() => setWebViewGeneration((value) => value + 1)}
+                      onError={() => setPreviewFailure(true)}
+                      testID="document-preview-html"
+                      originWhitelist={['*']}
+                      source={previewSource}
+                      scrollEnabled={false}
+                      containerStyle={{ flex: 0, height: previewHeight }}
+                      injectedJavaScript={previewScript}
+                      onMessage={(event) => {
+                        try {
+                          const message = JSON.parse(event.nativeEvent.data);
+                          if (message.type === 'preview-ready' && message.previewToken === paintToken) {
+                            setPaintedPreview({ source: previewSource, generation: webViewGeneration });
+                          }
+                          if (message.type === 'preview-height' &&
+                              Number.isFinite(message.height) && message.height > 0) {
+                            setPreviewHeight((height) =>
+                              Math.abs(height - message.height) > 1 ? message.height : height);
+                          }
+                        } catch {
+                          // Ignore messages unrelated to document sizing.
                         }
-                      } catch {
-                        // Ignore messages unrelated to document sizing.
-                      }
-                    }}
-                    style={[styles.web, { height: previewHeight }]}
-                  />
+                      }}
+                      style={[styles.web, { height: previewHeight, opacity: previewPainted ? 1 : 0 }]}
+                    />
+                    {!previewPainted ? (
+                      <View style={styles.previewLoading} testID="document-preview-paint-loading">
+                        <ActivityIndicator size="small" color={fg.primary} />
+                        <Text style={[typography.body, styles.loadingLabel]}>Loading document preview…</Text>
+                      </View>
+                    ) : null}
+                  </>
                 ) : previewFailure ? null : (
                   <ActivityIndicator size="small" color={fg.primary} />
                 )}
@@ -1762,6 +1804,7 @@ const styles = StyleSheet.create({
   previewSelector: { width: 320, maxWidth: '100%', alignSelf: 'center' },
   loadingLabel: { color: fg.secondary, textAlign: 'center' },
   gapWrap: { flexShrink: 1, gap: space('Spacing/12') },
+  previewLoading: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, alignItems: 'center', paddingTop: space('Spacing/24'), gap: space('Spacing/12') },
   paperWrap: { width: '100%' },
   paper: {
     overflow: 'hidden',

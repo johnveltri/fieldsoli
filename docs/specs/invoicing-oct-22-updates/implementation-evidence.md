@@ -129,3 +129,32 @@ address API/Edge regression suites passed 12 tests immediately before deployment
 No database migration, user-data write or mobile/store release was performed.
 An authenticated production provider lookup through the user's TestFlight app
 remains the final runtime check; this receipt does not claim that it was run.
+
+## Prepared Job preview and first-paint recovery — 2026-10-24
+
+User approved preparing the current live preview and fonts during Job View.
+The root launcher warms a read-only preview, shares in-flight reads, and reuses
+successful results for at most 30 seconds. Owner/Job/type/source/document revision,
+edit/inactive transitions, foreground and Business Details return invalidate the
+preparation. No document creation, number reservation, persistent cache or location
+collection was added. Fresh saved sharing reads and creation fingerprint validation
+are preserved.
+
+Memoized HTML avoids rebuilding embedded fonts on sizing/loading updates. The
+WebView remains hidden behind an explicit loading state until a font-ready,
+double-animation-frame signal. A per-render token rejects previous-document ready
+messages; source changes and renderer recovery remount the WebView. A missing
+ready signal after 15 seconds offers the existing Retry action.
+
+Final validation: 508 mobile tests across 73 suites, including 54 focused preview /
+preparation tests, passed. Full workspace TypeScript and product HTML validation
+passed; product exports regenerated. Independent review found a stale first-paint
+message race; the fix and regression test were reviewed with no remaining findings.
+
+Observed on selected iPhone 17 Pro / iOS 26.2, Expo Go served from this worktree on
+Metro 8082 against hosted Dev: FAB Estimate rendered; switching to Invoice rendered;
+backgrounding to the iOS Home screen and reopening Expo Go showed loading then
+restored the selected Invoice; existing saved Estimate #00001 rendered. Left on
+Job View. No documents were created or shared and no Job/business data was edited.
+This is a focused simulator smoke check, not a latency benchmark or physical
+TestFlight verification. Existing maintained-Figma-page mismatch remains unchanged.
