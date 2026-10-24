@@ -59,6 +59,7 @@ export function smsUrl(phone: string | null, body: string): string {
 export function pdfFileName(
   type: 'estimate' | 'invoice',
   number: number,
+  totalCents: number,
   businessName?: string | null,
 ): string {
   const title = type === 'estimate' ? 'Estimate' : 'Invoice';
@@ -69,9 +70,10 @@ export function pdfFileName(
     .replace(/\s+/g, ' ')
     .replace(/[. ]+$/g, '')
     .slice(0, 80);
+  const documentTitle = `${title} ${base} for ${formatUsdCombined(totalCents)}`;
   return safeBusinessName
-    ? `${safeBusinessName} - ${title} ${base}.pdf`
-    : `${title}-${base}.pdf`;
+    ? `${documentTitle} from ${safeBusinessName}.pdf`
+    : `${documentTitle}.pdf`;
 }
 
 export function defaultDocumentType(workStatus: string): 'estimate' | 'invoice' {

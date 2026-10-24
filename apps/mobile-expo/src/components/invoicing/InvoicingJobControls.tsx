@@ -936,6 +936,7 @@ export const InvoicingJobControls = forwardRef<
         const filename = pdfFileName(
           fresh.documentType,
           fresh.documentNumber,
+          fresh.payload.totalCents,
           fresh.payload.businessName,
         );
         const namedFile = new File(Paths.cache, filename);

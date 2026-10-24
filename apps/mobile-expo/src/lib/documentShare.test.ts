@@ -24,9 +24,12 @@ describe('documentShare', () => {
     expect(gmailSubject({ type: 'invoice', number: 12, businessName: 'North' })).toBe(
       'Invoice #00012 from North',
     );
-    expect(pdfFileName('invoice', 1)).toBe('Invoice-00001.pdf');
-    expect(pdfFileName('invoice', 1, 'Best Business / LLC')).toBe(
-      'Best Business LLC - Invoice 00001.pdf',
+    expect(pdfFileName('invoice', 1, 0)).toBe('Invoice 00001 for $0.00.pdf');
+    expect(pdfFileName('invoice', 1, 123456, 'Best Business / LLC')).toBe(
+      'Invoice 00001 for $1,234.56 from Best Business LLC.pdf',
+    );
+    expect(pdfFileName('estimate', 12, 19300, 'Veltri Ventures')).toBe(
+      'Estimate 00012 for $193.00 from Veltri Ventures.pdf',
     );
     expect(mailtoUrl({
       email: 'blake@example.com',
