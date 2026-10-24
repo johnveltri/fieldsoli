@@ -35,7 +35,7 @@ const nextConfig: NextConfig = {
               "style-src 'unsafe-inline'",
               "script-src 'self' 'unsafe-inline'",
               "connect-src 'none'",
-              "font-src 'none'",
+              "font-src 'self'",
               "object-src 'none'",
               "worker-src 'none'",
             ].join("; "),
