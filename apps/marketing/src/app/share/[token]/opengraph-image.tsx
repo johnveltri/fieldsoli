@@ -46,9 +46,10 @@ export default async function ShareCardImage({
     );
   }
   const card = shareCard(document);
-  const [bodyFont, bodyBoldFont, businessFont] = await Promise.all([
+  const [bodyFont, bodyBoldFont, metricFont, businessFont] = await Promise.all([
     readFile(join(process.cwd(), "public/fonts/Ubuntu-Regular.ttf")),
     readFile(join(process.cwd(), "public/fonts/Ubuntu-Medium.ttf")),
+    readFile(join(process.cwd(), "public/fonts/Ubuntu-Bold.ttf")),
     readFile(join(process.cwd(), "public/fonts/PTSerif-Bold.ttf")),
   ]);
   return new ImageResponse(
@@ -76,7 +77,7 @@ export default async function ShareCardImage({
             {card.shortDescription}
           </div>
         </div>
-        <div style={{ display: "flex", fontSize: 72 }}>{card.amount}</div>
+        <div style={{ display: "flex", fontSize: 72, fontWeight: 700 }}>{card.amount}</div>
         <div style={{ display: "flex", fontSize: 24, color: "#737373" }}>{card.issuedLabel}</div>
       </div>
     ),
@@ -85,6 +86,7 @@ export default async function ShareCardImage({
       fonts: [
         { name: "Ubuntu", data: bodyFont, weight: 400, style: "normal" },
         { name: "Ubuntu", data: bodyBoldFont, weight: 500, style: "normal" },
+        { name: "Ubuntu", data: metricFont, weight: 700, style: "normal" },
         { name: "PT Serif", data: businessFont, weight: 700, style: "normal" },
       ],
       headers: { "Cache-Control": "private, no-store" },
