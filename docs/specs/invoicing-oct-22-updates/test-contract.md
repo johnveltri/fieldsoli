@@ -32,3 +32,9 @@ Highest risks: hidden deployment/provider defect (01), async blank preview or st
 - Simulator smoke: current unsaved Estimate and Invoice render, close/reopen works,
   and existing saved Estimate remains accessible. This does not replace physical
   TestFlight resume/first-paint checks or establish a measured latency target.
+
+Follow-up assertions: an already-loaded saved snapshot renders while its owner
+revalidation remains pending; identical HTML keeps the same WebView source and
+ready state; read and paint phases expose exactly one loading message. Failed
+owner revalidation and fresh-read sharing/PDF regression checks remain covered.
+Follow-up simulator execution is assigned to the user.

@@ -723,12 +723,29 @@ export const InvoicingJobControls = forwardRef<
   const displaySaved = saved && !refreshingSaved && savedWorkStatus === workStatus
     ? saved
     : null;
-  const previewSource = useMemo(() => {
+  // Prepare immutable saved content while the Documents list is already loaded.
+  const preparedSavedHtml = useMemo(() => {
+    const result = new Map<string, { record: FinancialDocumentRecord; html: string }>();
+    if (!previewFontsReady) return result;
+    for (const record of documents) {
+      if (!record.archived) result.set(record.id, {
+        record, html: htmlFor(record, 'preview', previewFonts ?? undefined),
+      });
+    }
+    return result;
+  }, [documents, previewFonts, previewFontsReady]);
+  const previewHtml = useMemo(() => {
     if (!previewFontsReady) return null;
-    if (displaySaved) return { html: htmlFor(displaySaved, 'preview', previewFonts ?? undefined) };
-    if (preview) return { html: htmlFor(preview, 'preview', previewFonts ?? undefined, true) };
+    if (displaySaved) {
+      const prepared = preparedSavedHtml.get(displaySaved.id);
+      return prepared?.record === displaySaved
+        ? prepared.html : htmlFor(displaySaved, 'preview', previewFonts ?? undefined);
+    }
+    if (preview) return htmlFor(preview, 'preview', previewFonts ?? undefined, true);
     return null;
-  }, [displaySaved, preview, previewFonts, previewFontsReady]);
+  }, [displaySaved, preparedSavedHtml, preview, previewFonts, previewFontsReady]);
+  // An identical owner refresh must not restart an already painted WebView.
+  const previewSource = useMemo(() => previewHtml === null ? null : { html: previewHtml }, [previewHtml]);
   const paintSequence = useRef(0);
   const paintToken = useMemo(() => ++paintSequence.current, [previewSource, webViewGeneration]);
   const previewScript = useMemo(
@@ -979,12 +996,15 @@ export const InvoicingJobControls = forwardRef<
     }
   };
 
-  const openDocument = useCallback((documentId: string) => {
+  const openDocument = useCallback((documentId: string, forceRefresh = false) => {
     savedPreviewIdRef.current = documentId;
     setPreviewFailure(false);
     previewRequestRef.current += 1;
     const request = previewRequestRef.current;
-    setSaved(null);
+    const cached = !forceRefresh && !refreshingSaved && savedWorkStatus === workStatus
+      ? documents.find((record) => record.id === documentId && !record.archived) ?? null
+      : null;
+    setSaved(cached);
     setPreview(null);
     setPreviewOpen(true);
     setOffline(false);
@@ -1007,7 +1027,7 @@ export const InvoicingJobControls = forwardRef<
       .finally(() => {
         if (request === previewRequestRef.current) setBusy(null);
       });
-  }, [refreshDocument, setPreviewOpen, workStatus]);
+  }, [documents, refreshingSaved, savedWorkStatus, refreshDocument, setPreviewOpen, workStatus]);
 
   const openFinalization = useCallback(async (status: 'completed' | 'paid') => {
     const request = ++previewRequestRef.current;
@@ -1067,7 +1087,7 @@ export const InvoicingJobControls = forwardRef<
     if (finalization) {
       void openFinalization(finalization.status);
     } else if (savedPreviewIdRef.current) {
-      openDocument(savedPreviewIdRef.current);
+      openDocument(savedPreviewIdRef.current, true);
     } else {
       void switchType(previewType);
     }
@@ -1426,7 +1446,7 @@ export const InvoicingJobControls = forwardRef<
                 />
               </View>
             ) : null}
-            {busy ? (
+            {busy && busy !== 'Loading' && busy !== 'Loading…' && busy !== 'Reviewing…' ? (
               <Text
                 accessibilityLiveRegion="polite"
                 style={[typography.bodySmall, styles.loadingLabel]}
@@ -1509,7 +1529,10 @@ export const InvoicingJobControls = forwardRef<
                     ) : null}
                   </>
                 ) : previewFailure ? null : (
-                  <ActivityIndicator size="small" color={fg.primary} />
+                  <View style={styles.previewInitialLoading} testID="document-preview-data-loading">
+                    <ActivityIndicator size="small" color={fg.primary} />
+                    <Text style={[typography.body, styles.loadingLabel]}>Loading document preview…</Text>
+                  </View>
                 )}
               </View>
             </View>
@@ -1541,6 +1564,7 @@ export const InvoicingJobControls = forwardRef<
                     : 'SHARE INVOICE'
                 }
                 onPress={() => void openFreshShareSheet(displaySaved.id)}
+                disabled={!!busy}
                 includeSafeArea
               />
             </View>
@@ -1804,6 +1828,7 @@ const styles = StyleSheet.create({
   previewSelector: { width: 320, maxWidth: '100%', alignSelf: 'center' },
   loadingLabel: { color: fg.secondary, textAlign: 'center' },
   gapWrap: { flexShrink: 1, gap: space('Spacing/12') },
+  previewInitialLoading: { alignItems: 'center', paddingTop: space('Spacing/24'), gap: space('Spacing/12') },
   previewLoading: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, alignItems: 'center', paddingTop: space('Spacing/24'), gap: space('Spacing/12') },
   paperWrap: { width: '100%' },
   paper: {

@@ -158,3 +158,19 @@ restored the selected Invoice; existing saved Estimate #00001 rendered. Left on
 Job View. No documents were created or shared and no Job/business data was edited.
 This is a focused simulator smoke check, not a latency benchmark or physical
 TestFlight verification. Existing maintained-Figma-page mismatch remains unchanged.
+
+## Single loading presentation and prepared saved content — 2026-10-24
+
+Follow-up removes the separate read-busy label and gives data/paint loading the
+same presentation. Non-archived saved document HTML is prepared from the loaded
+list and fonts. Opening displays that content while revalidating owner state;
+identical HTML preserves the WebView source instead of triggering another render.
+Saved Share remains disabled during the initial owner refresh, preventing a second
+read and an out-of-order share sheet. Failed revalidation still removes content and sharing access. Foreground/Retry
+force a fresh owner read; sharing and PDF keep their existing fresh-read gates.
+
+Focused preview component tests passed 42 cases, including a deliberately pending
+saved owner read, unchanged-source revalidation, and exactly one loading message
+through data and paint. Simulator QA for this follow-up was explicitly deferred
+to the user. Native WebView first rendering still occurs on opening; this update
+does not claim a fully pre-rendered preview or zero initial render latency.

@@ -158,6 +158,45 @@ describe('InvoicingJobControls', () => {
     expect(mockPreview).not.toHaveBeenCalled();
   });
 
+  it('shows a prepared saved document during revalidation and preserves its painted source when unchanged', async () => {
+    mockList.mockResolvedValue([doc]);
+    const screen = render(<InvoicingJobControls {...props} mode="view" />);
+    const row = await screen.findByLabelText(/^Preview Estimate #00001,/);
+    let resolveRefresh!: (value: FinancialDocumentRecord[]) => void;
+    mockList.mockImplementationOnce(() => new Promise((resolve) => { resolveRefresh = resolve; }));
+    fireEvent.press(row);
+    const web = await screen.findByTestId('document-preview-html');
+    const source = web.props.source;
+    const token = Number(web.props.injectedJavaScript.match(/previewToken: (\d+)/)[1]);
+    expect(screen.queryByTestId('document-preview-data-loading')).toBeNull();
+    expect(screen.getByLabelText('SHARE ESTIMATE').props.accessibilityState.disabled).toBe(true);
+    const readCount = mockList.mock.calls.length;
+    fireEvent.press(screen.getByLabelText('SHARE ESTIMATE'));
+    expect(mockList).toHaveBeenCalledTimes(readCount);
+    expect(screen.getAllByText('Loading document preview…')).toHaveLength(1);
+    fireEvent(web, 'onMessage', { nativeEvent: { data: JSON.stringify({ type: 'preview-ready', previewToken: token }) } });
+    expect(screen.queryByText('Loading document preview…')).toBeNull();
+    await act(async () => resolveRefresh([{ ...doc }]));
+    expect(screen.getByTestId('document-preview-html').props.source).toBe(source);
+    expect(screen.getByLabelText('SHARE ESTIMATE').props.accessibilityState.disabled).toBe(false);
+    expect(screen.queryByText('Loading document preview…')).toBeNull();
+  });
+
+  it('uses one loading presentation through data and renderer preparation', async () => {
+    const ref = createRef<InvoicingJobControlsHandle>();
+    const screen = render(<InvoicingJobControls {...props} ref={ref} mode="launcher" />);
+    await waitFor(() => expect(mockList).toHaveBeenCalled());
+    let resolvePreview!: (value: DocumentPreview) => void;
+    mockPreview.mockImplementationOnce(() => new Promise((resolve) => { resolvePreview = resolve; }));
+    act(() => ref.current?.openPreview());
+    expect(screen.getAllByText('Loading document preview…')).toHaveLength(1);
+    expect(screen.queryByText('Loading…')).toBeNull();
+    await act(async () => resolvePreview({ payload, gaps: [], rendererVersion: 1 } as DocumentPreview));
+    await screen.findByTestId('document-preview-html');
+    expect(screen.getAllByText('Loading document preview…')).toHaveLength(1);
+    expect(screen.queryByText('Loading…')).toBeNull();
+  });
+
   it('refreshes saved payment status before rendering a preview', async () => {
     const paid = { ...doc, paymentProjection: 'paid' } as FinancialDocumentRecord;
     const unpaid = { ...doc, paymentProjection: 'unpaid' } as FinancialDocumentRecord;
@@ -689,7 +728,7 @@ describe('InvoicingJobControls', () => {
     await act(async () => { ref.current?.openPreview(); });
     const previous = await screen.findByTestId('document-preview-html');
     const previousToken = Number(previous.props.injectedJavaScript.match(/previewToken: (\d+)/)[1]);
-    mockPreview.mockResolvedValueOnce({ payload: { ...payload, documentType: 'invoice' }, gaps: [], rendererVersion: 1 } as DocumentPreview);
+    mockPreview.mockResolvedValueOnce({ payload: { ...payload, documentType: 'invoice' }, gaps: [], rendererVersion: 1, paymentProjection: 'paid' } as DocumentPreview);
     await act(async () => fireEvent.press(screen.getByRole('button', { name: 'Invoice' })));
     const current = screen.getByTestId('document-preview-html');
     const currentToken = Number(current.props.injectedJavaScript.match(/previewToken: (\d+)/)[1]);

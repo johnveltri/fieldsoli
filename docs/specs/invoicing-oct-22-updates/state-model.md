@@ -27,3 +27,15 @@ Font preparation starts on active Job View. HTML/source are memoized. Each modal
 opening and renderer restart waits for a font-ready, double-animation-frame signal
 before revealing document content; height messages alone do not dismiss the loader.
 A missing ready signal after 15 seconds transitions to the existing Retry state.
+
+### Unified loading and saved-document opening
+
+Data preparation and first paint use one loading presentation. Routine owner
+revalidation does not display a second loading label over prepared content.
+Non-archived saved documents from the current Job-status list prepare HTML with
+fonts before opening. Owner revalidation runs without delaying that saved content;
+an unchanged HTML result preserves the painted WebView. A failed revalidation
+still removes the preview and offers Retry. Foreground and Retry force a fresh
+read rather than using the optimistic saved content. Sharing/PDF remain gated by
+fresh owner reads. Native WebView first rendering is still performed on opening;
+this is data/font/HTML preparation, not a fully rendered off-screen WebView.
