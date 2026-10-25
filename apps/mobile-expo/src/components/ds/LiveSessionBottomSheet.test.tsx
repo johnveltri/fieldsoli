@@ -191,6 +191,31 @@ describe('LiveSessionBottomSheet phase3Capture', () => {
     expect(screen.getByTestId('bottom-sheet-register-flag').props.children).toBe('opt-out');
   });
 
+  it('clears native vertical padding from live-visit single-line fields', () => {
+    render(
+      <LiveSessionBottomSheet
+        typography={typography}
+        visible
+        phase3Capture
+        invoicingEnabled
+        supabase={supabase}
+        jobShortDescription="Panel upgrade"
+        startedAt="2026-01-01T12:00:00.000Z"
+        attachments={[]}
+        jobIdentity={identity}
+        onAddNote={noop}
+        onAddMaterial={noop}
+        onPressAttachment={noop}
+        onMinimize={noop}
+        onEndSessionPress={noop}
+      />,
+    );
+
+    for (const placeholder of ['Customer', 'Phone', 'Email', 'Address', 'Labor & Services']) {
+      expect(screen.getByPlaceholderText(placeholder)).toHaveStyle({ paddingVertical: 0 });
+    }
+  });
+
   it('TEST-L08 hides header EDIT and shows inline identity + add rows', () => {
     const onJobIdentityChange = jest.fn();
     const onAddNote = jest.fn();

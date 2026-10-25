@@ -42,7 +42,10 @@ function NativeTabsLayout() {
       hidden={hideBottomChrome}
       // iOS: leave background unset/transparent so Liquid Glass owns the chrome;
       // forcing a fill creates the opaque slab under Reduce Transparency.
-      backgroundColor={Platform.OS === 'android' ? androidTabBarBg : 'transparent'}
+      // Hidden tabs still paint Android's gesture area; match the full-page canvas.
+      backgroundColor={Platform.OS === 'android'
+        ? (hideBottomChrome ? bg.canvasWarm : androidTabBarBg)
+        : 'transparent'}
       tintColor={tabInk}
       iconColor={{ default: tabInk, selected: tabInk }}
       labelStyle={{

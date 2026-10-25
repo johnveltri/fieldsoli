@@ -1418,6 +1418,8 @@ export const InvoicingJobControls = forwardRef<
       <Modal
         visible={previewOpen}
         transparent
+        statusBarTranslucent
+        navigationBarTranslucent
         animationType="none"
         onShow={animatePreviewIn}
         onRequestClose={closeInvoicePreview}
@@ -1427,6 +1429,7 @@ export const InvoicingJobControls = forwardRef<
             styles.preview,
             {
               paddingTop: Math.max(insets.top - space('Spacing/8'), 0) + space('Spacing/4'),
+              paddingBottom: Platform.OS === 'android' ? insets.bottom : 0,
               transform: [{ translateY: previewTranslateY }],
             },
           ]}
@@ -1609,6 +1612,12 @@ export const InvoicingJobControls = forwardRef<
                 includeSafeArea
               />
             </View>
+          ) : null}
+          {Platform.OS === 'android' ? (
+            <View
+              pointerEvents="none"
+              style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: insets.bottom, backgroundColor: bg.surfaceWhite }}
+            />
           ) : null}
           <Modal
             visible={shareModalMounted}

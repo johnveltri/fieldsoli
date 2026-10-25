@@ -1175,6 +1175,9 @@ const styles = StyleSheet.create({
   fieldInput: {
     color: fg.primary,
     paddingHorizontal: 0,
+    // Android EditText adds default vertical padding unless we clear it. The
+    // surrounding icon row owns vertical spacing so input rows match add rows.
+    paddingVertical: 0,
     margin: 0,
     width: '100%',
   },
