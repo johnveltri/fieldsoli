@@ -1,0 +1,74 @@
+{
+  "reference": "02-track-time-expenses-v2.png",
+  "dimensions": [
+    1320,
+    2868
+  ],
+  "images": [
+    {
+      "final": "01-unlimited-invoices-estimates.png",
+      "selected_layout": "01-unlimited-invoices-estimates-v3.png",
+      "proof": "01-unlimited-invoices-estimates-consistent-frame-v1.png",
+      "source_screen": "invoice-preview-charges.png",
+      "source_sha256": "d02b5f8fd9e1d49360ef060f9774cd0bd4527aa811dc6893d0ea8dde0e78c77b",
+      "header_pixel_check": "PASS",
+      "native_ui_pixel_check": "PASS before export card",
+      "hardware_pixel_check_against_02": "PASS",
+      "camera_cutout_pixel_check": "PASS",
+      "export_card_box": null
+    },
+    {
+      "final": "02-track-time-expenses.png",
+      "selected_layout": "02-track-time-expenses-v2.png",
+      "proof": "02-track-time-expenses-consistent-frame-v1.png",
+      "source_screen": "job-edit-time-materials-and-costs.png",
+      "source_sha256": "4c8c32e7435c2235acf5eb1f7cddba67c3af039cea645a34732d451cd4319f33",
+      "header_pixel_check": "PASS",
+      "native_ui_pixel_check": "PASS before export card",
+      "hardware_pixel_check_against_02": "PASS",
+      "camera_cutout_pixel_check": "PASS",
+      "export_card_box": null
+    },
+    {
+      "final": "03-simple-fast.png",
+      "selected_layout": "03-simple-fast-v1.png",
+      "proof": "03-simple-fast-consistent-frame-v1.png",
+      "source_screen": "active-visit.png",
+      "source_sha256": "3f491f3c2d643675382c91b4054287a949b680f7ed5cee552c7310d71c214921",
+      "header_pixel_check": "PASS",
+      "native_ui_pixel_check": "PASS before export card",
+      "hardware_pixel_check_against_02": "PASS",
+      "camera_cutout_pixel_check": "PASS",
+      "export_card_box": null
+    },
+    {
+      "final": "04-take-data-with-you.png",
+      "selected_layout": "04-take-data-with-you-v1.png",
+      "proof": "04-take-data-with-you-consistent-frame-v1.png",
+      "source_screen": "export-job-summary.png",
+      "source_sha256": "f3431adfde602c080c93f29709759dd28524cba3b3a3c7d41b18b8c1cd612dd2",
+      "header_pixel_check": "PASS",
+      "native_ui_pixel_check": "PASS before export card",
+      "hardware_pixel_check_against_02": "PASS",
+      "camera_cutout_pixel_check": "PASS",
+      "export_card_box": [
+        104,
+        1930,
+        1280,
+        2499
+      ]
+    },
+    {
+      "final": "05-job-earnings-insights.png",
+      "selected_layout": "05-job-earnings-insights-v1.png",
+      "proof": "05-job-earnings-insights-consistent-frame-v1.png",
+      "source_screen": "earnings-monthly-snapshot.png",
+      "source_sha256": "9d333c1329c9ebef88d7c57787ebe6053c759021c0f80be800932f8dc24218df",
+      "header_pixel_check": "PASS",
+      "native_ui_pixel_check": "PASS before export card",
+      "hardware_pixel_check_against_02": "PASS",
+      "camera_cutout_pixel_check": "PASS",
+      "export_card_box": null
+    }
+  ]
+}

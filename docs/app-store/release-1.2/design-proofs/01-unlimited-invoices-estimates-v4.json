@@ -1,0 +1,25 @@
+{
+  "output": "01-unlimited-invoices-estimates-v4.png",
+  "dimensions": [
+    1320,
+    2868
+  ],
+  "base": "01-unlimited-invoices-estimates-v3.png",
+  "crop_source": "../source-screenshots/invoice-preview-top.png",
+  "source_crop_box": [
+    35,
+    600,
+    1170,
+    1460
+  ],
+  "overlay_position": [
+    738,
+    990
+  ],
+  "overlay_dimensions": [
+    545,
+    413
+  ],
+  "method": "Original screenshot crop, uniform scaling, corner mask, soft shadow; no image generation",
+  "lower_screen_unchanged_check": "PASS"
+}

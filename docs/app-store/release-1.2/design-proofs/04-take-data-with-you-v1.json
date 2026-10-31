@@ -1,0 +1,28 @@
+{
+  "status": "Design proof matching the accepted campaign; generated device frame is not an official Apple asset",
+  "output": "04-take-data-with-you-v1.png",
+  "dimensions": [
+    1320,
+    2868
+  ],
+  "method": "Generated campaign artwork with deterministic original screen and actual workbook excerpt",
+  "artwork_source": "04-take-data-with-you-artwork-v1.png",
+  "lower_backdrop_source": "03-simple-fast-artwork-v1.png",
+  "screen_source": "../source-screenshots/export-job-summary.png",
+  "screen_sha256": "f3431adfde602c080c93f29709759dd28524cba3b3a3c7d41b18b8c1cd612dd2",
+  "screen_box": [
+    237,
+    869,
+    1081,
+    2704
+  ],
+  "source_ui_interior_pixel_check": "PASS before table overlay; full-width CTA PASS after overlay",
+  "table_source": "04-export-excerpt-source.json",
+  "table_box": [
+    104,
+    1930,
+    1280,
+    2499
+  ],
+  "changes": "Original export screen with a separate workbook excerpt"
+}

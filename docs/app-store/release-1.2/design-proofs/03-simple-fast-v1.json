@@ -1,0 +1,25 @@
+{
+  "status": "Design proof matching the accepted campaign; generated device frame is not an official Apple asset",
+  "output": "03-simple-fast-v1.png",
+  "dimensions": [
+    1320,
+    2868
+  ],
+  "method": "Deterministic source-screenshot composite; no new image generation",
+  "artwork_source": "03-simple-fast-artwork-v1.png",
+  "screen_source": "../source-screenshots/active-visit.png",
+  "screen_sha256": "3f491f3c2d643675382c91b4054287a949b680f7ed5cee552c7310d71c214921",
+  "screen_box": [
+    237,
+    869,
+    1081,
+    2704
+  ],
+  "source_ui_interior_pixel_check": "PASS: original screenshot interior preserved after uniform scaling",
+  "changes": "Original active visit: timer, job details, and full-width End Visit control preserved",
+  "source_review": {
+    "active-visit.png": "Selected: large running timer, active status, recognizable job, and original full-width End Visit action.",
+    "quick-capture-note.png": "Reviewed; a large portion is dimmed dashboard rather than the capture interaction."
+  },
+  "generation": "Built-in imagegen for campaign artwork, followed by deterministic original-screen composite"
+}

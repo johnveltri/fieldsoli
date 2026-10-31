@@ -1,0 +1,11 @@
+Create ONE fourth portrait App Store campaign image for FieldSoli, matching reference 1's approved slate/rust campaign design. Target dimensions 1320 x 2868.
+Reference 1: campaign styling and black iPhone 18 Pro front-frame layout.
+Reference 2: the actual Export Job Summary app screenshot, the authoritative phone screen.
+Reference 3: actual selected export data excerpt, supporting proof. Its headers, job descriptions and numbers must remain unchanged.
+Headline VERBATIM: "Take your data with you." Break naturally into two or three lines, large bold warm cream humanist sans serif, aligned left, same hierarchy and margins as existing series.
+Supporting text VERBATIM: "CSV export. No active subscription required." Smaller cream text, naturally split into two lines if needed. No new brand wordmark, logos, badges, stars, endorsements, competitor names, generic income advice or additional marketing claims.
+Use the same dark slate #2B3441 background, rust #A3421F diagonal accent, and one large upright black iPhone 18 Pro frame at the same position/scale as reference 1. Present reference 2 as the intact screen: Export Job Summary, year 2026, delivery address app-store-demo@fieldsoli.example, Included Data text, and original full-width REQUEST EXPORT button. Do not alter or reflow native controls, change their text, omit the button, or warp the screenshot.
+Add reference 3 as one clean floating spreadsheet excerpt across the lower phone's BLANK area, with a restrained white surface and soft shadow. The table should sit BELOW the Included Data text and ABOVE the REQUEST EXPORT button. All four headers and all four data rows must be readable. Do NOT cover or distort the export button, the Included Data copy, or the headline. The excerpt may extend beyond the phone's right edge but must fit inside the overall canvas. Do not make the table appear to be native app UI: it is an exported-data excerpt outside the device.
+Keep the on-device screenshot proportionate and exact. No invented Excel toolbar, spreadsheet app logos, columns or records. Do not paste customer names, addresses or IDs from elsewhere. Reference 3 already contains the approved selected data. Use only that excerpt.
+Current date October 28, 2026. Preserve reference screenshot year 2026 and all supplied data.
+One complete campaign image only, not a contact sheet or redesign.

@@ -1,3 +1,5 @@
+For public-facing copy, follow the owner-approved [marketing voice guide](marketing-voice.md). The strategy below provides direction; its language is not automatically a customer-facing headline or a claim about shipped functionality.
+
 # Brand Essence
 
 Light, Generous, Empowered, Soli

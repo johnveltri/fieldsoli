@@ -1,0 +1,11 @@
+Create ONE portrait App Store marketing image, the third in an existing campaign. Target 1320 x 2868 pixels.
+Use reference image 1 ONLY as the approved campaign template: deep slate and rust diagonal background, warm cream large bold headline, one upright BLACK iPhone 18 Pro frame, device size and lower placement. No brand wordmark, no floating panels, no new badges, no logos, no additional claims. Match the existing series closely.
+Replace the existing headline with exact text, two lines:
+"Simple."
+"Fast."
+Use the same left-aligned bold cream type family, weight, scale and top alignment as the campaign. Keep a purposeful space between headline and phone. No subtitle.
+Reference image 2 is the ACTUAL app screenshot to place inside the phone. It is the only allowed on-device content. Preserve its whole screenshot proportions, crop, native text, colors, spacing, cards, controls, and amounts. Treat it as a locked photographic screen plate, not a UI to redesign.
+On-device content must visibly include the ACTIVE VISIT indicator, timer "00:05", job "Drywall patch and paint", Started Oct 26, 2026 9:19 PM, the actual customer fields, and the original full-width rust "END VISIT" button at its exact relative location. The source's lower material action is partially visible below the fixed button; preserve that actual state rather than inventing a cleaner layout. Do not alter the button's height, full width, corner shape, or centered label. Do not squeeze, reflow, reorder, replace, or add content. No overlapping crops or additional phone.
+Use a straight-on phone to avoid warping the screenshot. Do not introduce a duplicate clock, status bar, home indicator or extra hardware island. Preserve the source's dark slate timer header with cream timer type and warm cream lower canvas.
+Current date Oct 28, 2026; preserve the supplied screenshot's Oct 26, 2026 recorded visit date. No new mock data.
+Keep all headline text and the full End Visit button visible. The phone is the same black device presentation as the reference. Background colors deep slate #2B3441 and rust #A3421F; headline #FAF6F0. Output a single cohesive campaign image, not a contact sheet or app redesign.

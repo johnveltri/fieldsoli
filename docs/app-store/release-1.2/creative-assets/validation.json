@@ -1,0 +1,59 @@
+{
+  "research_date": "2026-10-31",
+  "specifications": "https://developer.apple.com/help/app-store-connect/reference/app-information/creative-assets-specifications",
+  "safe_area_source": "Apple Photoshop templates linked from https://developer.apple.com/app-store/asset-best-practices/",
+  "source_image": "final-images/01-unlimited-invoices-estimates.png",
+  "source_sha256": "79c402f612c761d3905921a7421107ef1309535ec68834a240a28c33b2c31e3a",
+  "hardware": "Image 02 common hardware, already composited in the invoice final",
+  "generation": "Built-in imagegen backdrop; approved headline, original device and native UI composited deterministically",
+  "headline": "Unlimited invoices & estimates",
+  "support": "Simple time & expense tracking for contractors.",
+  "assets": [
+    {
+      "output": "06-app-store-header.png",
+      "dimensions": [
+        3840,
+        1646
+      ],
+      "safe_area": [
+        1097,
+        493,
+        2743,
+        1154
+      ],
+      "phone_box": [
+        2770,
+        95,
+        3491,
+        1545
+      ],
+      "no_alpha": "PASS",
+      "source_pixel_check": "PASS",
+      "composition": "Full canvas as requested; template safe-area constraint removed",
+      "copy": "Simple time & expense tracking for contractors."
+    },
+    {
+      "output": "07-app-store-search-results.png",
+      "dimensions": [
+        3840,
+        2560
+      ],
+      "safe_area": [
+        836,
+        765,
+        3004,
+        1795
+      ],
+      "phone_box": [
+        2670,
+        280,
+        3664,
+        2280
+      ],
+      "no_alpha": "PASS",
+      "source_pixel_check": "PASS",
+      "composition": "Full canvas as requested; template safe-area constraint removed",
+      "copy": "Simple time & expense tracking for contractors."
+    }
+  ]
+}
