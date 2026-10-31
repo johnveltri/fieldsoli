@@ -107,8 +107,10 @@ export type ListJobsForCurrentUserItem = {
   workStatus: JobDetailWorkStatus;
   jobPaymentState: JobPaymentState | null;
   revenueCents: number | null;
-  /** Optional: may be unavailable on older local schemas. */
+  /** Signed negative material spend only. */
   materialsCents: number | null;
+  /** Signed negative total spend: Materials plus Other Costs. */
+  costsCents: number;
   /** Optional: may be unavailable on older local schemas. */
   netEarningsCents: number | null;
   collectedCents: number | null;
@@ -378,7 +380,8 @@ async function enrichJobsRowsWithSessionRollups(
     const materialsSpendCents = materialsSpendByJobId.get(row.id) ?? 0;
     const materialsCents = -materialsSpendCents;
     const revenueCents = row.revenue_cents ?? 0;
-    const netEarningsCents = revenueCents - (totalCostsSpendByJobId.get(row.id) ?? 0);
+    const costsCents = -(totalCostsSpendByJobId.get(row.id) ?? 0);
+    const netEarningsCents = revenueCents + costsCents;
     const hasMaterials = jobsWithMaterialLines.has(row.id);
     const hasSessions = (sessionCountByJobId.get(row.id) ?? 0) > 0;
     const isFinanciallyComplete = row.is_job_record_complete;
@@ -397,6 +400,7 @@ async function enrichJobsRowsWithSessionRollups(
       jobPaymentState: row.job_payment_state,
       revenueCents: row.revenue_cents,
       materialsCents,
+      costsCents,
       netEarningsCents,
       collectedCents: row.collected_cents,
       isFinanciallyComplete,
@@ -633,8 +637,10 @@ export type EarningsSnapshotJob = {
   shortDescription: string;
   customerName: string | null;
   revenueCents: number;
-  /** Negative spend (revenue minus this yields net). */
+  /** Signed negative material spend only. */
   materialsCents: number;
+  /** Signed negative total spend: Materials plus Other Costs. */
+  costsCents: number;
   netEarningsCents: number;
   hours: number;
   /** Net earnings per hour in cents; null when the job has no logged hours. */
@@ -644,8 +650,10 @@ export type EarningsSnapshotJob = {
 export type EarningsSnapshotAggregate = {
   netEarningsCents: number;
   revenueCents: number;
-  /** Negative spend total. */
+  /** Signed negative material spend total only. */
   materialsCents: number;
+  /** Signed negative total spend: Materials plus Other Costs. */
+  costsCents: number;
   totalHours: number;
   jobCount: number;
   /** Aggregate net per hour in cents (total net / total hours); null when no hours. */
@@ -662,7 +670,7 @@ export type EarningsSnapshotForCurrentUserResult = {
  * `getWeeklyNetEarningsCentsForCurrentUser`: financially complete, completed
  * jobs (`job_work_status = completed`, including pending and paid payment
  * states) whose `last_worked_at` falls within the last `windowDays` days.
- * Returns aggregate metrics plus per-job rollups (revenue, materials, hours,
+ * Returns aggregate metrics plus per-job rollups (revenue, materials, total costs, hours,
  * net, net/hr) for ranking on the Earnings page.
  */
 export async function getEarningsSnapshotForCurrentUser(
@@ -676,6 +684,7 @@ export async function getEarningsSnapshotForCurrentUser(
     netEarningsCents: 0,
     revenueCents: 0,
     materialsCents: 0,
+    costsCents: 0,
     totalHours: 0,
     jobCount: 0,
     netPerHrCents: null,
@@ -773,7 +782,8 @@ export async function getEarningsSnapshotForCurrentUser(
   const jobs: EarningsSnapshotJob[] = jobRows.map((row) => {
     const revenueCents = row.revenue_cents ?? 0;
     const materialsCents = -(materialsSpendByJobId.get(row.id) ?? 0);
-    const netEarningsCents = revenueCents - (allCostsSpendByJobId.get(row.id) ?? 0);
+    const costsCents = -(allCostsSpendByJobId.get(row.id) ?? 0);
+    const netEarningsCents = revenueCents + costsCents;
     const hours = totalHoursByJobId.get(row.id) ?? 0;
     const netPerHrCents = hours > 0 ? netEarningsCents / hours : null;
     return {
@@ -782,6 +792,7 @@ export async function getEarningsSnapshotForCurrentUser(
       customerName: row.customer_name,
       revenueCents,
       materialsCents,
+      costsCents,
       netEarningsCents,
       hours,
       netPerHrCents,
@@ -793,6 +804,7 @@ export async function getEarningsSnapshotForCurrentUser(
       acc.netEarningsCents += job.netEarningsCents;
       acc.revenueCents += job.revenueCents;
       acc.materialsCents += job.materialsCents;
+      acc.costsCents += job.costsCents;
       acc.totalHours += job.hours;
       acc.jobCount += 1;
       return acc;

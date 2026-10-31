@@ -56,7 +56,7 @@
   <header>
     <p class="kicker">Canonical product source · shipped behavior only</p>
     <h1>FieldSoli current product</h1>
-    <p>Reviewed 2026-07-21 at source commit <code>50822e52f3c1b1e3ba758e02a875d624d2983024</code>. Estimates and invoices are recorded under approved but not shipped and are not current functionality.</p>
+    <p>Reviewed 2026-07-21 at source commit <code>323256b</code>. Estimates and invoices are recorded under approved but not shipped and are not current functionality.</p>
     <nav aria-label="Document sections">
       <a href="#purpose">Purpose</a>
       <a href="#navigation">Navigation</a>
@@ -70,7 +70,7 @@
     <dl class="meta">
       <div><dt>Product version</dt><dd>2026.07.21</dd></div>
       <div><dt>Review date</dt><dd>2026-07-21</dd></div>
-      <div><dt>Source revision</dt><dd>50822e52f3c1b1e3ba758e02a875d624d2983024</dd></div>
+      <div><dt>Source revision</dt><dd>323256b</dd></div>
       <div><dt>Historical Figma page</dt><dd><a href="https://www.figma.com/design/TdvsllfeXrnkvBqR4qb3fn/Fieldsolo-App---gig-work-for-skilled-trade?node-id=2022-4069">07 Current App — Maintained (archived reference)</a></dd></div>
     </dl>
     <aside class="notice">
@@ -138,13 +138,13 @@
         <article id="screen-earnings" data-screen-id="earnings" data-status="shipped">
           <p class="kicker">Main tab</p>
           <h3>Earnings</h3>
-          <dl><dt>Windows</dt><dd>Past week (7 days), month (30 days), or year (365 days).</dd><dt>Measures</dt><dd>Net earnings, revenue, materials, hours, job count, and net per hour for completed, financially complete jobs.</dd><dt>Actions</dt><dd>Open ranked jobs; jump from outstanding payments to the Jobs Open tab.</dd></dl>
+          <dl><dt>Windows</dt><dd>Past week (7 days), month (30 days), or year (365 days).</dd><dt>Measures</dt><dd>Net earnings, revenue, total costs (Materials plus Other Costs), hours, job count, and net per hour for completed, financially complete jobs. Costs are displayed as negative spend; Net equals Revenue plus Costs.</dd><dt>Actions</dt><dd>Open ranked jobs; jump from outstanding payments to the Jobs Open tab.</dd></dl>
           <p><a href="https://github.com/johnveltri/fieldsoli/blob/main/apps/mobile-expo/src/screens/EarningsScreen.tsx">Source</a> · <a href="https://www.figma.com/design/TdvsllfeXrnkvBqR4qb3fn/Fieldsolo-App---gig-work-for-skilled-trade?node-id=2025-313">Figma node 2025:313</a></p>
         </article>
         <article id="screen-job-detail" data-screen-id="job-detail" data-status="shipped">
           <p class="kicker">Shell-covering screen</p>
           <h3>Job Detail</h3>
-          <dl><dt>Data</dt><dd>Job identity, customer, address, category, work/payment status, earnings, time, visits, notes, and materials.</dd><dt>Actions</dt><dd>Edit job; change work status; create/edit/delete visits, notes, and materials; assign items to visits; start or manage live work; delete job.</dd><dt>Constraints</dt><dd>Material rows require description and nonzero quantity; units support presets and custom values.</dd></dl>
+          <dl><dt>Data</dt><dd>Job identity, customer, address, category, work/payment status, earnings, time, visits, notes, and materials. Home and Jobs cards display total Materials plus Other Costs under COST; each card retains whole-dollar rounding.</dd><dt>Actions</dt><dd>Edit job; change work status; create/edit/delete visits, notes, and materials; assign items to visits; start or manage live work; delete job.</dd><dt>Constraints</dt><dd>Material rows require description and nonzero quantity; units support presets and custom values.</dd></dl>
           <p><a href="https://github.com/johnveltri/fieldsoli/blob/main/apps/mobile-expo/src/screens/JobDetailScreen.tsx">Source</a> · <a href="https://www.figma.com/design/TdvsllfeXrnkvBqR4qb3fn/Fieldsolo-App---gig-work-for-skilled-trade?node-id=2025-561">Figma node 2025:561</a></p>
         </article>
         <article id="screen-profile" data-screen-id="profile" data-status="shipped">
@@ -167,7 +167,7 @@
         <article id="state-analytics-consent" data-state-id="analytics-consent" data-status="shipped"><h4>Analytics consent</h4><p>Blocks the authenticated shell until the user chooses Allow analytics or No thanks. <a href="https://www.figma.com/design/TdvsllfeXrnkvBqR4qb3fn/Fieldsolo-App---gig-work-for-skilled-trade?node-id=2028-1596">Figma 2028:1596</a></p></article>
         <article id="state-legal-reacceptance" data-state-id="legal-reacceptance" data-status="shipped"><h4>Legal reacceptance</h4><p>Fails closed when current Privacy/Terms acceptance cannot be verified and records acceptance before continuing. <a href="https://www.figma.com/design/TdvsllfeXrnkvBqR4qb3fn/Fieldsolo-App---gig-work-for-skilled-trade?node-id=2028-1606">Figma 2028:1606</a></p></article>
         <article id="state-delete-account" data-state-id="delete-account" data-status="shipped"><h4>Delete account</h4><p class="danger">Requires the exact confirmation phrase, then a system confirmation, before permanent account deletion. <a href="https://www.figma.com/design/TdvsllfeXrnkvBqR4qb3fn/Fieldsolo-App---gig-work-for-skilled-trade?node-id=2028-1614">Figma 2028:1614</a></p></article>
-        <article id="state-live-session" data-state-id="live-session" data-status="shipped"><h4>Active live visit</h4><p>Global minimized bar and editing flow for an in-progress visit. The feature-flagged expanded overlay persists time and job details inline; ending a visit opens that job's detail view in either state. <a href="https://www.figma.com/design/TdvsllfeXrnkvBqR4qb3fn/Fieldsolo-App---gig-work-for-skilled-trade?node-id=2028-1625">Figma 2028:1625</a></p></article>
+        <article id="state-live-session" data-state-id="live-session" data-status="shipped"><h4>Active live visit</h4><p>Global minimized bar and editing flow for an in-progress visit. The feature-flagged expanded overlay persists time and job details inline; ending a visit opens that job's detail view in either state. With invoicing enabled, inline Labor &amp; Services saves to component pricing on blur, minimize, and End Visit; legacy Revenue remains the flag-off path. <a href="https://www.figma.com/design/TdvsllfeXrnkvBqR4qb3fn/Fieldsolo-App---gig-work-for-skilled-trade?node-id=2028-1625">Figma 2028:1625</a></p></article>
       </div>
     </section>
 
@@ -176,7 +176,7 @@
       <table>
         <thead><tr><th>Capability</th><th>Entry point</th><th>Action and data effect</th><th>Constraints / states</th></tr></thead>
         <tbody>
-          <tr data-capability-id="auth.sign-in" data-status="shipped"><td>Sign in</td><td>Sign In</td><td>Creates a Supabase email/password session and enters the authenticated shell on Home.</td><td>Errors remain on the form; prior tab and overlay navigation is cleared on sign-out.</td></tr>
+          <tr data-capability-id="auth.sign-in" data-status="shipped"><td>Sign in</td><td>Sign In</td><td>Creates a Supabase email/password session and enters the authenticated shell on Home.</td><td>Errors remain on the form; prior tab and overlay navigation is cleared on sign-out. Account content reserves scroll clearance above the minimized Live Visit bar so Log Out remains reachable.</td></tr>
           <tr data-capability-id="auth.sign-up" data-status="shipped"><td>Create account</td><td>Sign In mode switch</td><td>Creates account/profile context and records legal acceptance.</td><td>First/last name, valid email, matching password confirmation meeting the new-password policy, and legal checkbox.</td></tr>
           <tr data-capability-id="legal.accept" data-status="shipped"><td>Accept current legal versions</td><td>Signup or legal gate</td><td>Persists Privacy and Terms versions/timestamps; local cache is best-effort.</td><td>Server verification remains authoritative; gate fails closed.</td></tr>
           <tr data-capability-id="analytics.choose" data-status="shipped"><td>Choose analytics</td><td>First authenticated run or Privacy</td><td>Grants or withdraws optional analytics and updates client activation.</td><td>Analytics are off before consent; failed writes revert UI.</td></tr>
@@ -287,7 +287,7 @@
       <pre id="fieldsolo-product-index">{
   "schemaVersion": 1,
   "productVersion": "2026.07.21",
-  "sourceCommit": "50822e52f3c1b1e3ba758e02a875d624d2983024",
+  "sourceCommit": "323256b",
   "reviewedAt": "2026-07-21",
   "statusRule": "Only shipped is current functionality.",
   "screens": [

@@ -63,9 +63,10 @@ describe('JobsScreen', () => {
           jobType: 'electrical',
           workStatus: 'inProgress',
           jobPaymentState: 'pending',
-          revenueCents: 30000,
-          materialsCents: -2000,
-          netEarningsCents: 28000,
+          revenueCents: 43940,
+          materialsCents: -3800,
+          costsCents: -5000,
+          netEarningsCents: 38940,
           collectedCents: 0,
           isFinanciallyComplete: true,
           hasMaterials: true,
@@ -88,6 +89,8 @@ describe('JobsScreen', () => {
     );
     expect(apiClient.listJobsForCurrentUserPage.mock.calls.length).toBeGreaterThanOrEqual(3);
 
+    expect(screen.getByText('-$50')).toBeTruthy();
+    expect(screen.queryByText('-$38')).toBeNull();
     fireEvent.press(screen.getByText('Install light fixture'));
     expect(onOpenJobDetail).toHaveBeenCalledWith('job-1');
   });
@@ -124,6 +127,7 @@ describe('JobsScreen', () => {
               jobPaymentState: 'pending',
               revenueCents: 30000,
               materialsCents: -2000,
+              costsCents: -2000,
               netEarningsCents: 28000,
               collectedCents: 0,
               isFinanciallyComplete: true,
@@ -173,6 +177,7 @@ describe('JobsScreen', () => {
                 jobPaymentState: 'paid',
                 revenueCents: 10000,
                 materialsCents: 0,
+                costsCents: 0,
                 netEarningsCents: 10000,
                 collectedCents: 10000,
                 isFinanciallyComplete: false,

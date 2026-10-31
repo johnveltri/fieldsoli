@@ -87,6 +87,7 @@ type SnapshotState = {
   netEarningsCents: number;
   revenueCents: number;
   materialsCents: number;
+  costsCents: number;
   totalHours: number;
   jobCount: number;
   netPerHrCents: number | null;
@@ -97,6 +98,7 @@ const EMPTY_SNAPSHOT: SnapshotState = {
   netEarningsCents: 0,
   revenueCents: 0,
   materialsCents: 0,
+  costsCents: 0,
   totalHours: 0,
   jobCount: 0,
   netPerHrCents: null,
@@ -236,6 +238,7 @@ export function EarningsScreen({
             netEarningsCents: snap.aggregate.netEarningsCents,
             revenueCents: snap.aggregate.revenueCents,
             materialsCents: snap.aggregate.materialsCents,
+            costsCents: snap.aggregate.costsCents,
             totalHours: snap.aggregate.totalHours,
             jobCount: snap.aggregate.jobCount,
             netPerHrCents: snap.aggregate.netPerHrCents,
@@ -433,7 +436,7 @@ export function EarningsScreen({
                   netEarnings={formatUsd(snapshot.netEarningsCents)}
                   netEarningsCents={snapshot.netEarningsCents}
                   revenue={formatUsd(snapshot.revenueCents)}
-                  costs={formatUsd(snapshot.materialsCents)}
+                  costs={formatUsd(snapshot.costsCents)}
                   time={`${snapshot.totalHours.toFixed(1)}h`}
                   netPerHr={formatNetPerHr(snapshot.netPerHrCents)}
                   netPerHrCents={snapshot.netPerHrCents}

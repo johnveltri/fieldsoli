@@ -10,6 +10,7 @@ const mockGetEarningsSnapshotForCurrentUser = jest.fn<
       netEarningsCents: number;
       revenueCents: number;
       materialsCents: number;
+      costsCents: number;
       totalHours: number;
       jobCount: number;
       netPerHrCents: number | null;
@@ -53,6 +54,7 @@ function job(overrides: Record<string, unknown>) {
     customerName: 'Ada',
     revenueCents: 120000,
     materialsCents: -40000,
+    costsCents: -40000,
     netEarningsCents: 80000,
     hours: 2,
     netPerHrCents: 40000,
@@ -95,6 +97,7 @@ describe('EarningsScreen', () => {
           netEarningsCents: windowDays === 30 ? 123000 : 95000,
           revenueCents: windowDays === 30 ? 170000 : 140000,
           materialsCents: windowDays === 30 ? -47000 : -45000,
+          costsCents: windowDays === 30 ? -47000 : -45000,
           totalHours: windowDays === 30 ? 4 : 3,
           jobCount: 2,
           netPerHrCents: windowDays === 30 ? 30750 : 95000 / 3,
@@ -113,6 +116,7 @@ describe('EarningsScreen', () => {
             customerName: 'Ben',
             revenueCents: 20000,
             materialsCents: -5000,
+            costsCents: -5000,
             netEarningsCents: 15000,
             hours: 1,
             netPerHrCents: 15000,
@@ -120,6 +124,22 @@ describe('EarningsScreen', () => {
         ],
       };
     });
+  });
+
+  it('shows all costs rather than materials in every earnings window', async () => {
+    mockGetEarningsSnapshotForCurrentUser.mockResolvedValue({
+      aggregate: { revenueCents: 43940, materialsCents: -3800, costsCents: -5000,
+        netEarningsCents: 38940, totalHours: 1, jobCount: 1, netPerHrCents: 38940 },
+      jobs: [],
+    });
+    const { screen } = renderHarness();
+    expect(await screen.findByText('-$50.00')).toBeTruthy();
+    for (const tab of ['MONTH', 'YEAR']) {
+      fireEvent.press(screen.getByText(tab));
+      expect(await screen.findByText('-$50.00')).toBeTruthy();
+      expect(screen.getByText('$389.40')).toBeTruthy();
+      expect(screen.queryByText('-$38.00')).toBeNull();
+    }
   });
 
   it('loads earnings data and opens linked jobs from the ranked rows and outstanding card', async () => {

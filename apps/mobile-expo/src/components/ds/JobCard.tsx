@@ -55,7 +55,7 @@ export function JobCard({
 }: JobCardProps) {
   const timeValue = job.timeLabel || '0.0h';
   const revenue = formatUsd(job.revenueCents);
-  const materials = formatUsd(job.materialsCents);
+  const costs = formatUsd(job.costsCents);
   const net = formatUsd(job.netEarningsCents);
 
   const recencySuffix =
@@ -119,7 +119,7 @@ export function JobCard({
                   { color: color('Semantic/Financial/Negative') },
                 ]}
               >
-                {materials}
+                {costs}
               </Text>
             </View>
             <View style={styles.metricCol}>
