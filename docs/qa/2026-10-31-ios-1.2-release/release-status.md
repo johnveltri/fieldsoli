@@ -3,8 +3,8 @@
 - Source: `3e06ee56aefdddb74412c4e658f63d57131e6a27` on `codex/ios-1-2-costs-release`.
 - Runtime: Node 22.23.4 locally; EAS production profile uses Node 22.13.1.
 - App version/build: **1.2.0 (24)**.
-- EAS build: `7b3f4695-12b5-4668-bc55-ba2ec71963d4`, compiling when this record was created.
-- EAS submission: `5b43f7dd-cd0d-4af4-848b-69c6adddc483`, scheduled for App Store Connect upload after the build.
+- EAS build: `7b3f4695-12b5-4668-bc55-ba2ec71963d4`, **FINISHED**.
+- EAS submission: `5b43f7dd-cd0d-4af4-848b-69c6adddc483`, **FINISHED**, uploaded at October 31, 2026, 3:01 PM America/Chicago.
 - [Build](https://expo.dev/accounts/veltrija/projects/fieldsolo/builds/7b3f4695-12b5-4668-bc55-ba2ec71963d4)
 - [Submission](https://expo.dev/accounts/veltrija/projects/fieldsolo/submissions/5b43f7dd-cd0d-4af4-848b-69c6adddc483)
 
@@ -15,3 +15,7 @@ This upload is for TestFlight. **No App Store review submission, metadata edit, 
 Install 1.2.0 (24) through TestFlight and record device/iOS version and effective production flags. Verify upgrade preserves existing jobs, visits and documents; mixed-cost totals reconcile; invoice/PDF/native-share cancellation works; Live Visit labor persists through minimize, background/relaunch and End Visit; logout/relogin recovers the correct account and active timer. Use synthetic authorized records and do not send invoices/messages or process money.
 
 Production invoicing is currently restricted in the connected PostHog project, so TestFlight accounts must qualify to exercise it. General-user access is a separate launch gate, not implicitly enabled by uploading a build. See the QA report for the flag and other unverified scenarios.
+
+Apple processing verified: build **24** is **VALID**, internal state **IN_BETA_TESTING**, external state **READY_FOR_BETA_SUBMISSION**. It is available to internal TestFlight testers; no external-beta review submission was made. App Store Connect still reports public version **1.1.0 (18)** as READY_FOR_DISTRIBUTION.
+
+EAS build finished October 31 at 3:01 PM America/Chicago; submission finished at 3:01 PM; Apple upload time 3:02 PM. Physical-iPhone acceptance remains pending user testing; no public-release recommendation is made.
