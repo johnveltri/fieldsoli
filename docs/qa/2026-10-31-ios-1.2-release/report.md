@@ -50,8 +50,8 @@ Node **22.23.4**, within repository engine range:
 - REL-04: logout/relogin passed; true expiry and two-account isolation not tested (no second authorized account/mechanism).
 - REL-05: concurrent/stale editing blocked: no second user-selected UI session. Do not substitute direct API writes.
 - REL-06: existing historical data across three windows inspected; full pagination/date-boundary fixture reconciliation not performed.
-- Flag-off pricing has unit coverage; runtime feature-off compatibility remains unverified. No remote rollout changes.
-- Production new-user invoicing access, production shared document links, store metadata/device previews, and physical native permissions remain unverified. The old hosted-Dev public-link failure is environment-specific until independently tested in production.
+- Flag-off pricing has unit coverage. A local flag-off runtime pass retained $125 job revenue and the $100 invoice-backed Paid job while hiding document and component-labor entry points. This is a focused compatibility pass, not an exhaustive flag-off audit. Original local invoicing override restored; no remote rollout changes.
+- Connected PostHog project Fieldsoli Analytics (461762), invoicing flag 970495, is active but restricted to one distinct ID and the old `.local` demo email. No general-user rule exists: general invoicing access must be deliberately addressed before public launch. [Flag configuration](https://us.posthog.com/project/461762/feature-flags/970495). Runtime new-user access in the production candidate, production shared document links, store metadata/device previews, and physical native permissions remain unverified. The old hosted-Dev public-link failure is environment-specific until independently tested in production.
 - Broad Inbox/settings/export/accessibility sweep and blank-account/business tests are not claimed complete.
 
 ## Persistent QA changes / cleanup
@@ -62,6 +62,10 @@ Synthetic hosted Dev only:
 - Created `QA 20261031 Logout continuity`, visit explicitly ended after sign-in recovery; customer `QA Customer 20261031`, $100 labor, no materials/no other costs confirmations, Invoice #00002, final Paid state.
 - Created `QA 20261031 Labor persistence`, $125 labor, visit explicitly ended (2:50–2:51 PM); left incomplete/in progress for review.
 - Added Estimate #00002 to the pre-existing Drywall job. Existing financial fields were not changed.
-- No account/password changes, deletion, bulk reset, external sends, remote flags, or backend deploy. All timers created by this run were ended. QA fixtures are retained for review.
+- No account/password changes, deletion, bulk reset, external sends, remote flags, or backend deploy. All timers created by this run were ended. The Logout continuity visit persisted as 2:38–2:44 PM, 0.1h. QA fixtures are retained for review. The temporary Metro server was stopped; the original local invoicing override was restored.
 
 TestFlight build/submission status is recorded separately in `release-status.md` when available.
+
+## Delivery boundary reaffirmed
+
+User explicitly reaffirmed TestFlight only during this run. Do not submit for App Store review or public release; the user must update metadata first. No store listing fields were changed.

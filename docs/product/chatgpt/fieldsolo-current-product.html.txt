@@ -56,7 +56,7 @@
   <header>
     <p class="kicker">Canonical product source · shipped behavior only</p>
     <h1>FieldSoli current product</h1>
-    <p>Reviewed 2026-07-21 at source commit <code>323256b</code>. Estimates and invoices are recorded under approved but not shipped and are not current functionality.</p>
+    <p>Reviewed 2026-07-21 at source commit <code>50822e52f3c1b1e3ba758e02a875d624d2983024</code>. Estimates and invoices are recorded under approved but not shipped and are not current functionality.</p>
     <nav aria-label="Document sections">
       <a href="#purpose">Purpose</a>
       <a href="#navigation">Navigation</a>
@@ -70,7 +70,7 @@
     <dl class="meta">
       <div><dt>Product version</dt><dd>2026.07.21</dd></div>
       <div><dt>Review date</dt><dd>2026-07-21</dd></div>
-      <div><dt>Source revision</dt><dd>323256b</dd></div>
+      <div><dt>Source revision</dt><dd>50822e52f3c1b1e3ba758e02a875d624d2983024</dd></div>
       <div><dt>Historical Figma page</dt><dd><a href="https://www.figma.com/design/TdvsllfeXrnkvBqR4qb3fn/Fieldsolo-App---gig-work-for-skilled-trade?node-id=2022-4069">07 Current App — Maintained (archived reference)</a></dd></div>
     </dl>
     <aside class="notice">
@@ -287,7 +287,7 @@
       <pre id="fieldsolo-product-index">{
   "schemaVersion": 1,
   "productVersion": "2026.07.21",
-  "sourceCommit": "323256b",
+  "sourceCommit": "50822e52f3c1b1e3ba758e02a875d624d2983024",
   "reviewedAt": "2026-07-21",
   "statusRule": "Only shipped is current functionality.",
   "screens": [
