@@ -1,0 +1,20 @@
+{
+  "status": "Design proof matching image 1 v3; generated device frame is not an official Apple asset",
+  "output": "02-track-time-expenses-v1.png",
+  "dimensions": [
+    1320,
+    2868
+  ],
+  "method": "Deterministic source-screenshot composite; no new image generation",
+  "artwork_source": "02-track-time-expenses-artwork-v1.png",
+  "screen_source": "../source-screenshots/job-time-and-earnings.png",
+  "screen_sha256": "5bf13ae8a0645efccbabda33244d3e1bdaae2ff5f8ca5629e37e663eff5147a6",
+  "screen_box": [
+    237,
+    869,
+    1081,
+    2704
+  ],
+  "source_ui_interior_pixel_check": "PASS, including full-width CTA",
+  "changes": "Actual job overview showing recorded time, material and other costs, and earnings"
+}

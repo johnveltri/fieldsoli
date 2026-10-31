@@ -1,0 +1,27 @@
+{
+  "status": "Design proof matching image 1 v3; generated device frame is not an official Apple asset",
+  "output": "02-track-time-expenses-v2.png",
+  "dimensions": [
+    1320,
+    2868
+  ],
+  "method": "Deterministic source-screenshot composite; no new image generation",
+  "artwork_source": "02-track-time-expenses-artwork-v1.png",
+  "screen_source": "../source-screenshots/job-edit-time-materials-and-costs.png",
+  "screen_sha256": "4c8c32e7435c2235acf5eb1f7cddba67c3af039cea645a34732d451cd4319f33",
+  "screen_box": [
+    237,
+    869,
+    1081,
+    2704
+  ],
+  "source_ui_interior_pixel_check": "PASS, including full-width CTA",
+  "changes": "Reviewed edit screen shows the 1.5h visit, drywall patch kit at $38.00, and Travel / Parking at $12.00 together",
+  "visual_source_review": {
+    "job-time-and-earnings.png": "Summary only; individual material and other-cost records absent.",
+    "job-visits-materials-and-costs.png": "Visit and material visible, but other-cost amount obscured by share button.",
+    "job-other-costs-notes-and-documents.png": "Parking cost visible, but visit and material absent; much of screen is notes/documents.",
+    "job-edit-time-materials-and-costs.png": "Selected: visit duration, material name/price/quantity/markup, and other-cost name/amount all visible together."
+  },
+  "artwork_generation": "Existing image 2 artwork generated with imagegen; this revision only composites original source pixels."
+}

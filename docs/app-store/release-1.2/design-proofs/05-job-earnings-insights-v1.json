@@ -1,0 +1,20 @@
+{
+  "status": "Design proof matching the accepted campaign; generated device frame is not an official Apple asset",
+  "output": "05-job-earnings-insights-v1.png",
+  "dimensions": [
+    1320,
+    2868
+  ],
+  "method": "Built-in imagegen campaign artwork with deterministic original screenshot composite",
+  "artwork_source": "05-job-earnings-insights-artwork-v1.png",
+  "screen_source": "../source-screenshots/earnings-monthly-snapshot.png",
+  "screen_sha256": "9d333c1329c9ebef88d7c57787ebe6053c759021c0f80be800932f8dc24218df",
+  "screen_box": [
+    237,
+    869,
+    1081,
+    2704
+  ],
+  "source_ui_interior_pixel_check": "PASS, earnings snapshot and bottom navigation",
+  "changes": "Original monthly earnings overview, partial ranking, controls, and bottom navigation preserved; no inferred ranking rows"
+}

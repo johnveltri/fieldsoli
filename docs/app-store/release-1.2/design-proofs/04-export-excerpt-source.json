@@ -1,0 +1,42 @@
+{
+  "source": "/Users/johnveltri/Downloads/fieldsoli-job-summary-2026.xlsx",
+  "sheet": "fieldsoli-job-summary-2026",
+  "ranges": [
+    "B1:B5",
+    "K1:K5",
+    "S1:T5"
+  ],
+  "headers": [
+    "job_description",
+    "revenue",
+    "total_costs",
+    "net_earnings"
+  ],
+  "rows": [
+    [
+      "Change Stovetop lightbulb",
+      "20.0",
+      "5.0",
+      "15.0"
+    ],
+    [
+      "Cabinet Installation",
+      "600.0",
+      "4.0",
+      "596.0"
+    ],
+    [
+      "Leaking P-Trap Repair",
+      "125.0",
+      "0.0",
+      "125.0"
+    ],
+    [
+      "Sewer Line Repair",
+      "1200.0",
+      "497.31",
+      "702.69"
+    ]
+  ],
+  "presentation": "Selected original columns, original row order, currency display formatting only"
+}

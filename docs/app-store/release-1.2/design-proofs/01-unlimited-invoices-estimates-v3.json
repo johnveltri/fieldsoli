@@ -1,0 +1,20 @@
+{
+  "status": "Design proof; device frame inherited from v2, not an official Apple frame asset",
+  "output": "01-unlimited-invoices-estimates-v3.png",
+  "dimensions": [
+    1320,
+    2868
+  ],
+  "method": "Deterministic source-screenshot composite; no new image generation",
+  "artwork_source": "01-unlimited-invoices-estimates-v2.png",
+  "screen_source": "../source-screenshots/invoice-preview-charges.png",
+  "screen_sha256": "d02b5f8fd9e1d49360ef060f9774cd0bd4527aa811dc6893d0ea8dde0e78c77b",
+  "screen_box": [
+    237,
+    869,
+    1081,
+    2704
+  ],
+  "source_ui_interior_pixel_check": "PASS, including full-width CTA",
+  "changes": "Scrolled invoice replaces contact-heavy view; no rows below CTA"
+}
