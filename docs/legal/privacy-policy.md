@@ -1,8 +1,8 @@
 # FieldSoli Privacy Policy
 
-**Effective date:** October 24, 2026
+**Effective date:** November 2, 2026
 
-**Policy version:** 2026-10-24
+**Policy version:** 2026-11-02
 
 FieldSoli™ is a product operated by **Veltri Ventures LLC, an Illinois limited liability company** ("FieldSoli," "we," "us," or "our"). This Privacy Policy explains how we collect, use, disclose, retain, and protect personal information when you use:
 
@@ -160,7 +160,19 @@ You can manage location permission through **Privacy Choices → Location → Ad
 
 Job Summary CSV exports may include job-snapshot customer phone and email columns when present.
 
-### K. Information FieldSoli does not currently collect through the mobile app
+### K. Hosted estimates, invoices, and document sharing
+
+When you create an estimate or invoice, we store a document snapshot in our Supabase database and use Vercel to host its shared page. The snapshot can include business and customer names and contact details, the service address, short job description, the job's long description displayed as **Client notes**, customer-facing charges, taxes, totals, dates, and payment terms. The page also displays applicable document or payment status. Client notes are different from the separate internal notes you capture for jobs or work sessions; review the document before sharing it.
+
+Anyone with an enabled link can open the document without signing in or having their identity verified. A recipient can forward it to others. Links do not automatically expire: an estimate's valid-until date or invoice's due date does not expire the link.
+
+Messaging, email, and other recipient services may fetch the link to generate a preview. Our share-page previews include business name, document type, total, short job description, and issue date. Recipients and their services may retain previews and copies under their own practices. When you use your device's sharing features to send a link or PDF, you choose the recipient or service; that service's terms and privacy practices apply to its processing.
+
+**Archive & Disable Link** stops future hosted access but retains the document snapshot in your account. Re-enabling restores the same URL, so anyone who previously received it can access it again. Deleting a job disables its document links; restoring the job does not automatically re-enable them. Completed account deletion removes associated documents from active systems and revokes hosted access, subject to the retention and deletion provisions in Sections 7 and 8. A deletion request alone does not immediately revoke links.
+
+Disabling or deleting a link cannot recall PDFs, downloads, screenshots, printed copies, or previews retained by recipients or their services. Shared document pages exclude Vercel Web Analytics and request that search engines not index them and that browsers and intermediaries not cache them. These requests do not guarantee that every third party complies or deletes existing copies. Hosting, delivery, and security systems still process technical information, including request logs, as described elsewhere in this policy. See Section 5 for disclosures at your direction and Section 10 for your choices and rights.
+
+### L. Information FieldSoli does not currently collect through the mobile app
 
 The current FieldSoli mobile app does not request or collect calendars, camera or photo-library content, audio recordings, microphone data, email-inbox content, payment-card numbers, or bank-account credentials. FieldSoli does not request write access to your contacts.
 
@@ -169,7 +181,7 @@ The current FieldSoli mobile app does not request or collect calendars, camera o
 In addition to the category-specific purposes described above, we use personal information to:
 
 - create, authenticate, maintain, and secure accounts;
-- provide job capture, live and manual work-session tracking, Inbox capture and assignment, material and other job-cost tracking, payment-status features, earnings insights, and Job Summary export;
+- provide job capture, live and manual work-session tracking, Inbox capture and assignment, material and other job-cost tracking, payment-status features, earnings insights, estimates, invoices, document sharing, and Job Summary export;
 - store, organize, retrieve, display, and delete User Content;
 - operate the waitlist and send communications you requested or agreed to receive;
 - provide support and fulfill privacy requests;

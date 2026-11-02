@@ -1,8 +1,8 @@
 # FieldSoli Terms of Service
 
-**Effective date:** September 20, 2026
+**Effective date:** November 2, 2026
 
-**Terms version:** 2026-09-20
+**Terms version:** 2026-11-02
 
 FieldSoli™ is a product operated by **Veltri Ventures LLC, an Illinois limited liability company** ("FieldSoli," "we," "us," or "our"). These Terms of Service (the "Terms") govern access to and use of:
 
@@ -38,6 +38,7 @@ FieldSoli provides business-organizing tools that currently allow users to:
 - record material and other job-cost quantities, units, unit costs, and calculated totals;
 - view estimates and summaries based on entered information, including work duration, material and other job-cost totals, net earnings, net hourly rate, outstanding payments, job rankings, recent work, and items that may need attention;
 - request a Job Summary CSV export of completed jobs for one calendar year, delivered by email as a secure download link (not a tax package, invoice export, or full account backup);
+- create customer-facing estimates and invoices, share hosted document links, and generate PDFs;
 - manage account and profile information and available privacy choices; and
 - access the FieldSoli website, waitlist, legal information, and support.
 
@@ -53,7 +54,7 @@ We do not provide a service-level agreement or guarantee that any feature will r
 
 ## 4. Limited Right to Use the Services
 
-Subject to these Terms, FieldSoli grants you a limited, revocable, non-exclusive, non-transferable, and non-sublicensable right to access and use the Services for your internal business purposes while these Terms remain in effect.
+Subject to these Terms, FieldSoli grants you a limited, revocable, non-exclusive, non-transferable, and non-sublicensable right to access and use the Services for your business purposes, including customer-facing document sharing through the available features, while these Terms remain in effect.
 
 The Services and mobile applications are licensed, not sold. Except for the limited right expressly granted in these Terms and any rights granted under applicable app-store terms, FieldSoli and its licensors reserve all rights in the Services.
 
@@ -87,7 +88,7 @@ You are solely responsible for:
 - the accuracy and legality of information you enter into FieldSoli; and
 - obtaining any rights, notices, permissions, or consents needed to enter and process information about customers, properties, jobs, and worksites.
 
-FieldSoli does not verify your identity, credentials, licenses, insurance, work, customer relationships, prices, or compliance. Records created in FieldSoli are internal business-organizing records. They are not customer contracts, legal notices, permits, tax returns, payroll records, safety systems, or other legally required documents.
+FieldSoli does not verify your identity, credentials, licenses, insurance, work, customer relationships, prices, or compliance. FieldSoli provides internal business-organizing records and customer-facing estimate and invoice tools. You must review documents for accuracy, completeness, and compliance with your agreements and applicable contractual, tax, disclosure, and other statutory requirements before sharing or relying on them. FieldSoli does not guarantee that a document satisfies those requirements or replaces customer contracts, legal notices, permits, tax returns, payroll records, safety systems, or other legally required documents.
 
 You should maintain independent copies of records you need for taxes, licenses, insurance, customer relationships, disputes, or other legal and business purposes. FieldSoli is not a statutory records archive.
 
@@ -134,6 +135,12 @@ You represent and warrant that:
 
 Your customer does not become a FieldSoli user, customer, or party to these Terms merely because you enter information about that customer. You—not FieldSoli—remain responsible for responding to your customer's requests and meeting obligations you owe to that customer. We may assist you with a request where appropriate.
 
+### Customer-facing documents and sharing
+
+When you enable an estimate or invoice link, you authorize FieldSoli to display that document to anyone who has the link, including people to whom it is forwarded and services that fetch link previews. Recipients do not need to sign in, and FieldSoli does not verify their identity. Links do not automatically expire; an estimate's valid-until date or an invoice's due date does not expire the link.
+
+You must have authority to share the Customer Information included in a document and review its content and intended recipients before sharing a link or PDF. Disabling a link stops future hosted access but cannot recall PDFs, downloads, screenshots, printed copies, or previews already retained by others. Re-enabling a link restores the same URL. See Section 2 of the Privacy Policy for document data, link controls, and retention details.
+
 ## 9. License to User Content
 
 You grant FieldSoli a worldwide, non-exclusive, royalty-free license to host, store, reproduce, process, transmit, and display User Content only as reasonably necessary to:
@@ -149,7 +156,7 @@ This license includes the limited right to format, organize, calculate from, and
 
 The license ends when the relevant User Content is deleted from our active systems, except to the limited extent information remains in backups or must be retained for legal compliance, security, fraud prevention, dispute resolution, enforcement, or service wind-down, as described in the Privacy Policy.
 
-This license does not authorize FieldSoli to publicly display User Content, advertise with your or your customer's name or logo, sell User Content, train a general-purpose artificial-intelligence model on User Content, or create pricing or industry benchmarks from User Content.
+This license does not authorize FieldSoli to publicly display User Content except through the sharing features you choose to enable, advertise with your or your customer's name or logo, sell User Content, train a general-purpose artificial-intelligence model on User Content, or create pricing or industry benchmarks from User Content.
 
 ## 10. Aggregated and Deidentified Service Data
 

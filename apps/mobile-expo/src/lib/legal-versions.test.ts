@@ -21,9 +21,13 @@ const termsMarkdown = readFileSync(
 describe('legal document versions', () => {
   it('requires the normal gate for the prior privacy version and accepts the current one', () => {
     const required = { privacyVersion: REQUIRED_PRIVACY_VERSION, termsVersion: REQUIRED_TERMS_VERSION };
-    expect(needsLegalReacceptance({ privacyPolicyVersion: '2026-09-20', termsVersion: REQUIRED_TERMS_VERSION }, required)).toBe(true);
+    expect(needsLegalReacceptance({ privacyPolicyVersion: '2026-10-24', termsVersion: REQUIRED_TERMS_VERSION }, required)).toBe(true);
     expect(needsLegalReacceptance({ privacyPolicyVersion: REQUIRED_PRIVACY_VERSION, termsVersion: REQUIRED_TERMS_VERSION }, required)).toBe(false);
   });
+  it('requires renewed acceptance of the prior terms version', () => {
+    expect(needsLegalReacceptance({ privacyPolicyVersion: REQUIRED_PRIVACY_VERSION, termsVersion: '2026-09-20' }, { privacyVersion: REQUIRED_PRIVACY_VERSION, termsVersion: REQUIRED_TERMS_VERSION })).toBe(true);
+  });
+
   it('matches the canonical privacy policy version', () => {
     const markdownVersion = privacyMarkdown.match(/\*\*Policy version:\*\* ([\d-]+)/)?.[1];
     expect(REQUIRED_PRIVACY_VERSION).toBe(markdownVersion);
