@@ -2,6 +2,10 @@
 
 These seven PNGs are the canonical selected assets. Revisions overwrite these filenames.
 
+Fresh landscape [Android tablet artwork](android-tablets/README.md) is stored separately, with one five-image set per Nexus 7 and Pixel Tablet.
+
+The five [Android screenshot adaptations](android/README.md) are stored separately in `android/`, with minimal edge-to-edge frames and no Dynamic Island. They are 1080 × 1920 and reuse the supplied app screens with iOS status bars removed.
+
 Invoicing retains the selected **v3 layout and content**; time and expenses retains the **v2 screen** showing individual time, materials, and costs. All five portrait images share the hardware from image 02. The header and search creative use that same frame and the selected invoice screen.
 
 | Final image | Dimensions |
