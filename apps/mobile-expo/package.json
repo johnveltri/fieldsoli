@@ -12,6 +12,7 @@
     "web": "expo start --web",
     "export:ios:production": "FIELDSOLO_RELEASE_EXPORT=true EXPO_PUBLIC_APP_ENV=production EXPO_PUBLIC_IS_TESTFLIGHT=false EXPO_PUBLIC_ANALYTICS_DEBUG_RICH=false expo export --platform ios",
     "test": "jest --config ./jest.config.js",
+    "test:config-plugins": "node --test plugins/*.test.js",
     "test:watch": "jest --config ./jest.config.js --watch"
   },
   "dependencies": {
@@ -29,6 +30,7 @@
     "expo": "~57.0.17",
     "expo-asset": "~57.0.17",
     "expo-blur": "~57.0.3",
+    "expo-build-properties": "~57.0.22",
     "expo-clipboard": "~57.0.2",
     "expo-constants": "~57.0.18",
     "expo-contacts": "~57.0.6",
