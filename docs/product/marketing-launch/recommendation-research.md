@@ -1,3 +1,5 @@
+Historical prototype-stage research. For the production launch outcome and revised scope, see release-evidence.md.
+
 # Recommendation readiness — research and prototype changes
 
 Scope: private ChatGPT prototype only. Production code and fieldsoli.com are unchanged. No AI ranking, recommendation or conversion guarantee is possible; this is evidence and content preparation, not proof of an AI recommendation lift.

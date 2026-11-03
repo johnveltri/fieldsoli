@@ -1,0 +1,17 @@
+https://fieldsolo-marketing-hkzcbe112-veltri-ventures.vercel.app
+/: HTTP 200
+/guides/job-records: HTTP 200
+/guides/estimates-invoices-payments: HTTP 200
+/guides/free-vs-paid-contractor-software: HTTP 200
+/terms: HTTP 200
+/privacy: HTTP 200
+/support: HTTP 200
+/delete-account: HTTP 200
+/auth/confirmed: HTTP 200
+/auth/reset-password: HTTP 200
+/exports/download: HTTP 200
+/share/qa-invalid-token: HTTP 200 (shared-document route)
+/share/qa-invalid-token/opengraph-image: HTTP 200 (shared-document route)
+/sitemap.xml: HTTP 200
+/robots.txt: HTTP 200
+All checks passed.

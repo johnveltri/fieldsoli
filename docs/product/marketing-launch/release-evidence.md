@@ -18,3 +18,12 @@ The account-deletion instructions now point to Account → Help & Privacy → Pr
 A real emailed credential was not redeemed, an account was not deleted, and no private customer document/export link was used during QA. These limits must not be presented as full live end-to-end verification.
 
 Production rollback reference: `https://fieldsolo-marketing-p3lz48i5y-veltri-ventures.vercel.app` (Ready before this release). Deployment uses remote production environment settings without downloading secrets. The blocked `vercel pull --environment=production` was not retried.
+
+## Production outcome
+
+- PR: https://github.com/johnveltri/fieldsoli/pull/114 — open, not merged.
+- Deployed application source: `2bab154f76904a27e41b49470381f8650a9ee7a1`.
+- Production deployment: `dpl_3s6sMtQ3KwugP6KjptNrtUoAUPqC`, https://fieldsolo-marketing-hkzcbe112-veltri-ventures.vercel.app.
+- Promoted to https://fieldsoli.com on November 3, 2026, after all 15 staged route checks passed.
+- Public-domain browser checks passed at 320/390/1280px and for all service routes. Live invalid shared-document RPC and social preview PNG respond correctly. Invalid export fragment is removed and fails closed; malformed waitlist request is rejected without a submission. Sign-in deep link remains present and password-reset page has configuration.
+- The final documentation-only commit records this deployment; it does not require another application deployment.
