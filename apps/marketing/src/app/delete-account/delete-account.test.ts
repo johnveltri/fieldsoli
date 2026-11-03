@@ -18,6 +18,9 @@ describe("website account deletion instructions", () => {
   });
 
   it("matches the current in-app deletion flow and external request method", () => {
+    expect(pageSource).toContain("<strong>Account</strong>");
+    expect(pageSource).toContain("<strong>Privacy Choices</strong>");
+    expect(pageSource).toContain("below Legal");
     expect(pageSource).toContain("Type <strong>delete account</strong>");
     expect(pageSource).toContain("Confirm the final deletion prompt");
     expect(pageSource).toContain("privacy@fieldsoli.com");
