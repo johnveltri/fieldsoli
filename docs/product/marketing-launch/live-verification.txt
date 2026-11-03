@@ -1,0 +1,18 @@
+Homepage 1280px: approved sections, 10 FAQs, interactions, no overflow; indexable
+Homepage 390px: approved sections, 10 FAQs, interactions, no overflow; indexable
+Homepage 320px: approved sections, 10 FAQs, interactions, no overflow; indexable
+/guides/job-records: HTTP 200
+/guides/estimates-invoices-payments: HTTP 200
+/guides/free-vs-paid-contractor-software: HTTP 200
+/terms: HTTP 200
+/privacy: HTTP 200
+/support: HTTP 200
+/delete-account: HTTP 200
+/auth/confirmed: HTTP 200
+/auth/reset-password: HTTP 200
+/exports/download: HTTP 200
+/exports/download: noindex, no-referrer and CSP retained
+/share/test-nonexistent-link: noindex, no-referrer and CSP retained
+Public sitemap excludes all credential/private routes; scoped marketing CSS does not affect privacy page.
+
+Live service behavior: sign-in deep link retained; password reset without credentials renders Reset link expired; invalid synthetic export token is removed from the fragment and renders the unavailable state; shared invalid-token RPC and PNG social preview work; malformed waitlist POST returns 400 without creating a submission.

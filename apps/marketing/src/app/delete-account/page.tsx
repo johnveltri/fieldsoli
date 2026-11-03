@@ -25,8 +25,9 @@ export default function DeleteAccountPage() {
         <h2>Delete your account in the app</h2>
         <ol>
           <li>Sign in to your FieldSoli account.</li>
-          <li>Open <strong>Profile</strong>.</li>
-          <li>Select <strong>Delete account</strong>.</li>
+          <li>Open <strong>Account</strong>.</li>
+          <li>Open <strong>Privacy Choices</strong> under Help &amp; Privacy.</li>
+          <li>Select <strong>Delete Account</strong> below Legal.</li>
           <li>
             Type <strong>delete account</strong> when prompted and continue.
           </li>
