@@ -14,3 +14,5 @@ Homepage 320px: approved sections, 10 FAQs, interactions, no overflow; indexable
 /exports/download: noindex, no-referrer and CSP retained
 /share/test-nonexistent-link: noindex, no-referrer and CSP retained
 Public sitemap excludes all credential/private routes; scoped marketing CSS does not affect privacy page.
+
+Live service behavior: sign-in deep link retained; password reset without credentials renders Reset link expired; invalid synthetic export token is removed from the fragment and renders the unavailable state; shared invalid-token RPC and PNG social preview work; malformed waitlist POST returns 400 without creating a submission.
