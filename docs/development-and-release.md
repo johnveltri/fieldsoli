@@ -45,6 +45,34 @@ npx eas-cli@latest env:set \
 designed for this; database security comes from grants and RLS. Never put a service-role key or a
 Supabase secret key in EAS client variables.
 
+## Android release code optimization
+
+Android release builds enable R8 minification and resource shrinking through
+`expo-build-properties`. The local `with-android-r8-optimization` config plugin
+selects `proguard-android-optimize.txt` during prebuild: Expo SDK 57's legacy
+`proguard-android.txt` defaults disable code optimization. Dependency and app keep
+rules remain in effect. Generated native files are ignored; keep these settings in
+the Expo configuration and plugins so EAS prebuild applies them too.
+
+Run `npm run test:config-plugins -w mobile-expo` to check the template rewrite.
+After prebuild, verify `android/gradle.properties` has both
+`android.enableMinifyInReleaseBuilds=true` and
+`android.enableShrinkResourcesInReleaseBuilds=true`, and `android/app/build.gradle`
+uses the optimized default rule file for the release build.
+
+This change addresses the configuration behind Play's low DEX optimization / 1%
+obfuscation finding for version code 16 (1.2.0). It is not yet verified by Play.
+Before production rollout, build a new AAB, test the optimized release (startup,
+sign-in, job/visit flows, contacts, documents/sharing, and navigation), and upload
+to internal testing. Check that bundle's optimization, obfuscation, and shrinking
+metrics in App bundle explorer. Preserve the release's `mapping.txt` for readable
+crash traces and verify Play receives its deobfuscation mapping. If a metric is
+still low, inspect R8's merged configuration and dependency keep rules before
+changing them; enabling R8 alone does not guarantee Play's 25% thresholds.
+
+References: [Android R8 configuration](https://developer.android.com/topic/performance/app-optimization/enable-app-optimization)
+and [Expo build properties](https://docs.expo.dev/versions/v57.0.0/sdk/build-properties/).
+
 ## Daily local workflow
 
 Open Docker Desktop, then run:

@@ -38,6 +38,15 @@
     "plugins": [
       "expo-router",
       [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableMinifyInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true
+          }
+        }
+      ],
+      [
         "expo-location",
         {
           "locationWhenInUsePermission": "Allow FieldSoli to use your location to suggest nearby addresses.",
@@ -66,7 +75,8 @@
         }
       ],
       "expo-status-bar",
-      "./plugins/with-android-landscape"
+      "./plugins/with-android-landscape",
+      "./plugins/with-android-r8-optimization"
     ],
     "extra": {
       "eas": {
