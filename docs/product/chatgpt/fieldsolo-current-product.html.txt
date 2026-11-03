@@ -242,6 +242,7 @@
     </section>
 
     <section id="status-approved" data-status="approved-not-shipped">
+      <article id="search-indexing-policy" data-status="approved-not-shipped"><h3>Consistent public indexing policy</h3><p>Follow-up PR makes support/legal/deletion help explicitly indexable, removes conflicting Googlebot defaults from email-auth pages, and aligns guide canonicals, Article identity and sitemap URLs. Hosted invoice/estimate and export noindex headers remain unchanged. Public homepage and guides are already indexable in production. See <a href="indexing/audit.md">audit and verification limits</a>. This follow-up is not yet deployed.</p></article>
 
       <h2>Approved but not shipped</h2>
       <article id="address-proximity" data-status="approved-not-shipped">

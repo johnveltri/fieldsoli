@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
+import { publicPageMetadata } from "../../lib/search-metadata";
 import Link from "next/link";
 
 import styles from "../legal.module.css";
 
 export const metadata: Metadata = {
+  ...publicPageMetadata("/delete-account"),
   title: "Delete Account",
   description: "How to request deletion of your FieldSoli account.",
 };

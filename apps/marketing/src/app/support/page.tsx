@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
+import { publicPageMetadata } from "../../lib/search-metadata";
 import Link from "next/link";
 
 import styles from "../legal.module.css";
 
 export const metadata: Metadata = {
+  ...publicPageMetadata("/support"),
   title: "Support",
   description: "Get help using FieldSoli, managing your account, or requesting account deletion.",
 };
