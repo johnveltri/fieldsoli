@@ -1,0 +1,248 @@
+{
+  "size": [
+    2560,
+    1600
+  ],
+  "source": "Fresh Expo Go SDK 57 Android emulator captures; hosted Dev fictional fixture",
+  "frame": "Same minimal black 16:10 tablet frame throughout; no camera cutout",
+  "images": [
+    {
+      "file": "nexus-7/01-unlimited-invoices-estimates.png",
+      "headline": "Unlimited invoices & estimates",
+      "subtitle": "",
+      "native_capture": "source-screenshots/android-tablets/nexus-7/invoice-preview-charges.png",
+      "sha256": "f7bb98f561fb62163792ed70dd20b66b0a7dd053be7bf13efb4c02d2dfdc2b8f",
+      "screen_box": [
+        280,
+        300,
+        2000,
+        1250
+      ],
+      "native_pixel_check": "PASS; uniform scaling only",
+      "native_cta_check": "PASS after all separate proof cards",
+      "separate_proof_cards": [
+        {
+          "source": "invoice-preview-top.png",
+          "crop": [
+            184,
+            365,
+            900,
+            860
+          ],
+          "placement": [
+            1930,
+            255,
+            500
+          ]
+        }
+      ]
+    },
+    {
+      "file": "nexus-7/02-track-time-expenses.png",
+      "headline": "Track time & expenses",
+      "subtitle": "",
+      "native_capture": "source-screenshots/android-tablets/nexus-7/job-other-costs.png",
+      "sha256": "0235554d716905f84e8f498d7e03a081e7e53f5f9b9a8c2b6481e962cde5c214",
+      "screen_box": [
+        280,
+        300,
+        2000,
+        1250
+      ],
+      "native_pixel_check": "PASS; uniform scaling only",
+      "native_cta_check": "N/A",
+      "separate_proof_cards": [
+        {
+          "source": "job-visits-materials-and-costs.png",
+          "crop": [
+            360,
+            264,
+            1560,
+            422
+          ],
+          "placement": [
+            1330,
+            275,
+            1050
+          ]
+        }
+      ]
+    },
+    {
+      "file": "nexus-7/03-simple-fast.png",
+      "headline": "Simple. Fast.",
+      "subtitle": "",
+      "native_capture": "source-screenshots/android-tablets/nexus-7/active-visit.png",
+      "sha256": "9a4210369d9095ccda2beecad228eb91febad8fd0f81a3df8ab4716c8ce02911",
+      "screen_box": [
+        280,
+        300,
+        2000,
+        1250
+      ],
+      "native_pixel_check": "PASS; uniform scaling only",
+      "native_cta_check": "PASS after all separate proof cards",
+      "separate_proof_cards": []
+    },
+    {
+      "file": "nexus-7/04-take-data-with-you.png",
+      "headline": "Take your data with you.",
+      "subtitle": "CSV export. No active subscription required.",
+      "native_capture": "source-screenshots/android-tablets/nexus-7/export-job-summary.png",
+      "sha256": "88e3d5190333bb06f61266a83f3caf7dbcbf7f16f87d8a527406283f9f6df2c0",
+      "screen_box": [
+        280,
+        300,
+        2000,
+        1250
+      ],
+      "native_pixel_check": "PASS; uniform scaling only",
+      "native_cta_check": "PASS after all separate proof cards",
+      "separate_proof_cards": [
+        {
+          "source": "design-proofs/04-export-excerpt.png",
+          "placement": [
+            1400,
+            740,
+            1000
+          ]
+        }
+      ]
+    },
+    {
+      "file": "nexus-7/05-job-earnings-insights.png",
+      "headline": "Job earnings insights",
+      "subtitle": "Understand profitability to inform future pricing",
+      "native_capture": "source-screenshots/android-tablets/nexus-7/earnings-job-comparisons.png",
+      "sha256": "5e5fcc409eff936cfe456c896340fd04a505a27e13c19150b1bfff69a19dddec",
+      "screen_box": [
+        280,
+        300,
+        2000,
+        1250
+      ],
+      "native_pixel_check": "PASS; uniform scaling only",
+      "native_cta_check": "N/A",
+      "separate_proof_cards": [
+        {
+          "source": "earnings-least-profitable.png",
+          "crop": [
+            360,
+            310,
+            1560,
+            565
+          ],
+          "placement": [
+            1600,
+            280,
+            800
+          ]
+        }
+      ]
+    },
+    {
+      "file": "pixel-tablet/01-unlimited-invoices-estimates.png",
+      "headline": "Unlimited invoices & estimates",
+      "subtitle": "",
+      "native_capture": "source-screenshots/android-tablets/pixel-tablet/invoice-preview-charges.png",
+      "sha256": "1ef52a77ab4a4aa9ca10b3ebe512bb3e454d18a35b0449abd5d58327c6d36f53",
+      "screen_box": [
+        280,
+        300,
+        2000,
+        1250
+      ],
+      "native_pixel_check": "PASS; uniform scaling only",
+      "native_cta_check": "PASS after all separate proof cards",
+      "separate_proof_cards": [
+        {
+          "source": "invoice-preview-top.png",
+          "crop": [
+            504,
+            365,
+            1220,
+            860
+          ],
+          "placement": [
+            1930,
+            255,
+            500
+          ]
+        }
+      ]
+    },
+    {
+      "file": "pixel-tablet/02-track-time-expenses.png",
+      "headline": "Track time & expenses",
+      "subtitle": "",
+      "native_capture": "source-screenshots/android-tablets/pixel-tablet/job-edit-time-materials-and-costs.png",
+      "sha256": "9196cdab0d54981595b70a071c0b9dd8135a589d37b06f861fff3a4cba0a5764",
+      "screen_box": [
+        280,
+        300,
+        2000,
+        1250
+      ],
+      "native_pixel_check": "PASS; uniform scaling only",
+      "native_cta_check": "N/A",
+      "separate_proof_cards": []
+    },
+    {
+      "file": "pixel-tablet/03-simple-fast.png",
+      "headline": "Simple. Fast.",
+      "subtitle": "",
+      "native_capture": "source-screenshots/android-tablets/pixel-tablet/active-visit.png",
+      "sha256": "83fadb6bef1fd47998c9b4eada6198d5fc669654b6c3f1530f8651dae00d97c9",
+      "screen_box": [
+        280,
+        300,
+        2000,
+        1250
+      ],
+      "native_pixel_check": "PASS; uniform scaling only",
+      "native_cta_check": "PASS after all separate proof cards",
+      "separate_proof_cards": []
+    },
+    {
+      "file": "pixel-tablet/04-take-data-with-you.png",
+      "headline": "Take your data with you.",
+      "subtitle": "CSV export. No active subscription required.",
+      "native_capture": "source-screenshots/android-tablets/pixel-tablet/export-job-summary.png",
+      "sha256": "82130c4346d26dc3f141ad854bb342b2220161db66b7567ca0aa643ff661fefb",
+      "screen_box": [
+        280,
+        300,
+        2000,
+        1250
+      ],
+      "native_pixel_check": "PASS; uniform scaling only",
+      "native_cta_check": "PASS after all separate proof cards",
+      "separate_proof_cards": [
+        {
+          "source": "design-proofs/04-export-excerpt.png",
+          "placement": [
+            1400,
+            740,
+            1000
+          ]
+        }
+      ]
+    },
+    {
+      "file": "pixel-tablet/05-job-earnings-insights.png",
+      "headline": "Job earnings insights",
+      "subtitle": "Understand profitability to inform future pricing",
+      "native_capture": "source-screenshots/android-tablets/pixel-tablet/earnings-job-comparisons.png",
+      "sha256": "c038aa9d5894e4a8c44409378c33f7730f0d78096ce1c68e00f66b44ab3679a2",
+      "screen_box": [
+        280,
+        300,
+        2000,
+        1250
+      ],
+      "native_pixel_check": "PASS; uniform scaling only",
+      "native_cta_check": "N/A",
+      "separate_proof_cards": []
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "output": "06-feature-graphic.png",
+  "dimensions": [
+    1024,
+    500
+  ],
+  "format": "RGB PNG without alpha",
+  "headline": "Unlimited invoices & estimates",
+  "subtitle": "Simple time & expense tracking for contractors.",
+  "phone": "Existing Android edge-to-edge frame and invoice plate; no new native UI generated",
+  "method": "Deterministic composition of approved existing artwork",
+  "visual_review": "PASS: exact approved copy, no clipping, intact invoice, consistent notch-free frame"
+}

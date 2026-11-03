@@ -8,9 +8,17 @@ module.exports = ({ config }) => {
   validateReleaseEnvironment(process.env);
 
   const app = require('./app.json').expo;
+  // Expo Go cannot execute the native Android landscape config plugin. Opt
+  // this local tablet preview into rotation without changing release defaults.
+  const tabletPreview =
+    process.env.FIELDSOLI_ANDROID_TABLET_PREVIEW === 'true'
+    && process.env.EXPO_PUBLIC_APP_ENV === 'development'
+    && process.env.EAS_BUILD !== 'true'
+    && process.env.FIELDSOLO_RELEASE_EXPORT !== 'true';
   return {
     ...app,
     ...config,
+    orientation: tabletPreview ? 'default' : app.orientation,
     plugins: [
       ...(app.plugins ?? []),
       'expo-mail-composer',

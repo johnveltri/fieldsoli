@@ -1,0 +1,101 @@
+{
+  "dimensions": [
+    1080,
+    1920
+  ],
+  "format": "RGB PNG, no alpha",
+  "source_type": "Original supplied screenshots with iOS status bars cropped; not fresh Android captures",
+  "frame": "Identical thin edge-to-edge frame; no hardware cutout, notch, Dynamic Island, or iPhone buttons",
+  "images": [
+    {
+      "file": "01-unlimited-invoices-estimates.png",
+      "native_source": "invoice-preview-charges.png",
+      "native_source_sha256": "d02b5f8fd9e1d49360ef060f9774cd0bd4527aa811dc6893d0ea8dde0e78c77b",
+      "source_crop": [
+        0,
+        140,
+        1206,
+        2622
+      ],
+      "screen_box": [
+        240,
+        640,
+        840,
+        1875
+      ],
+      "source_interior_pixel_check": "PASS before separate export table"
+    },
+    {
+      "file": "02-track-time-expenses.png",
+      "native_source": "job-edit-time-materials-and-costs.png",
+      "native_source_sha256": "4c8c32e7435c2235acf5eb1f7cddba67c3af039cea645a34732d451cd4319f33",
+      "source_crop": [
+        0,
+        140,
+        1206,
+        2622
+      ],
+      "screen_box": [
+        240,
+        640,
+        840,
+        1875
+      ],
+      "source_interior_pixel_check": "PASS before separate export table"
+    },
+    {
+      "file": "03-simple-fast.png",
+      "native_source": "active-visit.png",
+      "native_source_sha256": "3f491f3c2d643675382c91b4054287a949b680f7ed5cee552c7310d71c214921",
+      "source_crop": [
+        0,
+        140,
+        1206,
+        2622
+      ],
+      "screen_box": [
+        240,
+        640,
+        840,
+        1875
+      ],
+      "source_interior_pixel_check": "PASS before separate export table"
+    },
+    {
+      "file": "04-take-data-with-you.png",
+      "native_source": "export-job-summary.png",
+      "native_source_sha256": "f3431adfde602c080c93f29709759dd28524cba3b3a3c7d41b18b8c1cd612dd2",
+      "source_crop": [
+        0,
+        140,
+        1206,
+        2622
+      ],
+      "screen_box": [
+        240,
+        640,
+        840,
+        1875
+      ],
+      "source_interior_pixel_check": "PASS before separate export table"
+    },
+    {
+      "file": "05-job-earnings-insights.png",
+      "native_source": "earnings-monthly-snapshot.png",
+      "native_source_sha256": "9d333c1329c9ebef88d7c57787ebe6053c759021c0f80be800932f8dc24218df",
+      "source_crop": [
+        0,
+        140,
+        1206,
+        2622
+      ],
+      "screen_box": [
+        240,
+        640,
+        840,
+        1875
+      ],
+      "source_interior_pixel_check": "PASS before separate export table"
+    }
+  ]
+}
