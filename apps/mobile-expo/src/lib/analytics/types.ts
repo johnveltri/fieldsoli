@@ -21,6 +21,8 @@ export type AnalyticsScreenName =
   | 'profile';
 
 export type AnalyticsEventName =
+  | 'acquisition_resolved'
+  | 'document_created'
   | 'app_opened'
   | 'app_became_active'
   | 'auth_screen_viewed'

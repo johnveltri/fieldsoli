@@ -29,6 +29,10 @@ const mockPrintToFile = jest.fn<(...args: unknown[]) => Promise<{ uri: string }>
 const mockPdfSharingAvailable = jest.fn<() => Promise<boolean>>();
 const mockSendSms = jest.fn<(...args: unknown[]) => Promise<unknown>>();
 let mockShareSheetClosed: (() => void) | undefined;
+const mockCaptureForUser = jest.fn();
+jest.mock('../../lib/analytics', () => ({
+  analytics: { captureForUser: (...args: unknown[]) => mockCaptureForUser(...args) },
+}));
 
 jest.mock('@fieldsolo/api-client', () => ({
   ...jest.requireActual<object>('@fieldsolo/api-client'),
@@ -361,6 +365,9 @@ describe('InvoicingJobControls', () => {
       {},
       expect.objectContaining({ requestKey: 'retained-key', fingerprint: 'retained-fingerprint' }),
     ));
+    await waitFor(() => expect(mockCaptureForUser).toHaveBeenCalledWith('owner-1', 'document_created', {
+      document_type: 'estimate', document_ref: 'doc-1', job_ref: 'job-1', mutation_ref: 'retained-key',
+    }));
     await waitFor(() => expect(AsyncStorage.getItem(
       'fieldsolo.financial-document-intent.v1:owner-1:job-1',
     )).resolves.toBeNull());
@@ -605,6 +612,7 @@ describe('InvoicingJobControls', () => {
       }),
     );
     expect(onFinalized).toHaveBeenCalledWith('paid');
+    expect(mockCaptureForUser).not.toHaveBeenCalledWith('owner-1', 'document_created', expect.anything());
   });
 
   it('creates an invoice and completes the Job from the final review without sharing', async () => {
@@ -639,6 +647,9 @@ describe('InvoicingJobControls', () => {
       }),
     );
     expect(onFinalized).toHaveBeenCalledWith('completed');
+    expect(mockCaptureForUser).toHaveBeenCalledWith('owner-1', 'document_created', expect.objectContaining({
+      document_type: 'invoice', document_ref: 'doc-1', job_ref: 'job-1',
+    }));
   });
 
   it('cancels Paid review when the existing preview is closed without saving', async () => {

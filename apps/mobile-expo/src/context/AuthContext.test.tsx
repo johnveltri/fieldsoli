@@ -10,6 +10,8 @@ const mockSignOut = jest.fn<() => Promise<void>>(async () => undefined);
 const mockUnsubscribe = jest.fn();
 const mockAnalyticsOnSignOut = jest.fn<() => Promise<void>>(async () => undefined);
 const mockClearAnalyticsConsentCache = jest.fn<() => Promise<void>>(async () => undefined);
+const mockWithdrawAnalytics = jest.fn<() => Promise<void>>(async () => undefined);
+const mockDeleteAccount = jest.fn<() => Promise<void>>(async () => undefined);
 let mockAuthStateChange: ((event: string, session: Session | null) => void) | null = null;
 
 jest.mock('../lib/supabase', () => ({
@@ -31,6 +33,7 @@ jest.mock('../lib/analytics', () => ({
     capture: jest.fn(),
     isConsentGranted: () => false,
     onSignOut: () => mockAnalyticsOnSignOut(),
+    withdrawConsent: () => mockWithdrawAnalytics(),
   },
   errorProperties: () => ({}),
 }));
@@ -40,7 +43,7 @@ jest.mock('../lib/analytics/consentStorage', () => ({
 }));
 
 jest.mock('@fieldsolo/api-client', () => ({
-  deleteCurrentAccount: jest.fn(),
+  deleteCurrentAccount: () => mockDeleteAccount(),
   updateCurrentUserPassword: jest.fn(),
 }));
 
@@ -53,11 +56,27 @@ function SessionState() {
   return <Text>{session ? 'signed in' : 'signed out'}</Text>;
 }
 
+let deleteAccount!: ReturnType<typeof useAuth>['deleteAccount'];
+function DeletionHarness() {
+  const auth = useAuth();
+  deleteAccount = auth.deleteAccount;
+  return <Text>{auth.session ? 'ready' : 'out'}</Text>;
+}
+
 describe('AuthProvider', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockAuthStateChange = null;
     mockGetSession.mockResolvedValue({ data: { session: signedInSession } });
+  });
+
+  it('clears local analytics and acquisition after account deletion before sign-out', async () => {
+    const screen = render(<AuthProvider><DeletionHarness /></AuthProvider>);
+    await screen.findByText('ready');
+    await act(async () => { await deleteAccount(); });
+    expect(mockDeleteAccount).toHaveBeenCalledTimes(1);
+    expect(mockWithdrawAnalytics).toHaveBeenCalledTimes(1);
+    expect(mockWithdrawAnalytics.mock.invocationCallOrder[0]).toBeLessThan(mockSignOut.mock.invocationCallOrder[0]);
   });
 
   it('clears analytics identity and cached consent after an automatic sign-out', async () => {
