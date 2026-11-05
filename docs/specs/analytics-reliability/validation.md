@@ -22,7 +22,8 @@ Re-run required CI in the supported Node version before merge.
 
 ## Existing suite failures
 
-A full mobile run exposed 20 failures in four suites. An independent archive of
+The final full mobile run has 558 passing tests and 20 failures across 80 suites
+(76 suites pass; four fail). An independent archive of
 unchanged main c6c0014 reproduced the same 20 failing tests (64 passing tests in
 those four suites), using the same local dependencies:
 
