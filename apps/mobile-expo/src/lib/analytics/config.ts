@@ -14,6 +14,7 @@ export type AnalyticsConfig = {
   appVersion: string;
   buildNumber: string;
   platform: string;
+  appleAdsAttributionEnabled?: boolean;
 };
 
 function boolFromEnv(value: string | undefined, fallback = false): boolean {
@@ -35,4 +36,6 @@ export const analyticsConfig: AnalyticsConfig = {
   appVersion: (process.env.EXPO_PUBLIC_APP_VERSION ?? '1.0.0').trim(),
   buildNumber: (process.env.EXPO_PUBLIC_BUILD_NUMBER ?? 'dev').trim(),
   platform: Platform.OS,
+  // Enable in the release environment only after attribution disclosures are approved.
+  appleAdsAttributionEnabled: boolFromEnv(process.env.EXPO_PUBLIC_APPLE_ADS_ATTRIBUTION_ENABLED, false),
 };

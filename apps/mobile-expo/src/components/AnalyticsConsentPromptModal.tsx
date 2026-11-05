@@ -4,6 +4,7 @@ import {
   Linking,
   Modal,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -14,6 +15,7 @@ import {
   withdrawAnalyticsConsent,
 } from '../lib/analytics/consentSync';
 import { LEGAL_URLS } from '../lib/legal-versions';
+import { analyticsConfig } from '../lib/analytics/config';
 import { cardShadowRn, fg, space } from '../theme/nativeTokens';
 
 type AnalyticsConsentPromptModalProps = {
@@ -79,7 +81,7 @@ export function AnalyticsConsentPromptModal({
       animationType="fade"
       onRequestClose={() => {}}
     >
-      <View style={styles.backdrop}>
+      <ScrollView style={styles.backdrop} contentContainerStyle={styles.scrollContent}>
         <View style={styles.card}>
           <Text style={styles.title}>Help improve FieldSoli?</Text>
           <Text style={styles.body}>
@@ -90,6 +92,9 @@ export function AnalyticsConsentPromptModal({
           <Text style={styles.listHeading}>If enabled, we may collect:</Text>
           <Text style={styles.listItem}>• App interactions (screens and actions you take)</Text>
           <Text style={styles.listItem}>• Device platform and app version</Text>
+          {analyticsConfig.appleAdsAttributionEnabled && analyticsConfig.platform === 'ios' && (
+            <Text style={styles.listItem}>• Apple Ads campaign information, linked to your app activity, to measure which ads are useful</Text>
+          )}
           <Text style={styles.listItem}>• Coarse error categories (not raw error text)</Text>
           <Text style={styles.body}>
             We do not sell your data. You can change this anytime in Privacy
@@ -133,7 +138,7 @@ export function AnalyticsConsentPromptModal({
             <Text style={styles.secondaryButtonLabel}>No thanks</Text>
           </Pressable>
         </View>
-      </View>
+      </ScrollView>
     </Modal>
   );
 }
@@ -142,6 +147,9 @@ const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.45)',
+  },
+  scrollContent: {
+    flexGrow: 1,
     justifyContent: 'center',
     padding: space('Spacing/24'),
   },

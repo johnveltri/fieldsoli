@@ -200,9 +200,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       deleteAccount: async () => {
         try {
           await deleteCurrentAccount(supabase);
-          if (analytics.isConsentGranted()) {
-            analytics.capture('account_delete_succeeded', { source: 'profile' });
-          }
+          // Stop local collection and clear acquisition before sign-out; emitting
+          // an identified success here can recreate the person just deleted remotely.
+          await analytics.withdrawConsent();
           await supabase.auth.signOut();
           await clearSignedOutAnalyticsState();
           return { error: null };

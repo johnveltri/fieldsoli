@@ -33,6 +33,7 @@ import * as Sharing from 'expo-sharing';
 import * as SMS from 'expo-sms';
 import { Asset } from 'expo-asset';
 import { File, Paths } from 'expo-file-system';
+import { analytics } from '../../lib/analytics';
 import {
   IconCopy,
   IconDownload,
@@ -468,6 +469,12 @@ export const InvoicingJobControls = forwardRef<
             timezone: intent.timezone,
             requestKey: intent.requestKey,
           }));
+      analytics.captureForUser(ownerId, 'document_created', {
+        document_type: intent.type,
+        document_ref: created.id,
+        job_ref: intent.jobId,
+        mutation_ref: intent.requestKey,
+      });
       onDocumentsChanged?.();
       return created;
     }
@@ -480,9 +487,16 @@ export const InvoicingJobControls = forwardRef<
       requestKey: intent.requestKey,
       confirmedPaidTotalCents: intent.confirmedPaidTotalCents,
     });
+    // Finalization can also create an invoice. Selecting an existing one isn't creation.
+    if (!intent.documentId) {
+      analytics.captureForUser(ownerId, 'document_created', {
+        document_type: 'invoice', document_ref: finalized.id,
+        job_ref: intent.jobId, mutation_ref: intent.requestKey,
+      });
+    }
     onDocumentsChanged?.();
     return finalized;
-  }, [client, onDocumentsChanged]);
+  }, [client, onDocumentsChanged, ownerId]);
 
   const clearIntent = useCallback(async (requestKey: string | undefined) => {
     if (!ownerId || !requestKey) return;

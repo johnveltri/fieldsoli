@@ -9,6 +9,7 @@ import {
   type AnalyticsConfig,
 } from './config';
 import { sanitizeProperties } from './utils';
+import { createAppleAdsAttribution } from './appleAds';
 import { migrateStorageKey } from '../storageMigration';
 import {
   FIELD_SOLO_ANALYTICS_ANONYMOUS_ID_KEY,
@@ -47,8 +48,16 @@ class AnalyticsClient {
   private currentScreen: AnalyticsScreenName | null = null;
   private userId: string | null = null;
   private consentGranted = false;
+  private consentGeneration = 0;
+  private readonly acquisition;
 
-  constructor(private readonly config: AnalyticsConfig) {}
+  constructor(private readonly config: AnalyticsConfig) {
+    this.acquisition = createAppleAdsAttribution(
+      config.platform === 'ios' && config.environment === 'production'
+      && config.appleAdsAttributionEnabled === true && !config.isTestflight
+      && config.provider === 'posthog' && config.posthogKey.length > 0,
+    );
+  }
 
   isConsentGranted(): boolean {
     return this.consentGranted;
@@ -85,6 +94,9 @@ class AnalyticsClient {
     properties: AnalyticsEventPayloads[Name] = {},
   ): void {
     if (!this.consentGranted) return;
+    if ((event === 'app_opened' || event === 'app_became_active') && this.userId) {
+      this.resolveAcquisition(this.userId);
+    }
     const payload = this.withEnvelope(properties);
     try {
       this.adapter.capture(event, payload);
@@ -93,11 +105,19 @@ class AnalyticsClient {
     }
   }
 
+  captureForUser<Name extends AnalyticsEventName>(
+    userId: string | null, event: Name, properties: AnalyticsEventPayloads[Name],
+  ): void {
+    if (!userId || userId !== this.userId) return;
+    this.capture(event, properties);
+  }
+
   identify(userId: string, traits: AnalyticsUserTraits = {}): void {
     if (!this.consentGranted) return;
     this.userId = userId;
     try {
       this.adapter.identify(userId, this.clean(traits));
+      this.resolveAcquisition(userId);
     } catch {
       // no-op
     }
@@ -106,6 +126,8 @@ class AnalyticsClient {
   reset(): void {
     if (!this.consentGranted) return;
     this.userId = null;
+    this.consentGeneration += 1;
+    this.acquisition.stop();
     this.appSessionId = makeId('session');
     try {
       this.adapter.reset();
@@ -131,6 +153,7 @@ class AnalyticsClient {
   }
 
   private async disable(clearAnonymousId: boolean): Promise<void> {
+    this.consentGeneration += 1;
     this.consentGranted = false;
     this.userId = null;
     this.appSessionId = null;
@@ -138,12 +161,11 @@ class AnalyticsClient {
     this.adapter = createNoopAdapter(
       clearAnonymousId ? 'consent_withdrawn' : 'consent_not_granted',
     );
+    this.acquisition.stop();
     if (clearAnonymousId) {
-      try {
-        await AsyncStorage.removeItem(ANONYMOUS_ID_KEY);
-      } catch {
-        // no-op
-      }
+      await Promise.allSettled([
+        this.acquisition.withdraw(), AsyncStorage.removeItem(ANONYMOUS_ID_KEY),
+      ]);
     }
   }
 
@@ -161,6 +183,26 @@ class AnalyticsClient {
       current_screen: this.currentScreen,
       debug_rich_enabled: this.config.debugRichEnabled,
       ...properties,
+      ...this.acquisition.properties(),
+    });
+  }
+
+  private resolveAcquisition(userId: string): void {
+    const generation = this.consentGeneration;
+    void this.acquisition.resolve(userId, (properties) => {
+      if (!this.consentGranted || this.userId !== userId || generation !== this.consentGeneration) return;
+      try {
+        this.adapter.identify(userId, {
+          acquisition_source: null, acquisition_reason: null,
+          apple_ads_org_id: null, apple_ads_campaign_id: null,
+          apple_ads_ad_group_id: null, apple_ads_keyword_id: null, apple_ads_ad_id: null,
+          apple_ads_conversion_type: null, apple_ads_claim_type: null, apple_ads_placement: null,
+          ...properties,
+        });
+        this.capture('acquisition_resolved', properties);
+      } catch {
+        // Attribution must never affect app use.
+      }
     });
   }
 
