@@ -58,6 +58,7 @@ describe('analytics consent gating', () => {
 
   it('sends events after consent is granted', async () => {
     await analytics.grantConsent();
+    analytics.identify('user-1');
     analytics.capture('app_opened', { auth_state: 'authenticated' });
 
     expect(mockCapture).toHaveBeenCalledWith(

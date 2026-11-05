@@ -70,10 +70,11 @@ describe('AuthProvider', () => {
     mockGetSession.mockResolvedValue({ data: { session: signedInSession } });
   });
 
-  it('clears local analytics and acquisition after account deletion before sign-out', async () => {
+  it('clears local analytics before remote account deletion and sign-out', async () => {
     const screen = render(<AuthProvider><DeletionHarness /></AuthProvider>);
     await screen.findByText('ready');
     await act(async () => { await deleteAccount(); });
+    expect(mockWithdrawAnalytics.mock.invocationCallOrder[0]).toBeLessThan(mockDeleteAccount.mock.invocationCallOrder[0]);
     expect(mockDeleteAccount).toHaveBeenCalledTimes(1);
     expect(mockWithdrawAnalytics).toHaveBeenCalledTimes(1);
     expect(mockWithdrawAnalytics.mock.invocationCallOrder[0]).toBeLessThan(mockSignOut.mock.invocationCallOrder[0]);

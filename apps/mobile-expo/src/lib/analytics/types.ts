@@ -21,6 +21,18 @@ export type AnalyticsScreenName =
   | 'profile';
 
 export type AnalyticsEventName =
+  | 'app_session_started'
+  | 'job_became_meaningful'
+  | 'useful_action_completed'
+  | 'meaningful_return'
+  | 'workflow_validation_blocked'
+  | 'job_work_saved'
+  | 'document_refresh_failed'
+  | 'document_create_failed'
+  | 'document_create_started'
+  | 'other_cost_updated'
+  | 'other_cost_created'
+  | 'other_cost_create_failed'
   | 'acquisition_resolved'
   | 'document_created'
   | 'app_opened'
@@ -157,6 +169,8 @@ export type AnalyticsAdapter = {
   name: string;
   capture: (event: AnalyticsEventName, properties: AnalyticsProperties) => void;
   identify: (userId: string, traits: AnalyticsUserTraits) => void;
-  reset: () => void;
+  reset: () => void | Promise<void>;
+  flush?: () => Promise<void>;
+  diagnostics?: () => { pending: number; dropped: number; storageFailures: number; lastResult: string };
   screen: (name: AnalyticsScreenName, properties: AnalyticsProperties) => void;
 };

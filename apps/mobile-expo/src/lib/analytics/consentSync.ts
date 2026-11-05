@@ -14,6 +14,8 @@ import {
   writeAnalyticsConsentCache,
 } from './consentStorage';
 
+let resolutionGeneration = 0;
+
 export async function syncAnalyticsConsentForUser(userId: string): Promise<void> {
   await resolveAnalyticsConsentForUser(userId);
 }
@@ -29,26 +31,36 @@ export type AnalyticsConsentResolution = 'granted' | 'withdrawn' | 'missing' | '
 export async function resolveAnalyticsConsentForUser(
   userId: string,
 ): Promise<AnalyticsConsentResolution> {
+  const generation = ++resolutionGeneration;
   const cached = await readAnalyticsConsentCache();
+  if (generation !== resolutionGeneration) return 'unavailable';
   if (cached?.userId === userId) {
-    await analytics.applyConsent(cached.status);
+    await analytics.applyConsent(cached.status, userId);
   } else {
     await analytics.applyConsent(null);
   }
 
   try {
     const status = await fetchAnalyticsConsentStatus(supabase);
+    if (generation !== resolutionGeneration) return 'unavailable';
+    if (cached?.userId === userId && cached.status === 'withdrawn' && status !== 'withdrawn') {
+      // A stale server grant must not undo an offline withdrawal.
+      await upsertAnalyticsConsentStatus(supabase, 'withdrawn');
+      return 'withdrawn';
+    }
     if (status) {
       await writeAnalyticsConsentCache(userId, status);
-      await analytics.applyConsent(status);
+      if (generation !== resolutionGeneration) return 'unavailable';
+      await analytics.applyConsent(status, userId);
       return status;
     }
     await clearAnalyticsConsentCache();
     await analytics.applyConsent(null);
     return 'missing';
   } catch {
+    if (generation !== resolutionGeneration) return 'unavailable';
     if (cached?.userId === userId) {
-      await analytics.applyConsent(cached.status);
+      await analytics.applyConsent(cached.status, userId);
       return cached.status;
     }
     await analytics.applyConsent(null);
@@ -57,24 +69,31 @@ export async function resolveAnalyticsConsentForUser(
 }
 
 export async function grantAnalyticsConsent(userId: string): Promise<void> {
+  ++resolutionGeneration;
+  // An explicit new grant starts a fresh observation period, never an old queue.
+  await analytics.withdrawConsent();
   try {
     await upsertAnalyticsConsentStatus(supabase, 'granted');
   } catch {
     // Best-effort server sync; local consent still applies when offline.
   }
   await writeAnalyticsConsentCache(userId, 'granted');
-  await analytics.grantConsent();
+  await analytics.grantConsent(userId);
   analytics.identify(userId);
 }
 
 export async function withdrawAnalyticsConsent(userId: string): Promise<void> {
+  ++resolutionGeneration;
+  // Apply the user's choice locally before waiting for any network request.
+  await Promise.all([
+    analytics.withdrawConsent(),
+    writeAnalyticsConsentCache(userId, 'withdrawn'),
+  ]);
   try {
     await upsertAnalyticsConsentStatus(supabase, 'withdrawn');
   } catch {
-    // Best-effort server sync; local consent still applies when offline.
+    // Resolution retries this withdrawal; a stale grant cannot override it.
   }
-  await writeAnalyticsConsentCache(userId, 'withdrawn');
-  await analytics.withdrawConsent();
 }
 
 export type { AnalyticsConsentStatus };

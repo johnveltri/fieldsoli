@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
+import { nativeApplicationVersion, nativeBuildVersion } from 'expo-application';
 
-export const ANALYTICS_SCHEMA_VERSION = 1;
+export const ANALYTICS_SCHEMA_VERSION = 2;
 
 export type AnalyticsProviderName = 'posthog' | 'none';
 
@@ -33,8 +34,8 @@ export const analyticsConfig: AnalyticsConfig = {
   debugRichEnabled: boolFromEnv(process.env.EXPO_PUBLIC_ANALYTICS_DEBUG_RICH, false),
   environment: (process.env.EXPO_PUBLIC_APP_ENV ?? process.env.NODE_ENV ?? 'development').trim(),
   isTestflight: boolFromEnv(process.env.EXPO_PUBLIC_IS_TESTFLIGHT, false),
-  appVersion: (process.env.EXPO_PUBLIC_APP_VERSION ?? '1.0.0').trim(),
-  buildNumber: (process.env.EXPO_PUBLIC_BUILD_NUMBER ?? 'dev').trim(),
+  appVersion: nativeApplicationVersion ?? 'unknown',
+  buildNumber: nativeBuildVersion ?? 'unknown',
   platform: Platform.OS,
   // Enable in the release environment only after attribution disclosures are approved.
   appleAdsAttributionEnabled: boolFromEnv(process.env.EXPO_PUBLIC_APPLE_ADS_ATTRIBUTION_ENABLED, false),
