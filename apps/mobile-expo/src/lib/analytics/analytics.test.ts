@@ -33,57 +33,16 @@ describe('analytics adapters', () => {
     }).not.toThrow();
   });
 
-  it('PostHog adapter posts capture, identify, and screen calls to the capture endpoint', () => {
-    const adapter = createPostHogAdapter({
-      apiKey: 'ph_test',
-      host: 'https://us.i.posthog.com',
-      onDrop: jest.fn(),
-    });
-
-    adapter.capture('job_created', { anonymous_id: 'anon-1', job_id: 'job-1' });
-    adapter.identify('user-1', { email_domain: 'example.com' });
-    adapter.screen('jobs', { source: 'test' });
-    adapter.reset();
-
-    expect(global.fetch).toHaveBeenNthCalledWith(1, 'https://us.i.posthog.com/capture/', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        api_key: 'ph_test',
-        event: 'job_created',
-        properties: {
-          distinct_id: 'anon-1',
-          anonymous_id: 'anon-1',
-          job_id: 'job-1',
-        },
-      }),
-    });
-    expect(global.fetch).toHaveBeenNthCalledWith(2, 'https://us.i.posthog.com/capture/', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        api_key: 'ph_test',
-        event: '$identify',
-        properties: {
-          distinct_id: 'user-1',
-          user_id: 'user-1',
-          $set: { email_domain: 'example.com' },
-        },
-      }),
-    });
-    expect(global.fetch).toHaveBeenNthCalledWith(3, 'https://us.i.posthog.com/capture/', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        api_key: 'ph_test',
-        event: 'screen_viewed',
-        properties: {
-          distinct_id: 'user-1',
-          screen: 'jobs',
-          source: 'test',
-        },
-      }),
-    });
+  it('queues identified events and sends stable UUIDs and original timestamps', async () => {
+    const adapter = createPostHogAdapter({ apiKey: 'ph_test', host: 'https://us.i.posthog.com', onDrop: jest.fn() });
+    adapter.capture('job_created', { job_id: 'pre-identity' });
+    adapter.identify('user-1', {});
+    adapter.capture('job_created', { job_id: 'job-1' });
+    await adapter.flush?.(); await adapter.flush?.();
+    const bodies = (global.fetch as jest.Mock).mock.calls.map((call) => JSON.parse(call[1].body));
+    expect(bodies.map(body => body.event)).toEqual(['$identify', 'job_created']);
+    expect(bodies[1]).toMatchObject({ uuid: expect.any(String), timestamp: expect.any(String), properties: { distinct_id: 'user-1', job_id: 'job-1' } });
+    await adapter.reset();
   });
 });
 
@@ -102,7 +61,14 @@ describe('analytics privacy sanitizer', () => {
     ).toEqual({ job_id: 'job-1' });
   });
 
-  it('keeps debug-rich fields when debug-rich mode is enabled', () => {
+  it('rejects unknown, nested, raw-error and customer data while preserving attribution references', () => {
+    expect(sanitizeProperties({ job_ref: 'j1', mutation_ref: 'm1', apple_ads_campaign_id: '123',
+      customer_name: 'Private', email_domain: 'private.example', token: 'secret',
+      error_message: 'secret', source: { nested: 'secret' }, extra: { email: 'secret' },
+    }, true)).toEqual({ job_ref: 'j1', mutation_ref: 'm1', apple_ads_campaign_id: '123' });
+  });
+
+  it('never persists content even when debug-rich mode is enabled', () => {
     expect(
       sanitizeProperties(
         {
@@ -114,8 +80,6 @@ describe('analytics privacy sanitizer', () => {
       ),
     ).toEqual({
       job_id: 'job-1',
-      email: 'beta@example.com',
-      job_short_description: 'Kitchen sink',
     });
   });
 });

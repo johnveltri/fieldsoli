@@ -31,6 +31,7 @@ const mockSendSms = jest.fn<(...args: unknown[]) => Promise<unknown>>();
 let mockShareSheetClosed: (() => void) | undefined;
 const mockCaptureForUser = jest.fn();
 jest.mock('../../lib/analytics', () => ({
+  errorProperties: () => ({ error_category: 'application' }),
   analytics: { captureForUser: (...args: unknown[]) => mockCaptureForUser(...args) },
 }));
 
@@ -340,6 +341,7 @@ describe('InvoicingJobControls', () => {
     await act(async () => { fireEvent.press(button); });
     expect(await AsyncStorage.getItem('fieldsolo.financial-document-intent.v1:owner-1:job-1')).toContain('other-control-key');
     expect(mockCreate).not.toHaveBeenCalled();
+    expect(mockCaptureForUser).toHaveBeenCalledWith('owner-1', 'document_create_failed', expect.objectContaining({ document_type: 'estimate' }));
     await act(async () => { fireEvent.press(button); });
 
     await waitFor(() => expect(mockCreate).toHaveBeenCalledWith(
@@ -572,6 +574,7 @@ describe('InvoicingJobControls', () => {
     fireEvent.press(await screen.findByText('Business info form'));
     await waitFor(() => expect(mockPreview).toHaveBeenCalledTimes(2));
     expect(props.onEditDetails).not.toHaveBeenCalled();
+    expect(mockCaptureForUser).toHaveBeenCalledWith('owner-1', 'workflow_validation_blocked', { workflow: 'document', document_type: 'estimate', field: 'business_name' });
   });
 
   it('reviews the selected invoice without building a new preview and confirms its saved total', async () => {

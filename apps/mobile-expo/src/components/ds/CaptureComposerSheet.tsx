@@ -1,3 +1,4 @@
+import { analytics, errorProperties } from '../../lib/analytics';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -310,6 +311,7 @@ export function CaptureComposerSheet({
     async (options?: CaptureComposerJobCreatedOptions) => {
       if (!canCommitJob || !onJobCreated) return;
       if (!isSupabaseConfigured()) {
+        analytics.capture('job_create_failed', { error_category: 'configuration', source: 'composer' });
         setError('Supabase is not configured.');
         return;
       }
@@ -319,7 +321,8 @@ export function CaptureComposerSheet({
         const shortDescription = title.trim();
         const jobId = await createJobForCurrentUser(supabase, { shortDescription });
         onJobCreated(jobId, options);
-      } catch {
+      } catch (error) {
+        analytics.capture('job_create_failed', { source: 'composer', ...errorProperties(error) });
         setError("Couldn't add this job. Try again.");
         setCommitting(false);
         return;

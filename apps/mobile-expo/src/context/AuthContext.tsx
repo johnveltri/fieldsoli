@@ -170,8 +170,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (analytics.isConsentGranted()) {
           analytics.capture('signed_out', { source: 'manual' });
         }
-        await supabase.auth.signOut();
         await clearSignedOutAnalyticsState();
+        await supabase.auth.signOut();
       },
       requestPasswordReset: async (email) => {
         const trimmed = email.trim().toLowerCase();
@@ -199,10 +199,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
       deleteAccount: async () => {
         try {
+          // Purge and abort before the backend deletes the PostHog person.
+          // A failed deletion leaves analytics off until consent is resolved again.
+          await analytics.withdrawConsent();
           await deleteCurrentAccount(supabase);
           // Stop local collection and clear acquisition before sign-out; emitting
           // an identified success here can recreate the person just deleted remotely.
-          await analytics.withdrawConsent();
           await supabase.auth.signOut();
           await clearSignedOutAnalyticsState();
           return { error: null };

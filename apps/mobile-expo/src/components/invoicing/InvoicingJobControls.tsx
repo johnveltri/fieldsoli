@@ -33,7 +33,7 @@ import * as Sharing from 'expo-sharing';
 import * as SMS from 'expo-sms';
 import { Asset } from 'expo-asset';
 import { File, Paths } from 'expo-file-system';
-import { analytics } from '../../lib/analytics';
+import { analytics, errorProperties } from '../../lib/analytics';
 import {
   IconCopy,
   IconDownload,
@@ -655,6 +655,20 @@ export const InvoicingJobControls = forwardRef<
     [client, jobId, preview, saved, workStatus],
   );
 
+  const lastValidationRef = useRef('');
+  useEffect(() => {
+    if (!previewOpen || !preview || saved || !ownerId) { lastValidationRef.current = ''; return; }
+    const fields = [...new Set(preview.gaps.map((field) =>
+      ['business_name', 'customer_name', 'short_description', 'labor', 'material_amount', 'billable_other', 'job'].includes(field) ? field : 'unknown',
+    ))].sort();
+    const key = `${jobId}:${previewType}:${fields.join(',')}`;
+    if (!fields.length || key === lastValidationRef.current) return;
+    lastValidationRef.current = key;
+    for (const field of fields) analytics.captureForUser(ownerId, 'workflow_validation_blocked', {
+      workflow: 'document', document_type: previewType, field,
+    });
+  }, [previewOpen, preview, saved, ownerId, jobId, previewType]);
+
   const createAndShare = useCallback(async () => {
     if (!preview || preview.gaps.length > 0 || creationRunningRef.current || recoveringIntent) return;
     if (!ownerId) {
@@ -670,9 +684,11 @@ export const InvoicingJobControls = forwardRef<
       }
       return;
     }
+    analytics.captureForUser(ownerId, 'document_create_started', { document_type: previewType, job_id: jobId });
     creationRunningRef.current = true;
     setBusy('Creating…');
     let intent: FinancialDocumentIntent | null = null;
+    let creationConfirmed = false;
     try {
       let confirmedPaidTotalCents: number | null = null;
       if (previewType === 'invoice' && workStatus === 'paid') {
@@ -696,6 +712,7 @@ export const InvoicingJobControls = forwardRef<
       await writeFinancialDocumentIntent(ownerId, jobId, intent);
       recoveryBlockedRef.current = true;
       const created = await executeIntent(intent);
+      creationConfirmed = true;
       await clearIntent(intent.requestKey);
       setSaved(created);
       setSavedWorkStatus(workStatus);
@@ -703,6 +720,9 @@ export const InvoicingJobControls = forwardRef<
       await openFreshShareSheet(created.id);
       await reload();
     } catch (error) {
+      analytics.captureForUser(ownerId, creationConfirmed ? 'document_refresh_failed' : 'document_create_failed', {
+        document_type: previewType, job_id: jobId, ...errorProperties(error),
+      });
       if (error instanceof FinancialDocumentError && error.code === 'stale') {
         Alert.alert(
           'This Job changed. Review the updated preview before sharing.',

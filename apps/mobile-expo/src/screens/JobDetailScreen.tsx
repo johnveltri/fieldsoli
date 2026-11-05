@@ -815,6 +815,7 @@ export function JobDetailScreen({
           advanceMarkCompleteWizardRef.current(refreshed);
         }
         analytics.capture('job_saved', {
+          has_work_description: values.shortDescription?.trim().length > 0,
           job_id: job.id,
           changed_fields: changedFields(before, values),
           completeness_before: jobDetailIsFinanciallyComplete(job, showInvoicing)
@@ -2286,6 +2287,7 @@ export function JobDetailScreen({
 
   const openMarkCompleteGap = useCallback(
     (gap: FinancialCompletenessGap, jobSeed?: JobDetailViewModel) => {
+      analytics.capture('workflow_validation_blocked', { workflow: 'complete_job', field: gap });
       const seed = jobSeed ?? jobRef.current ?? job;
       if (useFullscreenEdit && seed) {
         switch (gap) {
@@ -2534,6 +2536,9 @@ export function JobDetailScreen({
             costCents: values.costCents,
           });
         }
+        analytics.capture(lineId ? 'other_cost_updated' : 'other_cost_created', {
+          job_id: job.id, visit_id: ocDraftSessionId, source: 'job_detail',
+        });
         await refetchJob();
         invalidateJobsList();
         const keepWizard = completeWizardActiveRef.current;
@@ -2543,6 +2548,7 @@ export function JobDetailScreen({
           advanceMarkCompleteWizard(refreshed);
         }
       } catch (e) {
+        analytics.capture('other_cost_create_failed', { operation: lineId ? 'update' : 'create', ...errorProperties(e) });
         Alert.alert(
           'Save failed',
           formatErrorMessage(e) || 'Could not save other cost.',
@@ -2817,6 +2823,14 @@ export function JobDetailScreen({
     setEditSaving(true);
     try {
       await applyJobDetailEdit(supabase, job.id, payload);
+      const addedKinds = [
+        ...(payload.sessions.create.length ? ['visit'] : []),
+        ...(payload.notes.create.length ? ['note'] : []),
+        ...(payload.materials.create.length ? ['material'] : []),
+        ...(payload.otherCosts.create.length ? ['other_cost'] : []),
+      ];
+      if (addedKinds.length) analytics.capture('job_work_saved', { job_id: job.id, record_kinds: addedKinds });
+      analytics.capture('job_saved', { job_id: job.id, has_work_description: (payload.job.shortDescription ?? '').trim().length > 0 });
       const refreshed = await fetchJobDetail(supabase, job.id);
       if (refreshed) {
         jobRef.current = refreshed;
@@ -2881,8 +2895,16 @@ export function JobDetailScreen({
       if (completeWizardActiveRef.current && refreshed) {
         advanceMarkCompleteWizard(refreshed);
       }
+      const addedKinds = [
+        ...(payload.sessions.create.length ? ['visit'] : []),
+        ...(payload.notes.create.length ? ['note'] : []),
+        ...(payload.materials.create.length ? ['material'] : []),
+        ...(payload.otherCosts.create.length ? ['other_cost'] : []),
+      ];
+      if (addedKinds.length) analytics.capture('job_work_saved', { job_id: job.id, record_kinds: addedKinds });
       analytics.capture('job_saved', {
         job_id: job.id,
+        has_work_description: (refreshed?.shortDescription ?? '').trim().length > 0,
         changed_fields: ['job_detail_edit'],
         completeness_before: jobDetailIsFinanciallyComplete(job, showInvoicing) ? 'complete' : 'incomplete',
         completeness_after:

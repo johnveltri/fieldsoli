@@ -28,6 +28,7 @@
     "@react-native-picker/picker": "^2.11.4",
     "@tabler/icons-react-native": "^3.49.0",
     "expo": "~57.0.17",
+    "expo-application": "57.0.3",
     "expo-asset": "~57.0.17",
     "expo-blur": "~57.0.3",
     "expo-build-properties": "~57.0.22",

@@ -244,6 +244,11 @@
     <section id="status-approved" data-status="approved-not-shipped">
 
       <h2>Approved but not shipped</h2>
+      <article id="analytics-reliability" data-status="approved-not-shipped">
+        <h3>Consented analytics reliability — implementation for review</h3>
+        <p>Schema 2 adds a bounded account-scoped event queue with retries, original occurrence timestamps and stable event identifiers. Withdrawal, logout and account deletion clear pending delivery. Screen transitions are deduplicated; app sessions and work visits use separate identifiers; native build metadata identifies the binary. Meaningful jobs, saved useful work, later meaningful use, and concrete document/completion gaps help diagnose dropout. Only activity observed after post-login consent qualifies; placeholders alone do not activate. Apple Ads enablement and onboarding remain separate.</p>
+        <p>See the <a href="../specs/analytics-reliability/implementation.md">implementation and measurement contract</a>. Native rebuilds and synthetic device/ingestion checks remain release gates. No production settings or dashboards were changed.</p>
+      </article>
       <article id="apple-ads-attribution" data-status="approved-not-shipped">
         <h3>Apple Ads attribution — implementation pending release</h3>
         <p>A local iOS AdServices bridge and consent-gated acquisition enrichment connect available campaign, ad-group and keyword identifiers to observable app activity. Document creation confirmations add an invoice milestone; signup before consent remains unobservable. Unknown, unsupported and negative attribution remain distinct. The build-time rollout is disabled by default pending acquisition disclosures and the existing-user consent decision. Source checks are not proof of a real attributed installation or live analytics delivery.</p>

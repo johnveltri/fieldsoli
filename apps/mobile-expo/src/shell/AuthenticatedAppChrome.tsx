@@ -467,6 +467,7 @@ export function AuthenticatedAppChrome({ children }: AuthenticatedAppChromeProps
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {
+      analytics.onAppState(state);
       if (state === 'active') {
         analytics.capture('app_became_active', {
           auth_state: session ? 'authenticated' : 'anonymous',
