@@ -12,6 +12,7 @@ const mockSignIn = jest.fn<
 const mockSignUp = jest.fn(async () => ({ error: null, session: { user: { id: 'user-1' } } }));
 const mockRequestPasswordReset = jest.fn(async () => ({ error: null }));
 const mockSetSignupLegalPending = jest.fn();
+const mockCommitPasswordAutofill = jest.fn(async () => undefined);
 
 jest.mock('expo-font', () => ({
   useFonts: () => [true],
@@ -24,6 +25,10 @@ jest.mock('../context/AuthContext', () => ({
     requestPasswordReset: mockRequestPasswordReset,
     setSignupLegalPending: mockSetSignupLegalPending,
   }),
+}));
+
+jest.mock('../lib/passwordAutofill', () => ({
+  commitPasswordAutofill: () => mockCommitPasswordAutofill(),
 }));
 
 jest.mock('../components/CanvasTiledBackground', () => ({
@@ -366,6 +371,7 @@ describe('SignInScreen', () => {
     });
 
     expect(screen.getByText('Check your email')).toBeTruthy();
+    expect(mockCommitPasswordAutofill).toHaveBeenCalledTimes(1);
     expect(screen.getByText('tech@example.com')).toBeTruthy();
     expect(screen.queryByText('Welcome back')).toBeNull();
     expect(mockRecordSignupLegalAcceptances).not.toHaveBeenCalled();

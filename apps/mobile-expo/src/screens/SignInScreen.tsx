@@ -33,6 +33,7 @@ import {
   REQUIRED_TERMS_VERSION,
 } from '../lib/legal-versions';
 import { cacheLegalAcceptance } from '../lib/legalAcceptanceStorage';
+import { commitPasswordAutofill } from '../lib/passwordAutofill';
 import { supabase } from '../lib/supabase';
 import { DsTextInput } from '../components/ds/DsTextInput';
 import { cardShadowRn, createTextStyles, fg, space } from '../theme/nativeTokens';
@@ -343,6 +344,7 @@ export function SignInScreen() {
                 return;
               }
               if (isEmailNotConfirmed(signInErr)) {
+                await commitPasswordAutofill();
                 setPassword('');
                 setConfirmPassword('');
                 setPendingConfirmEmail(trimmed);
