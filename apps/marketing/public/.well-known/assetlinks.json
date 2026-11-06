@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.get_login_creds"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.veltriventures.fieldsoli",
+      "sha256_cert_fingerprints": [
+        "21:ED:A1:E3:B5:4C:1D:A2:BC:10:EB:3D:97:89:2B:82:62:73:2E:C7:B9:7C:90:1F:CF:E7:3B:87:4A:62:76:EF"
+      ]
+    }
+  }
+]

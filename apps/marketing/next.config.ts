@@ -18,6 +18,14 @@ const nextConfig: NextConfig = {
 
     return [
       {
+        source: "/.well-known/apple-app-site-association",
+        headers: [{ key: "Content-Type", value: "application/json" }],
+      },
+      {
+        source: "/.well-known/assetlinks.json",
+        headers: [{ key: "Content-Type", value: "application/json" }],
+      },
+      {
         source: "/share/:token*",
         headers: [
           { key: "Cache-Control", value: "private, no-store" },

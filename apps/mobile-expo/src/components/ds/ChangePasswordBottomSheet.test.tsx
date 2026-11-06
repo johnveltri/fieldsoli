@@ -32,6 +32,9 @@ describe('ChangePasswordBottomSheet', () => {
       <ChangePasswordBottomSheet typography={typography} visible onSubmit={onSubmit} />,
     );
     const save = screen.getByLabelText('SAVE NEW PASSWORD');
+    expect(screen.getByPlaceholderText('New Password').props.autoComplete).toBe('new-password');
+    expect(screen.getByPlaceholderText('New Password').props.textContentType).toBe('newPassword');
+    expect(screen.getByPlaceholderText('Repeat Password').props.autoComplete).toBe('new-password');
 
     fireEvent.changeText(screen.getByPlaceholderText('New Password'), 'password123');
     fireEvent.changeText(screen.getByPlaceholderText('Repeat Password'), 'password123');

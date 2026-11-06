@@ -640,10 +640,10 @@ export function SignInScreen() {
               onBlur={() => setEmailFocused(false)}
               accessibilityLabel="Email"
               autoCapitalize="none"
-              autoComplete="email"
+              autoComplete={mode === 'forgotPassword' ? 'email' : 'username'}
               autoCorrect={false}
               keyboardType="email-address"
-              textContentType="emailAddress"
+              textContentType={mode === 'forgotPassword' ? 'emailAddress' : 'username'}
               returnKeyType={mode === 'forgotPassword' ? 'done' : 'next'}
               onSubmitEditing={() => {
                 if (mode === 'forgotPassword') void onForgotPasswordSubmit();
