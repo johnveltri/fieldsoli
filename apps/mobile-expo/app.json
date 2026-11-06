@@ -9,6 +9,7 @@
     "userInterfaceStyle": "light",
     "ios": {
       "bundleIdentifier": "com.veltriventures.fieldsoli",
+      "associatedDomains": ["webcredentials:fieldsoli.com"],
       "supportsTablet": false,
       "infoPlist": {
         "NSLocationDefaultAccuracyReduced": true
@@ -76,7 +77,8 @@
       ],
       "expo-status-bar",
       "./plugins/with-android-landscape",
-      "./plugins/with-android-r8-optimization"
+      "./plugins/with-android-r8-optimization",
+      "./plugins/with-android-credential-association"
     ],
     "extra": {
       "eas": {

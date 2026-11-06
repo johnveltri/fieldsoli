@@ -115,6 +115,8 @@ export function ChangePasswordBottomSheet({
             placeholder="New Password"
             placeholderTextColor={fg.secondary}
             secureTextEntry
+            autoComplete="new-password"
+            textContentType="newPassword"
             autoCapitalize="none"
             autoCorrect={false}
             editable={!saving}
@@ -131,6 +133,8 @@ export function ChangePasswordBottomSheet({
             placeholder="Repeat Password"
             placeholderTextColor={fg.secondary}
             secureTextEntry
+            autoComplete="new-password"
+            textContentType="newPassword"
             autoCapitalize="none"
             autoCorrect={false}
             editable={!saving}

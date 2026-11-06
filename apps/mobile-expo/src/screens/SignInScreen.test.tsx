@@ -4,6 +4,7 @@ import { describe, expect, it, jest, beforeEach, afterEach } from '@jest/globals
 import { Keyboard, KeyboardAvoidingView, Linking, Platform } from 'react-native';
 
 import { SignInScreen } from './SignInScreen';
+import { REQUIRED_PRIVACY_VERSION, REQUIRED_TERMS_VERSION } from '../lib/legal-versions';
 
 const mockSignIn = jest.fn<
   (...args: unknown[]) => Promise<{ error: Error | null; session: null }>
@@ -11,6 +12,7 @@ const mockSignIn = jest.fn<
 const mockSignUp = jest.fn(async () => ({ error: null, session: { user: { id: 'user-1' } } }));
 const mockRequestPasswordReset = jest.fn(async () => ({ error: null }));
 const mockSetSignupLegalPending = jest.fn();
+const mockCommitPasswordAutofill = jest.fn(async () => undefined);
 
 jest.mock('expo-font', () => ({
   useFonts: () => [true],
@@ -23,6 +25,10 @@ jest.mock('../context/AuthContext', () => ({
     requestPasswordReset: mockRequestPasswordReset,
     setSignupLegalPending: mockSetSignupLegalPending,
   }),
+}));
+
+jest.mock('../lib/passwordAutofill', () => ({
+  commitPasswordAutofill: () => mockCommitPasswordAutofill(),
 }));
 
 jest.mock('../components/CanvasTiledBackground', () => ({
@@ -214,14 +220,21 @@ describe('SignInScreen', () => {
   it('provides platform autofill hints for sign in and sign up', () => {
     const screen = render(<SignInScreen />);
 
-    expect(screen.getByLabelText('Email').props.autoComplete).toBe('email');
+    expect(screen.getByLabelText('Email').props.autoComplete).toBe('username');
+    expect(screen.getByLabelText('Email').props.textContentType).toBe('username');
     expect(screen.getByLabelText('Password').props.autoComplete).toBe('current-password');
 
     fireEvent.press(screen.getByText('Create an account'));
+    expect(screen.getByLabelText('Email').props.autoComplete).toBe('username');
     expect(screen.getByLabelText('First name').props.autoComplete).toBe('name-given');
     expect(screen.getByLabelText('Last name').props.autoComplete).toBe('name-family');
     expect(screen.getByLabelText('Password').props.autoComplete).toBe('new-password');
     expect(screen.getByLabelText('Confirm password').props.autoComplete).toBe('new-password');
+
+    fireEvent.press(screen.getByText('Back to sign in'));
+    fireEvent.press(screen.getByText('Forgot password?'));
+    expect(screen.getByLabelText('Email').props.autoComplete).toBe('email');
+    expect(screen.getByLabelText('Email').props.textContentType).toBe('emailAddress');
   });
 
   it('disables create account until passwords match', () => {
@@ -331,8 +344,8 @@ describe('SignInScreen', () => {
       expect(mockRecordSignupLegalAcceptances).toHaveBeenCalledTimes(1);
       expect(mockCacheLegalAcceptance).toHaveBeenCalledWith({
         userId: 'user-1',
-        privacyVersion: '2026-10-24',
-        termsVersion: '2026-09-20',
+        privacyVersion: REQUIRED_PRIVACY_VERSION,
+        termsVersion: REQUIRED_TERMS_VERSION,
       });
     });
   });
@@ -358,6 +371,7 @@ describe('SignInScreen', () => {
     });
 
     expect(screen.getByText('Check your email')).toBeTruthy();
+    expect(mockCommitPasswordAutofill).toHaveBeenCalledTimes(1);
     expect(screen.getByText('tech@example.com')).toBeTruthy();
     expect(screen.queryByText('Welcome back')).toBeNull();
     expect(mockRecordSignupLegalAcceptances).not.toHaveBeenCalled();

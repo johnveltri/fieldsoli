@@ -33,6 +33,7 @@ import {
   REQUIRED_TERMS_VERSION,
 } from '../lib/legal-versions';
 import { cacheLegalAcceptance } from '../lib/legalAcceptanceStorage';
+import { commitPasswordAutofill } from '../lib/passwordAutofill';
 import { supabase } from '../lib/supabase';
 import { DsTextInput } from '../components/ds/DsTextInput';
 import { cardShadowRn, createTextStyles, fg, space } from '../theme/nativeTokens';
@@ -343,6 +344,7 @@ export function SignInScreen() {
                 return;
               }
               if (isEmailNotConfirmed(signInErr)) {
+                await commitPasswordAutofill();
                 setPassword('');
                 setConfirmPassword('');
                 setPendingConfirmEmail(trimmed);
@@ -640,10 +642,10 @@ export function SignInScreen() {
               onBlur={() => setEmailFocused(false)}
               accessibilityLabel="Email"
               autoCapitalize="none"
-              autoComplete="email"
+              autoComplete={mode === 'forgotPassword' ? 'email' : 'username'}
               autoCorrect={false}
               keyboardType="email-address"
-              textContentType="emailAddress"
+              textContentType={mode === 'forgotPassword' ? 'emailAddress' : 'username'}
               returnKeyType={mode === 'forgotPassword' ? 'done' : 'next'}
               onSubmitEditing={() => {
                 if (mode === 'forgotPassword') void onForgotPasswordSubmit();

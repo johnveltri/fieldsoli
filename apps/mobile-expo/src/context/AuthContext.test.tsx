@@ -12,6 +12,11 @@ const mockAnalyticsOnSignOut = jest.fn<() => Promise<void>>(async () => undefine
 const mockClearAnalyticsConsentCache = jest.fn<() => Promise<void>>(async () => undefined);
 const mockWithdrawAnalytics = jest.fn<() => Promise<void>>(async () => undefined);
 const mockDeleteAccount = jest.fn<() => Promise<void>>(async () => undefined);
+const mockCommitPasswordAutofill = jest.fn<() => Promise<void>>(async () => undefined);
+const mockSignInWithPassword = jest.fn<() => Promise<{
+  data: { session: Session | null };
+  error: Error | null;
+}>>();
 let mockAuthStateChange: ((event: string, session: Session | null) => void) | null = null;
 
 jest.mock('../lib/supabase', () => ({
@@ -24,8 +29,13 @@ jest.mock('../lib/supabase', () => ({
         return { data: { subscription: { unsubscribe: mockUnsubscribe } } };
       },
       signOut: () => mockSignOut(),
+      signInWithPassword: () => mockSignInWithPassword(),
     },
   },
+}));
+
+jest.mock('../lib/passwordAutofill', () => ({
+  commitPasswordAutofill: () => mockCommitPasswordAutofill(),
 }));
 
 jest.mock('../lib/analytics', () => ({
@@ -57,9 +67,11 @@ function SessionState() {
 }
 
 let deleteAccount!: ReturnType<typeof useAuth>['deleteAccount'];
+let signIn!: ReturnType<typeof useAuth>['signIn'];
 function DeletionHarness() {
   const auth = useAuth();
   deleteAccount = auth.deleteAccount;
+  signIn = auth.signIn;
   return <Text>{auth.session ? 'ready' : 'out'}</Text>;
 }
 
@@ -68,6 +80,22 @@ describe('AuthProvider', () => {
     jest.clearAllMocks();
     mockAuthStateChange = null;
     mockGetSession.mockResolvedValue({ data: { session: signedInSession } });
+    mockSignInWithPassword.mockResolvedValue({ data: { session: signedInSession }, error: null });
+  });
+
+  it('finishes Android autofill only after successful password sign-in', async () => {
+    const screen = render(<AuthProvider><DeletionHarness /></AuthProvider>);
+    await screen.findByText('ready');
+
+    await act(async () => { await signIn('tech@example.com', 'Password123!'); });
+    expect(mockCommitPasswordAutofill).toHaveBeenCalledTimes(1);
+
+    mockSignInWithPassword.mockResolvedValueOnce({
+      data: { session: null },
+      error: new Error('Invalid login credentials'),
+    });
+    await act(async () => { await signIn('tech@example.com', 'wrong'); });
+    expect(mockCommitPasswordAutofill).toHaveBeenCalledTimes(1);
   });
 
   it('clears local analytics before remote account deletion and sign-out', async () => {

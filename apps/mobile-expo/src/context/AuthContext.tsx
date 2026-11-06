@@ -11,6 +11,7 @@ import { clearAnalyticsConsentCache } from '../lib/analytics/consentStorage';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { AUTH_CONFIRM_URL, AUTH_RESET_PASSWORD_URL } from '../lib/authUrls';
 import { newPasswordPolicyError } from '../lib/passwordPolicy';
+import { commitPasswordAutofill } from '../lib/passwordAutofill';
 import { observeAddressLocationLifecycle, setAddressLocationAccount } from '../lib/addressLocation';
 
 export type SignUpProfileSeed = {
@@ -142,6 +143,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSignupLegalPending,
       signIn: async (email, password) => {
         const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        if (!error && data.session) await commitPasswordAutofill();
         return { error, session: data.session };
       },
       signUp: async (email, password, profile) => {
@@ -164,6 +166,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           password,
           options: signUpOptions,
         });
+        if (!error && data.session) await commitPasswordAutofill();
         return { error, session: data.session };
       },
       signOut: async () => {
@@ -187,6 +190,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (policyError) return { error: new Error(policyError) };
         try {
           await updateCurrentUserPassword(supabase, newPassword);
+          await commitPasswordAutofill();
           return { error: null };
         } catch (e) {
           return {
