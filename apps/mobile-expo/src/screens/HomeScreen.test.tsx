@@ -106,6 +106,7 @@ function job(overrides: Record<string, unknown>) {
     jobPaymentState: 'pending',
     revenueCents: 50000,
     materialsCents: -12000,
+    costsCents: -12000,
     netEarningsCents: 38000,
     collectedCents: 0,
     isFinanciallyComplete: true,

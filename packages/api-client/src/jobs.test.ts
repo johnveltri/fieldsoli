@@ -359,6 +359,7 @@ describe('jobs api client', () => {
     expect(result.aggregate).toEqual({
       revenueCents: 140000,
       materialsCents: -45000,
+      costsCents: -45000,
       netEarningsCents: 95000,
       totalHours: 3,
       jobCount: 2,
@@ -371,6 +372,7 @@ describe('jobs api client', () => {
         customerName: 'Ada',
         revenueCents: 120000,
         materialsCents: -40000,
+        costsCents: -40000,
         netEarningsCents: 80000,
         hours: 2,
         netPerHrCents: 40000,
@@ -381,6 +383,7 @@ describe('jobs api client', () => {
         customerName: null,
         revenueCents: 20000,
         materialsCents: -5000,
+        costsCents: -5000,
         netEarningsCents: 15000,
         hours: 1,
         netPerHrCents: 15000,
@@ -399,6 +402,51 @@ describe('jobs api client', () => {
       'sess-high',
       'sess-low',
     ]);
+  });
+
+  it.each([
+    ['material only', 'material', 3800, 0, -3800],
+    ['other cost only', 'material', 0, 1200, -0],
+    ['mixed costs', 'material', 3800, 1200, -3800],
+    ['legacy material', null, 3800, 1200, -3800],
+    ['zero costs', 'material', 0, 0, -0],
+  ])('%s: list and earnings use deduplicated total costs', async (_name, costType, material, other, expectedMaterials) => {
+    const row = {
+      id: 'job-cost', short_description: 'Drywall patch', revenue_cents: 43940,
+      updated_at: '2026-10-31T10:00:00Z', created_at: '2026-10-31T10:00:00Z',
+      job_work_status: 'completed', is_job_record_complete: true,
+    };
+    const session = { id: 'visit', job_id: row.id, session_status: 'ended',
+      started_at: '2026-10-31T10:00:00Z', ended_at: '2026-10-31T11:00:00Z' };
+    const costs = [
+      { id: 'material', job_id: row.id, session_id: 'visit', cost_type: costType, total_cost_cents: material },
+      { id: 'other', job_id: null, session_id: 'visit', cost_type: 'other', total_cost_cents: other },
+    ];
+    const clientFor = () => {
+      const byJob = makeBuilder({ awaitResult: { data: [costs[0]], error: null } });
+      const bySession = makeBuilder({ awaitResult: { data: costs, error: null } });
+      return { byJob, bySession, client: makeClient({ authUserId: 'user-1', buildersByTable: {
+        jobs: [makeBuilder({ awaitResult: { data: [row], error: null } })],
+        sessions: [makeBuilder({ awaitResult: { data: [session], error: null } })],
+        job_costs: [byJob, bySession],
+      } }) };
+    };
+    const expected = { revenueCents: 43940, materialsCents: expectedMaterials,
+      costsCents: -(material + other), netEarningsCents: 43940 - material - other };
+    const list = clientFor();
+    expect((await listJobsForCurrentUser(list.client as never))[0]).toMatchObject(expected);
+    for (const windowDays of [7, 30, 365]) {
+      const snapshot = clientFor();
+      const result = await getEarningsSnapshotForCurrentUser(snapshot.client as never, { windowDays });
+      expect(result.jobs[0]).toMatchObject(expected);
+      expect(result.aggregate).toMatchObject({ ...expected,
+        materialsCents: expectedMaterials || 0, costsCents: -(material + other) || 0 });
+      // Soft-deleted rows are excluded by both database query paths.
+      expect(snapshot.byJob.is).toHaveBeenCalledWith('deleted_at', null);
+      expect(snapshot.bySession.is).toHaveBeenCalledWith('deleted_at', null);
+    }
+    expect(list.byJob.is).toHaveBeenCalledWith('deleted_at', null);
+    expect(list.bySession.is).toHaveBeenCalledWith('deleted_at', null);
   });
 
   it('getOutstandingPaymentsForCurrentUser counts financially complete unpaid jobs', async () => {
@@ -826,6 +874,7 @@ describe('jobs api client', () => {
       timeLabel: '2.0h',
       revenueCents: 50000,
       materialsCents: -5000,
+      costsCents: -5000,
       netEarningsCents: 45000,
       collectedCents: 50000,
       hasMaterials: true,

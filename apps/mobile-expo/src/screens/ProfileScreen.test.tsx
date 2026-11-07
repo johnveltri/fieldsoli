@@ -65,6 +65,7 @@ jest.mock('@fieldsolo/api-client', () => ({
 }));
 
 jest.mock('../components/shell/ShellBottomNav', () => ({
+  ...jest.requireActual<typeof import('../components/shell/ShellBottomNav')>('../components/shell/ShellBottomNav'),
   shellBottomNavOuterHeight: () => 80,
 }));
 

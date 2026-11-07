@@ -33,6 +33,7 @@ import {
   platformHeaderRowStyle,
 } from '../components/platform/platformHeaderMetrics';
 import { TopHeaderBackIcon } from '../components/figma-icons/TopHeaderIcons';
+import { shellLiveSessionBarBottom } from '../components/shell/ShellBottomNav';
 import { useAuth } from '../context/AuthContext';
 import { analytics, changedFields, emailProperties, errorProperties } from '../lib/analytics';
 import { supabase } from '../lib/supabase';
@@ -377,7 +378,8 @@ export function ProfileScreen({ onBack, onBackToHome = onBack }: ProfileScreenPr
         contentContainerStyle={[
           styles.scrollContent,
           {
-            paddingBottom: insets.bottom + space('Spacing/32'),
+            // Keep the final account action scrollable above the global live-visit bar.
+            paddingBottom: shellLiveSessionBarBottom(insets.bottom) + space('Spacing/32') * 3,
             flexGrow: 1,
           },
         ]}

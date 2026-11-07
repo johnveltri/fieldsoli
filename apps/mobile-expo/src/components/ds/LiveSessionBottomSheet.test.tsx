@@ -191,6 +191,31 @@ describe('LiveSessionBottomSheet phase3Capture', () => {
     expect(screen.getByTestId('bottom-sheet-register-flag').props.children).toBe('opt-out');
   });
 
+  it.each([true, false])('persists the correct pricing field on blur, minimize and end (invoicing=%s)', async (invoicingEnabled) => {
+    const onJobIdentityChange = jest.fn();
+    const onMinimize = jest.fn();
+    const onEndSessionPress = jest.fn();
+    render(<LiveSessionBottomSheet typography={typography} visible phase3Capture
+      invoicingEnabled={invoicingEnabled} supabase={supabase}
+      jobShortDescription="Panel upgrade" startedAt="2026-01-01T12:00:00.000Z"
+      attachments={[]} jobIdentity={identity} onJobIdentityChange={onJobIdentityChange}
+      onAddNote={noop} onAddMaterial={noop} onPressAttachment={noop}
+      onMinimize={onMinimize} onEndSessionPress={onEndSessionPress} />);
+    const input = screen.getByPlaceholderText(invoicingEnabled ? 'Labor & Services' : 'Revenue');
+    fireEvent(input, 'focus', { nativeEvent: { target: 1 } });
+    fireEvent.changeText(input, '100');
+    fireEvent(input, 'blur');
+    const expected = invoicingEnabled ? { laborServicesCents: 10000 } : { revenueCents: 10000 };
+    expect(onJobIdentityChange).toHaveBeenLastCalledWith(expect.objectContaining(expected));
+    expect(onJobIdentityChange.mock.calls.at(-1)![0]).not.toHaveProperty(invoicingEnabled ? 'revenueCents' : 'laborServicesCents');
+    fireEvent.press(screen.getByLabelText('Close'));
+    await waitFor(() => expect(onMinimize).toHaveBeenCalled());
+    expect(onJobIdentityChange).toHaveBeenLastCalledWith(expect.objectContaining(expected));
+    fireEvent.press(screen.getByLabelText('End visit'));
+    await waitFor(() => expect(onEndSessionPress).toHaveBeenCalled());
+    expect(onJobIdentityChange).toHaveBeenLastCalledWith(expect.objectContaining(expected));
+  });
+
   it('clears native vertical padding from live-visit single-line fields', () => {
     render(
       <LiveSessionBottomSheet

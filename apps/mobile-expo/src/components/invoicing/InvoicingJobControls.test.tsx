@@ -256,7 +256,7 @@ describe('InvoicingJobControls', () => {
       ? screen.getByLabelText('SHARE ESTIMATE')
       : screen.getByRole('button', { name: 'Copy link' })));
     if (action === 'copy') {
-      const shareModal = screen.UNSAFE_getAllByType(Modal).find((modal) => modal.props.statusBarTranslucent)!;
+      const shareModal = screen.UNSAFE_getAllByType(Modal).find((modal) => modal.props.onDismiss)!;
       act(() => shareModal.props.onRequestClose());
       act(() => mockShareSheetClosed?.());
     }
@@ -955,7 +955,7 @@ describe('InvoicingJobControls', () => {
     fireEvent(web, 'onMessage', { nativeEvent: { data: JSON.stringify({ type: 'preview-ready', previewToken: token }) } });
     fireEvent.press(await screen.findByLabelText('SHARE ESTIMATE'));
     await screen.findByRole('button', { name: 'Share document' });
-    const shareModal = screen.UNSAFE_getAllByType(Modal).find((modal) => modal.props.statusBarTranslucent)!;
+    const shareModal = screen.UNSAFE_getAllByType(Modal).find((modal) => modal.props.onDismiss)!;
     await act(async () => fireEvent.press(screen.getByRole('button', { name: 'Share document' })));
     act(() => mockShareSheetClosed?.());
     await act(async () => shareModal.props.onDismiss());
@@ -989,7 +989,7 @@ describe('InvoicingJobControls', () => {
     await act(async () => ref.current?.openDocument(doc.id));
     fireEvent.press(await screen.findByLabelText('SHARE ESTIMATE'));
     await screen.findByRole('button', { name: 'Share document' });
-    const shareModal = screen.UNSAFE_getAllByType(Modal).find((modal) => modal.props.statusBarTranslucent)!;
+    const shareModal = screen.UNSAFE_getAllByType(Modal).find((modal) => modal.props.onDismiss)!;
     await act(async () => fireEvent.press(screen.getByRole('button', { name: 'Share document' })));
     let finishRead!: () => void;
     mockList.mockImplementationOnce(() => new Promise((resolve, reject) => {
@@ -1018,7 +1018,7 @@ describe('InvoicingJobControls', () => {
     await screen.findByRole('button', { name: phone ? 'Text Customer' : 'Text' });
     const modals = screen.UNSAFE_getAllByType(Modal);
     const previewModal = modals.find((modal) => modal.props.onShow)!;
-    const shareModal = modals.find((modal) => modal.props.statusBarTranslucent)!;
+    const shareModal = modals.find((modal) => modal.props.onDismiss)!;
     await act(async () => fireEvent.press(screen.getByRole('button', { name: phone ? 'Text Customer' : 'Text' })));
     act(() => mockShareSheetClosed?.());
     act(() => shareModal.props.onDismiss());

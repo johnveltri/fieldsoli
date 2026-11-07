@@ -472,13 +472,17 @@ export function LiveSessionBottomSheet({
         return;
       }
       const cents =
-        next?.revenueCents !== undefined
-          ? next.revenueCents
-          : parseMoneyToCents(draft.revenueText);
+        invoicingEnabled
+          ? (next?.laborServicesCents !== undefined
+            ? next.laborServicesCents
+            : parseMoneyToCents(draft.revenueText))
+          : (next?.revenueCents !== undefined
+            ? next.revenueCents
+            : parseMoneyToCents(draft.revenueText));
       const patch: LiveSessionJobIdentityPatch = {
         shortDescription: nextTitle.slice(0, JOB_SHORT_DESCRIPTION_MAX_LENGTH),
         longDescription: next?.longDescription ?? draft.longDescription,
-        revenueCents: cents,
+        ...(invoicingEnabled ? { laborServicesCents: cents } : { revenueCents: cents }),
       };
       onJobIdentityChange(patch);
       lastPersistedTitle.current = nextTitle;
@@ -491,10 +495,10 @@ export function LiveSessionBottomSheet({
         customer.customerEmail,
         customer.customerId ?? '',
         customer.serviceAddress,
-        patch.revenueCents ?? '',
+        cents ?? '',
       ].join('\u0001');
     },
-    [onJobIdentityChange],
+    [invoicingEnabled, onJobIdentityChange],
   );
 
   const schedulePersist = useCallback(() => {
