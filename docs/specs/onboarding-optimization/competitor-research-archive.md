@@ -1,7 +1,7 @@
 # Onboarding optimization: research and decision packet
 
-**Status:** Exploring; Readiness: Blocked pending product decisions and firsthand validation.  
-**Date:** 2026-11-04  
+**Status:** Exploring; Readiness: Blocked pending product decisions and firsthand validation.
+**Date:** 2026-11-04
 **Scope:** Separate onboarding initiative requested by the owner. Planning only. Analytics work currently underway retains post-login consent timing.
 
 ## Scope correction — owner direction
