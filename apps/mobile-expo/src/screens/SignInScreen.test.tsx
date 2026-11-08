@@ -354,6 +354,25 @@ describe('SignInScreen', () => {
     expect(mockSetSignupLegalPending).not.toHaveBeenCalled();
   });
 
+  it('shows the server resend wait and enables retry when it expires', async () => {
+    await savePendingSignup('tech@example.com');
+    const screen = render(<SignInScreen initialMode="signIn" />);
+    await screen.findByLabelText('Verification code');
+    jest.useFakeTimers();
+    try {
+      mockResend.mockResolvedValueOnce({ error: { status: 429, message: 'For security purposes, you can only request this after 42 seconds.' } });
+      await act(async () => { fireEvent.press(screen.getByRole('button', { name: 'Resend email' })); });
+      expect(screen.getByRole('button', { name: 'Resend email in 42s' }).props.accessibilityState.disabled).toBe(true);
+      await act(async () => { jest.advanceTimersByTime(41000); });
+      expect(screen.getByText('Resend email in 1s')).toBeTruthy();
+      await act(async () => { jest.advanceTimersByTime(1000); });
+      expect(screen.getByRole('button', { name: 'Resend email' }).props.accessibilityState.disabled).toBe(false);
+    } finally {
+      screen.unmount();
+      jest.useRealTimers();
+    }
+  });
+
   it('resends the confirmation email from the check your email screen', async () => {
     mockSignUp.mockResolvedValueOnce({ error: null, session: null });
     mockSignIn.mockResolvedValueOnce({

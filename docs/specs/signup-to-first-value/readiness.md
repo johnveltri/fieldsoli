@@ -69,3 +69,5 @@ Sign-in refinement: removed the full-width verification action that appeared for
 ## PR validation — 2026-11-08
 
 Focused mobile suites passed: 59 tests across AuthWelcome, SignInScreen, pendingSignup, AuthContext and HomeScreen. Mobile TypeScript, API consent/analytics-consent tests (8), the rollback-only local migration regression, product export, design checks and whitespace checks passed. The legal-gate suite is recorded separately in the PR validation. These checks do not replace the provider/native release gates above.
+
+Resend follow-up: successful resend starts a 60-second local cooldown. A rate-limited response uses the seconds in the provider message when available, otherwise a 60-second retry delay with explicit notice that broader email limits may require longer. Countdown uses wall-clock time, disables only resend, and leaves code verification available.

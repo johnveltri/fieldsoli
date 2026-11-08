@@ -102,6 +102,26 @@ export function SignInScreen({ initialMode = 'welcome' }: { initialMode?: 'welco
   const [pendingConfirmEmail, setPendingConfirmEmail] = useState('');
   const [pendingResetEmail, setPendingResetEmail] = useState('');
   const [resendBusy, setResendBusy] = useState(false);
+  const [resendAvailableAt, setResendAvailableAt] = useState(0);
+  const [resendSeconds, setResendSeconds] = useState(0);
+  const startResendCooldown = useCallback((seconds: number) => {
+    setResendAvailableAt(Date.now() + seconds * 1000);
+    setResendSeconds(seconds);
+  }, []);
+  useEffect(() => {
+    if (!resendAvailableAt) return;
+    const update = () => setResendSeconds(Math.max(0, Math.ceil((resendAvailableAt - Date.now()) / 1000)));
+    update();
+    const timer = setInterval(() => {
+      update();
+      if (Date.now() >= resendAvailableAt) clearInterval(timer);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [resendAvailableAt]);
+  useEffect(() => {
+    setResendAvailableAt(0);
+    setResendSeconds(0);
+  }, [pendingConfirmEmail]);
   const [resendNotice, setResendNotice] = useState<string | null>(null);
   const [legalAccepted, setLegalAccepted] = useState(false);
   const [passwordVisible, setPasswordVisible] = useState(false);
@@ -257,7 +277,7 @@ export function SignInScreen({ initialMode = 'welcome' }: { initialMode?: 'welco
 
   const onResendConfirmation = useCallback(async () => {
     const targetEmail = pendingConfirmEmail || email.trim().toLowerCase();
-    if (!targetEmail || busy || resendBusy) return;
+    if (!targetEmail || busy || resendBusy || Date.now() < resendAvailableAt) return;
     setResendNotice(null);
     setResendBusy(true);
     try {
@@ -267,18 +287,26 @@ export function SignInScreen({ initialMode = 'welcome' }: { initialMode?: 'welco
         options: { emailRedirectTo: AUTH_CONFIRM_URL },
       });
       if (resendErr) {
-        setResendNotice(resendErr.status === 429
-          ? 'Please wait before requesting another email.'
-          : 'Could not request a confirmation email. Try again or sign in.');
+        if (resendErr.status === 429) {
+          // Auth errors expose a message rather than Retry-After headers.
+          const seconds = resendErr.message.match(/(?:after|wait(?: for)?)\s+(\d+)\s*seconds?/i)?.[1];
+          startResendCooldown(seconds ? Math.max(1, Number(seconds)) : 60);
+          setResendNotice(seconds
+            ? 'Please wait before requesting another email.'
+            : 'Too many email requests. Try again after the countdown; the email service may require a longer wait.');
+        } else {
+          setResendNotice('Could not request a confirmation email. Try again or sign in.');
+        }
         return;
       }
+      startResendCooldown(60);
       setResendNotice('If this email needs confirmation, check your inbox for a code or confirmation link.');
     } catch {
       setResendNotice('Could not request a confirmation email. Check your connection and try again.');
     } finally {
       setResendBusy(false);
     }
-  }, [email, pendingConfirmEmail, busy, resendBusy]);
+  }, [email, pendingConfirmEmail, busy, resendBusy, resendAvailableAt, startResendCooldown]);
 
   const onVerifyCode = useCallback(async () => {
     if (busy || resendBusy || !verificationCode.trim() || !pendingConfirmEmail) return;
@@ -554,19 +582,19 @@ export function SignInScreen({ initialMode = 'welcome' }: { initialMode?: 'welco
                 ) : null}
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityState={{ disabled: busy || resendBusy, busy: resendBusy }}
+                  accessibilityState={{ disabled: busy || resendBusy || resendSeconds > 0, busy: resendBusy }}
                   onPress={() => void onResendConfirmation()}
-                  disabled={busy || resendBusy}
+                  disabled={busy || resendBusy || resendSeconds > 0}
                   style={({ pressed }) => [
                     styles.secondaryButton,
-                    (busy || resendBusy) && styles.primaryButtonDisabled,
+                    (busy || resendBusy || resendSeconds > 0) && styles.primaryButtonDisabled,
                     pressed && styles.primaryButtonPressed,
                   ]}
                 >
                   {resendBusy ? (
                     <ActivityIndicator color={fg.primary} />
                   ) : (
-                    <Text style={[text.bodySemi, { color: fg.primary }]}>Resend email</Text>
+                    <Text style={[text.bodySemi, { color: fg.primary }]}>{resendSeconds > 0 ? `Resend email in ${resendSeconds}s` : 'Resend email'}</Text>
                   )}
                 </Pressable>
 
