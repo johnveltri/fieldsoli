@@ -401,7 +401,7 @@ describe('SignInScreen', () => {
           email: 'tech@example.com',
         }),
       );
-      expect(screen.getByText('If this email needs confirmation, check your inbox for a code or confirmation link.')).toBeTruthy();
+      expect(screen.getByText('Check your inbox for a verification code.')).toBeTruthy();
     });
   });
 

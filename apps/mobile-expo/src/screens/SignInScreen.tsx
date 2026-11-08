@@ -300,7 +300,7 @@ export function SignInScreen({ initialMode = 'welcome' }: { initialMode?: 'welco
         return;
       }
       startResendCooldown(60);
-      setResendNotice('If this email needs confirmation, check your inbox for a code or confirmation link.');
+      setResendNotice('Check your inbox for a verification code.');
     } catch {
       setResendNotice('Could not request a confirmation email. Check your connection and try again.');
     } finally {
@@ -572,7 +572,7 @@ export function SignInScreen({ initialMode = 'welcome' }: { initialMode?: 'welco
                     style={[
                       text.caption,
                       {
-                        color: resendNotice.startsWith('If this email') ? fg.secondary : '#b00020',
+                        color: resendNotice === 'Check your inbox for a verification code.' ? fg.secondary : '#b00020',
                         marginBottom: gap,
                       },
                     ]}
