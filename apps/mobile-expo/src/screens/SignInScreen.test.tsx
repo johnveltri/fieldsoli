@@ -493,7 +493,7 @@ describe('SignInScreen', () => {
     expect(mockSignIn).not.toHaveBeenCalled();
   });
 
-  it('uses conditional delivery language for an obfuscated no-session signup and offers password recovery', async () => {
+  it('shows visible sign-in and reset guidance for an ambiguous no-session signup', async () => {
     mockSignUp.mockResolvedValueOnce({ error: null, session: null });
     const screen = render(<SignInScreen initialMode="signIn" />);
     fireEvent.press(screen.getByText('Create an account'));
@@ -502,8 +502,8 @@ describe('SignInScreen', () => {
     fireEvent.press(screen.getByRole('checkbox'));
     await act(async () => { fireEvent.press(screen.getByRole('button', { name: 'Create account' })); });
     expect(screen.getByText(/Enter the verification code for/)).toBeTruthy();
-    fireEvent.press(screen.getByRole('button', { name: 'Back' }));
-    fireEvent.press(screen.getByRole('button', { name: 'Forgot password?' }));
+    expect(screen.getByRole('button', { name: 'Sign in' })).toBeTruthy();
+    fireEvent.press(screen.getByRole('button', { name: 'reset your password' }));
     expect(screen.getByLabelText('Email').props.value).toBe('existing@example.com');
     expect(screen.getByRole('button', { name: 'Send reset link' })).toBeTruthy();
     await expect(readPendingSignup()).resolves.toBeNull();
@@ -538,7 +538,7 @@ describe('SignInScreen', () => {
     expect(screen.getByLabelText('Email')).toBeTruthy();
   });
 
-  it('also offers neutral recovery when signup returns an explicit registered-user error', async () => {
+  it('returns explicit registered-user errors to sign-in without pending verification', async () => {
     mockSignUp.mockResolvedValueOnce({ error: new Error('User already registered'), session: null });
     const screen = render(<SignInScreen initialMode="signIn" />);
     fireEvent.press(screen.getByText('Create an account'));
@@ -546,9 +546,8 @@ describe('SignInScreen', () => {
     fireEvent.changeText(screen.getByLabelText('Password'), 'Password123!');
     fireEvent.press(screen.getByRole('checkbox'));
     await act(async () => { fireEvent.press(screen.getByRole('button', { name: 'Create account' })); });
-    expect(screen.getByText(/Enter the verification code for/)).toBeTruthy();
-    expect(screen.queryByText(/An account already exists/)).toBeNull();
-    fireEvent.press(screen.getByRole('button', { name: 'Back' }));
+    expect(screen.queryByLabelText('Verification code')).toBeNull();
+    expect(screen.getByText('An account already exists with this email. Sign in or reset your password.')).toBeTruthy();
     expect(screen.getByLabelText('Email').props.value).toBe('existing@example.com');
     await expect(readPendingSignup()).resolves.toBeNull();
   });
@@ -568,11 +567,13 @@ describe('SignInScreen', () => {
     expect(mockVerifyOtp).toHaveBeenCalledWith({ email: 'tech@example.com', token: '12345678', type: 'email' });
   });
 
-  it('keeps verification to two actions and the standard upper-left Back control', async () => {
+  it('keeps primary verification actions and provides inline recovery guidance', async () => {
     await savePendingSignup('pending@example.com');
     const screen = render(<SignInScreen initialMode="signIn" />);
     await screen.findByLabelText('Verification code');
-    expect(screen.getAllByRole('button')).toHaveLength(3);
+    expect(screen.getAllByRole('button')).toHaveLength(5);
+    expect(screen.getByRole('button', { name: 'Sign in' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'reset your password' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Verify email' }).props.accessibilityState.disabled).toBe(true);
     expect(screen.getByRole('button', { name: 'Resend email' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Back' })).toBeTruthy();

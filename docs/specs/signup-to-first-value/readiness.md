@@ -73,3 +73,9 @@ Focused mobile suites passed: 59 tests across AuthWelcome, SignInScreen, pending
 Resend follow-up: successful resend starts a 60-second local cooldown. A rate-limited response uses the seconds in the provider message when available, otherwise a 60-second retry delay with explicit notice that broader email limits may require longer. Countdown uses wall-clock time, disables only resend, and leaves code verification available.
 
 Resend success copy clarified to “Check your inbox for a verification code.” This directs the next action without claiming delivery or exposing account status; the code-entry screen no longer mentions legacy confirmation links.
+
+## P2 compatibility corrections
+
+Signup metadata describes the account, not the client requesting a resend. Confirmation emails therefore retain the confirmation-link CTA and fallback URL in both metadata branches; only the code section is conditional. This supersedes earlier code-only email notes. Explicit user_already_exists / User already registered errors return to sign-in, preserve the normalized email, and clear pending verification. Ambiguous no-session signup still supports code entry with visible inline Sign in / reset your password actions. Existing recovery guidance behind Back alone was insufficient.
+
+Regression checks cover both email-template branches and ambiguous/explicit registration responses. The template test evaluates the current conditional branches locally; actual hosted Go rendering and old/new-client token consumption still require provider integration QA. No hosted templates or settings changed in this correction.

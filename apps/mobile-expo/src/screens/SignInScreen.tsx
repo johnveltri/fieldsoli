@@ -402,7 +402,11 @@ export function SignInScreen({ initialMode = 'welcome' }: { initialMode?: 'welco
             ...errorProperties(signUpErr),
           });
           if (('code' in signUpErr && signUpErr.code === 'user_already_exists') || signUpErr.message.toLowerCase().includes('user already registered')) {
-            await continueVerification(trimmed);
+            await clearPendingSignup();
+            setPendingConfirmEmail('');
+            setEmail(trimmed);
+            setMode('signIn');
+            setError('An account already exists with this email. Sign in or reset your password.');
           } else setError(authErrorMessage(signUpErr));
           return;
         }
@@ -544,6 +548,16 @@ export function SignInScreen({ initialMode = 'welcome' }: { initialMode?: 'welco
                 </Text>
                 <Text style={[text.body, { color: fg.secondary, marginBottom: space('Spacing/24') }]}>
                   Enter the verification code for{' '}<Text style={[text.bodySemi, { color: fg.primary }]}>{pendingConfirmEmail}</Text>.
+                </Text>
+                <Text style={[text.body, { color: fg.secondary, marginBottom: space('Spacing/16') }]}>
+                  Already have an account?{' '}
+                  <Text accessibilityRole="button" onPress={onAuthBack} style={{ color: fg.primary, textDecorationLine: 'underline' }}>Sign in</Text>
+                  {' or '}
+                  <Text accessibilityRole="button" onPress={() => {
+                    if (busy || resendBusy) return;
+                    onAuthBack();
+                    setMode('forgotPassword');
+                  }} style={{ color: fg.primary, textDecorationLine: 'underline' }}>reset your password</Text>.
                 </Text>
                 <DsTextInput
                   accessibilityLabel="Verification code"
