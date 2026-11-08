@@ -220,7 +220,8 @@ describe('HomeScreen quick visit', () => {
       />,
     );
 
-    expect(await screen.findByText("Looks like you don't have any jobs yet")).toBeTruthy();
+    expect(await screen.findByText('Start with your first job.')).toBeTruthy();
+    expect(screen.getByText('Keep time, materials & expenses with the work. Add a job now and fill in details as you go.')).toBeTruthy();
     expect(screen.queryByText('Weekly Snapshot')).toBeNull();
 
     fireEvent.press(screen.getByRole('button', { name: 'Create my first job' }));

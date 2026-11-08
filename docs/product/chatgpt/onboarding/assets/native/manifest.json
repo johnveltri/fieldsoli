@@ -1,0 +1,70 @@
+[
+  {
+    "asset": "card-02-time-expenses.png",
+    "source": "job-edit-time-materials-and-costs.png",
+    "source_sha256": "4c8c32e7435c2235acf5eb1f7cddba67c3af039cea645a34732d451cd4319f33",
+    "crop": [
+      60,
+      350,
+      1146,
+      2622
+    ],
+    "removed_background_rgb": [
+      245,
+      241,
+      233
+    ],
+    "retained_rgb_check": "PASS"
+  },
+  {
+    "asset": "card-03-simple-fast.png",
+    "source": "active-visit.png",
+    "source_sha256": "3f491f3c2d643675382c91b4054287a949b680f7ed5cee552c7310d71c214921",
+    "crop": [
+      60,
+      340,
+      1146,
+      1338
+    ],
+    "removed_background_rgb": [
+      245,
+      241,
+      233
+    ],
+    "retained_rgb_check": "PASS"
+  },
+  {
+    "asset": "card-04-export.png",
+    "source": "export-job-summary.png",
+    "source_sha256": "f3431adfde602c080c93f29709759dd28524cba3b3a3c7d41b18b8c1cd612dd2",
+    "crop": [
+      60,
+      245,
+      1146,
+      1505
+    ],
+    "removed_background_rgb": [
+      245,
+      241,
+      233
+    ],
+    "retained_rgb_check": "PASS"
+  },
+  {
+    "asset": "card-05-earnings.png",
+    "source": "earnings-monthly-snapshot.png",
+    "source_sha256": "9d333c1329c9ebef88d7c57787ebe6053c759021c0f80be800932f8dc24218df",
+    "crop": [
+      60,
+      810,
+      1146,
+      1668
+    ],
+    "removed_background_rgb": [
+      245,
+      241,
+      233
+    ],
+    "retained_rgb_check": "PASS"
+  }
+]
