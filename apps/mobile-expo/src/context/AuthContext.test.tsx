@@ -1,3 +1,4 @@
+import { clearPendingSignup, readPendingSignup, savePendingSignup } from '../lib/pendingSignup';
 import type { Session } from '@supabase/supabase-js';
 import { act, render, waitFor } from '@testing-library/react-native';
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
@@ -76,7 +77,8 @@ function DeletionHarness() {
 }
 
 describe('AuthProvider', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    await clearPendingSignup();
     jest.clearAllMocks();
     mockAuthStateChange = null;
     mockGetSession.mockResolvedValue({ data: { session: signedInSession } });
@@ -129,4 +131,22 @@ describe('AuthProvider', () => {
       expect(mockClearAnalyticsConsentCache).toHaveBeenCalledTimes(1);
     });
   });
+  it('clears the signup navigation hint when an existing session is restored', async () => {
+    await savePendingSignup('pending@example.com');
+    const screen = render(<AuthProvider><SessionState /></AuthProvider>);
+    await screen.findByText('signed in');
+    await expect(readPendingSignup()).resolves.toBeNull();
+  });
+
+  it('keeps pending verification while signed out and clears it on authentication', async () => {
+    mockGetSession.mockResolvedValueOnce({ data: { session: null } });
+    await savePendingSignup('pending@example.com');
+    const screen = render(<AuthProvider><SessionState /></AuthProvider>);
+    await act(async () => {});
+    await expect(readPendingSignup()).resolves.toBe('pending@example.com');
+    act(() => { mockAuthStateChange?.('SIGNED_IN', signedInSession); });
+    await screen.findByText('signed in');
+    await expect(readPendingSignup()).resolves.toBeNull();
+  });
+
 });

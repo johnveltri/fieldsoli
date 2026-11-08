@@ -335,13 +335,10 @@ export function HomeScreen({
                 style={styles.firstJobLogo}
               />
               <Text accessibilityRole="header" style={[typography.headingH2, styles.firstJobTitle, { color: fg.primary }]}>
-                Looks like you don't have any jobs yet
+                Start with your first job.
               </Text>
               <Text style={[typography.bodySmall, styles.firstJobBody, { color: fg.primary }]}>
-                FieldSoli is a jobs &amp; earnings tracker for independent tradespeople designed for the field.
-              </Text>
-              <Text style={[typography.bodySmall, styles.firstJobBody, { color: fg.primary }]}>
-                Start with minimal info, and then let FieldSoli guide you to track enough so that you can understand your profitability. Track every job to understand your business and price smarter over time.
+                Keep time, materials &amp; expenses with the work. Add a job now and fill in details as you go.
               </Text>
               {firstJobError ? (
                 <Text style={[typography.bodySmall, styles.firstJobError, { color: color('Semantic/Status/Error/Text') }]}>

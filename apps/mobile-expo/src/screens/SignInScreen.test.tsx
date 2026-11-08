@@ -1,3 +1,5 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { PENDING_SIGNUP_KEY, readPendingSignup, savePendingSignup } from '../lib/pendingSignup';
 import React from 'react';
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { describe, expect, it, jest, beforeEach, afterEach } from '@jest/globals';
@@ -46,6 +48,7 @@ jest.mock('../lib/analytics', () => ({
 const mockRecordSignupLegalAcceptances = jest.fn(async () => undefined);
 const mockCacheLegalAcceptance = jest.fn(async () => undefined);
 const mockResend = jest.fn(async () => ({ error: null }));
+const mockVerifyOtp = jest.fn(async (_input: unknown) => ({ data: { session: { user: { id: 'user-1' } } }, error: null }));
 
 jest.mock('@fieldsolo/api-client', () => ({
   recordSignupLegalAcceptances: (...args: unknown[]) =>
@@ -56,6 +59,7 @@ jest.mock('../lib/supabase', () => ({
   supabase: {
     auth: {
       resend: (...args: unknown[]) => mockResend(...(args as [])),
+      verifyOtp: (input: unknown) => mockVerifyOtp(input),
     },
   },
 }));
@@ -68,7 +72,8 @@ jest.mock('../lib/legalAcceptanceStorage', () => ({
 describe('SignInScreen', () => {
   let linkingSubscription: { remove: jest.Mock };
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    await AsyncStorage.clear();
     jest.clearAllMocks();
     mockSignIn.mockResolvedValue({ error: null, session: null });
     mockSignUp.mockResolvedValue({ error: null, session: { user: { id: 'user-1' } } });
@@ -83,7 +88,7 @@ describe('SignInScreen', () => {
   });
 
   it('shows sign-in instructions in sign-in mode', () => {
-    const { getByText } = render(<SignInScreen />);
+    const { getByText } = render(<SignInScreen initialMode="signIn" />);
 
     expect(getByText('Welcome back')).toBeTruthy();
     expect(getByText('Sign in to keep track of your jobs, time & earnings.')).toBeTruthy();
@@ -94,7 +99,7 @@ describe('SignInScreen', () => {
     Object.defineProperty(Platform, 'OS', { configurable: true, value: 'android' });
 
     try {
-      const screen = render(<SignInScreen />);
+      const screen = render(<SignInScreen initialMode="signIn" />);
 
       expect(screen.UNSAFE_getByType(KeyboardAvoidingView).props.behavior).toBe('height');
       expect(screen.UNSAFE_getByProps({ keyboardDismissMode: 'on-drag' })).toBeTruthy();
@@ -107,7 +112,7 @@ describe('SignInScreen', () => {
   });
 
   it('shows sign-up instructions in sign-up mode', () => {
-    const screen = render(<SignInScreen />);
+    const screen = render(<SignInScreen initialMode="signIn" />);
 
     fireEvent.press(screen.getByText('Create an account'));
 
@@ -115,20 +120,20 @@ describe('SignInScreen', () => {
   });
 
   it('marks the brand title as an accessibility header', () => {
-    const { getByLabelText } = render(<SignInScreen />);
+    const { getByLabelText } = render(<SignInScreen initialMode="signIn" />);
 
     expect(getByLabelText('FieldSoli').props.accessibilityRole).toBe('header');
   });
 
   it('renders a superscript TM on the brand wordmark', () => {
-    const { getByLabelText, getByText } = render(<SignInScreen />);
+    const { getByLabelText, getByText } = render(<SignInScreen initialMode="signIn" />);
 
     expect(getByLabelText('FieldSoli')).toBeTruthy();
     expect(getByText('TM')).toBeTruthy();
   });
 
   it('rejects an invalid email before calling sign in', async () => {
-    const screen = render(<SignInScreen />);
+    const screen = render(<SignInScreen initialMode="signIn" />);
     fireEvent.changeText(screen.getByLabelText('Email'), 'not-an-email');
     fireEvent.changeText(screen.getByLabelText('Password'), 'password123');
 
@@ -141,7 +146,7 @@ describe('SignInScreen', () => {
   });
 
   it('normalizes the email and submits from the password keyboard', async () => {
-    const screen = render(<SignInScreen />);
+    const screen = render(<SignInScreen initialMode="signIn" />);
     fireEvent.changeText(screen.getByLabelText('Email'), '  Tech@Example.COM  ');
     fireEvent.changeText(screen.getByLabelText('Password'), 'password123');
 
@@ -153,7 +158,7 @@ describe('SignInScreen', () => {
   });
 
   it('hides email and password placeholders while those fields are focused', () => {
-    const screen = render(<SignInScreen />);
+    const screen = render(<SignInScreen initialMode="signIn" />);
     const email = screen.getByLabelText('Email');
     const password = screen.getByLabelText('Password');
 
@@ -175,7 +180,7 @@ describe('SignInScreen', () => {
 
   it('dismisses the keyboard before starting sign-in', async () => {
     const dismissKeyboard = jest.spyOn(Keyboard, 'dismiss');
-    const screen = render(<SignInScreen />);
+    const screen = render(<SignInScreen initialMode="signIn" />);
     fireEvent.changeText(screen.getByLabelText('Email'), 'tech@example.com');
     fireEvent.changeText(screen.getByLabelText('Password'), 'password123');
 
@@ -195,7 +200,7 @@ describe('SignInScreen', () => {
       error: new Error('Invalid login credentials'),
       session: null,
     });
-    const screen = render(<SignInScreen />);
+    const screen = render(<SignInScreen initialMode="signIn" />);
     fireEvent.changeText(screen.getByLabelText('Email'), 'tech@example.com');
     fireEvent.changeText(screen.getByLabelText('Password'), 'wrong-password');
 
@@ -207,7 +212,7 @@ describe('SignInScreen', () => {
   });
 
   it('lets the user show and hide the password', () => {
-    const screen = render(<SignInScreen />);
+    const screen = render(<SignInScreen initialMode="signIn" />);
     const password = screen.getByLabelText('Password');
 
     expect(password.props.secureTextEntry).toBe(true);
@@ -218,7 +223,7 @@ describe('SignInScreen', () => {
   });
 
   it('provides platform autofill hints for sign in and sign up', () => {
-    const screen = render(<SignInScreen />);
+    const screen = render(<SignInScreen initialMode="signIn" />);
 
     expect(screen.getByLabelText('Email').props.autoComplete).toBe('username');
     expect(screen.getByLabelText('Email').props.textContentType).toBe('username');
@@ -226,10 +231,10 @@ describe('SignInScreen', () => {
 
     fireEvent.press(screen.getByText('Create an account'));
     expect(screen.getByLabelText('Email').props.autoComplete).toBe('username');
-    expect(screen.getByLabelText('First name').props.autoComplete).toBe('name-given');
-    expect(screen.getByLabelText('Last name').props.autoComplete).toBe('name-family');
+    expect(screen.queryByLabelText('First name')).toBeNull();
+    expect(screen.queryByLabelText('Last name')).toBeNull();
     expect(screen.getByLabelText('Password').props.autoComplete).toBe('new-password');
-    expect(screen.getByLabelText('Confirm password').props.autoComplete).toBe('new-password');
+    expect(screen.queryByLabelText('Confirm password')).toBeNull();
 
     fireEvent.press(screen.getByText('Back to sign in'));
     fireEvent.press(screen.getByText('Forgot password?'));
@@ -237,31 +242,11 @@ describe('SignInScreen', () => {
     expect(screen.getByLabelText('Email').props.textContentType).toBe('emailAddress');
   });
 
-  it('disables create account until passwords match', () => {
-    const screen = render(<SignInScreen />);
-    fireEvent.press(screen.getByText('Create an account'));
-    fireEvent.changeText(screen.getByLabelText('Email'), 'tech@example.com');
-    fireEvent.changeText(screen.getByLabelText('First name'), 'Alex');
-    fireEvent.changeText(screen.getByLabelText('Last name'), 'Builder');
-    fireEvent.changeText(screen.getByLabelText('Password'), 'Password123!');
-    fireEvent.changeText(screen.getByLabelText('Confirm password'), 'Different123!');
-    fireEvent.press(screen.getByRole('checkbox'));
-
-    const createAccount = screen.getByRole('button', { name: 'Create account' });
-    expect(screen.getByText('Passwords do not match.')).toBeTruthy();
-    expect(createAccount.props.accessibilityState).toMatchObject({ disabled: true });
-    fireEvent.press(createAccount);
-    expect(mockSignUp).not.toHaveBeenCalled();
-  });
-
   it('disables create account until the password meets policy', () => {
-    const screen = render(<SignInScreen />);
+    const screen = render(<SignInScreen initialMode="signIn" />);
     fireEvent.press(screen.getByText('Create an account'));
     fireEvent.changeText(screen.getByLabelText('Email'), 'tech@example.com');
-    fireEvent.changeText(screen.getByLabelText('First name'), 'Alex');
-    fireEvent.changeText(screen.getByLabelText('Last name'), 'Builder');
     fireEvent.changeText(screen.getByLabelText('Password'), 'password123');
-    fireEvent.changeText(screen.getByLabelText('Confirm password'), 'password123');
     fireEvent.press(screen.getByRole('checkbox'));
 
     const createAccount = screen.getByRole('button', { name: 'Create account' });
@@ -274,7 +259,7 @@ describe('SignInScreen', () => {
   });
 
   it('hides the password requirement hint once the password meets policy', () => {
-    const screen = render(<SignInScreen />);
+    const screen = render(<SignInScreen initialMode="signIn" />);
     fireEvent.press(screen.getByText('Create an account'));
 
     expect(
@@ -289,14 +274,14 @@ describe('SignInScreen', () => {
   });
 
   it('shows privacy policy and terms links on sign in', () => {
-    const { getAllByText } = render(<SignInScreen />);
+    const { getAllByText } = render(<SignInScreen initialMode="signIn" />);
 
     expect(getAllByText('Privacy Policy').length).toBeGreaterThan(0);
     expect(getAllByText('Terms').length).toBeGreaterThan(0);
   });
 
   it('shows privacy and terms only in the agreement line during sign up', () => {
-    const screen = render(<SignInScreen />);
+    const screen = render(<SignInScreen initialMode="signIn" />);
 
     fireEvent.press(screen.getByText('Create an account'));
 
@@ -306,14 +291,11 @@ describe('SignInScreen', () => {
   });
 
   it('disables create account until the legal checkbox is checked', () => {
-    const screen = render(<SignInScreen />);
+    const screen = render(<SignInScreen initialMode="signIn" />);
 
     fireEvent.press(screen.getByText('Create an account'));
     fireEvent.changeText(screen.getByPlaceholderText('you@example.com'), 'tech@example.com');
-    fireEvent.changeText(screen.getByPlaceholderText('Alex'), 'Alex');
-    fireEvent.changeText(screen.getByPlaceholderText('Builder'), 'Builder');
     fireEvent.changeText(screen.getByPlaceholderText('••••••••'), 'Password123!');
-    fireEvent.changeText(screen.getByPlaceholderText('Re-enter password'), 'Password123!');
 
     const createAccount = screen.getByRole('button', { name: 'Create account' });
     expect(createAccount.props.accessibilityState).toMatchObject({ disabled: true });
@@ -322,14 +304,11 @@ describe('SignInScreen', () => {
   });
 
   it('submits sign up after the legal checkbox is checked', async () => {
-    const screen = render(<SignInScreen />);
+    const screen = render(<SignInScreen initialMode="signIn" />);
 
     fireEvent.press(screen.getByText('Create an account'));
     fireEvent.changeText(screen.getByPlaceholderText('you@example.com'), 'tech@example.com');
-    fireEvent.changeText(screen.getByPlaceholderText('Alex'), 'Alex');
-    fireEvent.changeText(screen.getByPlaceholderText('Builder'), 'Builder');
     fireEvent.changeText(screen.getByPlaceholderText('••••••••'), 'Password123!');
-    fireEvent.changeText(screen.getByPlaceholderText('Re-enter password'), 'Password123!');
     fireEvent.press(screen.getByRole('checkbox'));
 
     const createAccount = screen.getByRole('button', { name: 'Create account' });
@@ -356,14 +335,11 @@ describe('SignInScreen', () => {
       error: new Error('Email not confirmed'),
       session: null,
     });
-    const screen = render(<SignInScreen />);
+    const screen = render(<SignInScreen initialMode="signIn" />);
 
     fireEvent.press(screen.getByText('Create an account'));
     fireEvent.changeText(screen.getByPlaceholderText('you@example.com'), 'tech@example.com');
-    fireEvent.changeText(screen.getByPlaceholderText('Alex'), 'Alex');
-    fireEvent.changeText(screen.getByPlaceholderText('Builder'), 'Builder');
     fireEvent.changeText(screen.getByPlaceholderText('••••••••'), 'Password123!');
-    fireEvent.changeText(screen.getByPlaceholderText('Re-enter password'), 'Password123!');
     fireEvent.press(screen.getByRole('checkbox'));
 
     await act(async () => {
@@ -384,14 +360,11 @@ describe('SignInScreen', () => {
       error: new Error('Email not confirmed'),
       session: null,
     });
-    const screen = render(<SignInScreen />);
+    const screen = render(<SignInScreen initialMode="signIn" />);
 
     fireEvent.press(screen.getByText('Create an account'));
     fireEvent.changeText(screen.getByPlaceholderText('you@example.com'), 'tech@example.com');
-    fireEvent.changeText(screen.getByPlaceholderText('Alex'), 'Alex');
-    fireEvent.changeText(screen.getByPlaceholderText('Builder'), 'Builder');
     fireEvent.changeText(screen.getByPlaceholderText('••••••••'), 'Password123!');
-    fireEvent.changeText(screen.getByPlaceholderText('Re-enter password'), 'Password123!');
     fireEvent.press(screen.getByRole('checkbox'));
 
     await act(async () => {
@@ -409,13 +382,13 @@ describe('SignInScreen', () => {
           email: 'tech@example.com',
         }),
       );
-      expect(screen.getByText('Confirmation email sent. Check your inbox.')).toBeTruthy();
+      expect(screen.getByText('If this email needs confirmation, check your inbox for a code or confirmation link.')).toBeTruthy();
     });
   });
 
   it('opens sign in when the app receives the sign-in deep link', async () => {
     jest.spyOn(Linking, 'getInitialURL').mockResolvedValue('fieldsoli://sign-in');
-    const screen = render(<SignInScreen />);
+    const screen = render(<SignInScreen initialMode="signIn" />);
 
     await waitFor(() => {
       expect(screen.getByText('Welcome back')).toBeTruthy();
@@ -423,7 +396,7 @@ describe('SignInScreen', () => {
   });
 
   it('requests a password reset from forgot password mode', async () => {
-    const screen = render(<SignInScreen />);
+    const screen = render(<SignInScreen initialMode="signIn" />);
 
     fireEvent.press(screen.getByText('Forgot password?'));
     fireEvent.changeText(screen.getByLabelText('Email'), 'tech@example.com');
@@ -439,31 +412,182 @@ describe('SignInScreen', () => {
     });
   });
 
-  it('shows an existing-account error instead of check email when signup sign-in fails with invalid credentials', async () => {
+  it('verifies the email code without reentering the password', async () => {
     mockSignUp.mockResolvedValueOnce({ error: null, session: null });
-    mockSignIn.mockResolvedValueOnce({
-      error: new Error('Invalid login credentials'),
-      session: null,
-    });
-    const screen = render(<SignInScreen />);
-
+    const screen = render(<SignInScreen initialMode="signIn" />);
     fireEvent.press(screen.getByText('Create an account'));
-    fireEvent.changeText(screen.getByPlaceholderText('you@example.com'), 'tech@example.com');
-    fireEvent.changeText(screen.getByPlaceholderText('Alex'), 'Alex');
-    fireEvent.changeText(screen.getByPlaceholderText('Builder'), 'Builder');
-    fireEvent.changeText(screen.getByPlaceholderText('••••••••'), 'Password123!');
-    fireEvent.changeText(screen.getByPlaceholderText('Re-enter password'), 'Password123!');
+    fireEvent.changeText(screen.getByLabelText('Email'), 'tech@example.com');
+    fireEvent.changeText(screen.getByLabelText('Password'), 'Password123!');
     fireEvent.press(screen.getByRole('checkbox'));
-
-    await act(async () => {
-      fireEvent.press(screen.getByRole('button', { name: 'Create account' }));
-    });
-
-    expect(
-      screen.getByText(
-        'An account already exists for this email. Sign in or reset your password.',
-      ),
-    ).toBeTruthy();
-    expect(screen.queryByText('Check your email')).toBeNull();
+    await act(async () => { fireEvent.press(screen.getByRole('button', { name: 'Create account' })); });
+    fireEvent.changeText(screen.getByLabelText('Verification code'), '123456');
+    await act(async () => { fireEvent.press(screen.getByRole('button', { name: 'Verify email' })); });
+    expect(mockVerifyOtp).toHaveBeenCalledWith({ email: 'tech@example.com', token: '123456', type: 'email' });
+    expect(mockSignIn).not.toHaveBeenCalled();
   });
+  it('restores code entry after a real unmount/remount without persisting credentials', async () => {
+    mockSignUp.mockResolvedValueOnce({ error: null, session: null });
+    const screen = render(<SignInScreen initialMode="signIn" />);
+    fireEvent.press(screen.getByText('Create an account'));
+    fireEvent.changeText(screen.getByLabelText('Email'), 'Tech@example.com');
+    fireEvent.changeText(screen.getByLabelText('Password'), 'Password123!');
+    fireEvent.press(screen.getByRole('checkbox'));
+    await act(async () => { fireEvent.press(screen.getByRole('button', { name: 'Create account' })); });
+    fireEvent.changeText(screen.getByLabelText('Verification code'), '12345678');
+    const raw = await AsyncStorage.getItem(PENDING_SIGNUP_KEY);
+    expect(JSON.parse(raw!)).toEqual({ email: 'tech@example.com', createdAt: expect.any(Number) });
+    screen.unmount();
+    const restarted = render(<SignInScreen initialMode="signIn" />);
+    expect(await restarted.findByLabelText('Verification code')).toBeTruthy();
+    expect(restarted.getByText('tech@example.com')).toBeTruthy();
+    expect(restarted.getByLabelText('Verification code').props.value).toBe('');
+    fireEvent.changeText(restarted.getByLabelText('Verification code'), '12345678');
+    await act(async () => { fireEvent.press(restarted.getByRole('button', { name: 'Verify email' })); });
+    await expect(readPendingSignup()).resolves.toBeNull();
+  });
+
+  it('opens verification from an unconfirmed sign-in after stored state has expired', async () => {
+    mockSignIn.mockResolvedValueOnce({ error: new Error('Email not confirmed'), session: null });
+    const screen = render(<SignInScreen initialMode="signIn" />);
+    fireEvent.changeText(screen.getByLabelText('Email'), 'tech@example.com');
+    fireEvent.changeText(screen.getByLabelText('Password'), 'Password123!');
+    await act(async () => { fireEvent.press(screen.getByRole('button', { name: 'Sign in' })); });
+    expect(screen.getByLabelText('Verification code')).toBeTruthy();
+    await expect(readPendingSignup()).resolves.toBe('tech@example.com');
+  });
+
+  it('offers a small verification link only for the known pending email', async () => {
+    const screen = render(<SignInScreen initialMode="signIn" />);
+    fireEvent.changeText(screen.getByLabelText('Email'), 'tech@example.com');
+    expect(screen.queryByText('Continue email verification')).toBeNull();
+    screen.unmount();
+    await savePendingSignup('tech@example.com');
+    const resumed = render(<SignInScreen initialMode="signIn" />);
+    await resumed.findByLabelText('Verification code');
+    fireEvent.press(resumed.getByRole('button', { name: 'Back' }));
+    fireEvent.changeText(resumed.getByLabelText('Email'), 'different@example.com');
+    expect(resumed.queryByText('Continue email verification')).toBeNull();
+    fireEvent.changeText(resumed.getByLabelText('Email'), 'tech@example.com');
+    await act(async () => { fireEvent.press(resumed.getByRole('button', { name: 'Continue email verification' })); });
+    expect(resumed.getByLabelText('Verification code')).toBeTruthy();
+    expect(mockSignUp).not.toHaveBeenCalled();
+    expect(mockSignIn).not.toHaveBeenCalled();
+  });
+
+  it('uses conditional delivery language for an obfuscated no-session signup and offers password recovery', async () => {
+    mockSignUp.mockResolvedValueOnce({ error: null, session: null });
+    const screen = render(<SignInScreen initialMode="signIn" />);
+    fireEvent.press(screen.getByText('Create an account'));
+    fireEvent.changeText(screen.getByLabelText('Email'), 'existing@example.com');
+    fireEvent.changeText(screen.getByLabelText('Password'), 'Password123!');
+    fireEvent.press(screen.getByRole('checkbox'));
+    await act(async () => { fireEvent.press(screen.getByRole('button', { name: 'Create account' })); });
+    expect(screen.getByText(/Enter the verification code for/)).toBeTruthy();
+    fireEvent.press(screen.getByRole('button', { name: 'Back' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Forgot password?' }));
+    expect(screen.getByLabelText('Email').props.value).toBe('existing@example.com');
+    expect(screen.getByRole('button', { name: 'Send reset link' })).toBeTruthy();
+    await expect(readPendingSignup()).resolves.toBeNull();
+  });
+
+  it('gives initial legacy sign-in links precedence over pending verification', async () => {
+    await savePendingSignup('pending@example.com');
+    jest.mocked(Linking.getInitialURL).mockResolvedValue('fieldsoli://sign-in');
+    const screen = render(<SignInScreen initialMode="signIn" />);
+    await act(async () => {});
+    expect(screen.getByText('Welcome back')).toBeTruthy();
+    expect(screen.queryByLabelText('Verification code')).toBeNull();
+  });
+
+  it('does not let delayed restoration overwrite active user input', async () => {
+    await savePendingSignup('pending@example.com');
+    let resolveUrl!: (url: string | null) => void;
+    jest.mocked(Linking.getInitialURL).mockReturnValue(new Promise(resolve => { resolveUrl = resolve; }));
+    const screen = render(<SignInScreen initialMode="signIn" />);
+    fireEvent.changeText(screen.getByLabelText('Email'), 'other@example.com');
+    await act(async () => { resolveUrl(null); });
+    expect(screen.getByLabelText('Email').props.value).toBe('other@example.com');
+    expect(screen.queryByLabelText('Verification code')).toBeNull();
+  });
+
+  it('returns to an editable email and clears pending verification on Back', async () => {
+    await savePendingSignup('pending@example.com');
+    const screen = render(<SignInScreen initialMode="signIn" />);
+    await screen.findByLabelText('Verification code');
+    fireEvent.press(screen.getByRole('button', { name: 'Back' }));
+    await expect(readPendingSignup()).resolves.toBeNull();
+    expect(screen.getByLabelText('Email')).toBeTruthy();
+  });
+
+  it('also offers neutral recovery when signup returns an explicit registered-user error', async () => {
+    mockSignUp.mockResolvedValueOnce({ error: new Error('User already registered'), session: null });
+    const screen = render(<SignInScreen initialMode="signIn" />);
+    fireEvent.press(screen.getByText('Create an account'));
+    fireEvent.changeText(screen.getByLabelText('Email'), 'existing@example.com');
+    fireEvent.changeText(screen.getByLabelText('Password'), 'Password123!');
+    fireEvent.press(screen.getByRole('checkbox'));
+    await act(async () => { fireEvent.press(screen.getByRole('button', { name: 'Create account' })); });
+    expect(screen.getByText(/Enter the verification code for/)).toBeTruthy();
+    expect(screen.queryByText(/An account already exists/)).toBeNull();
+    fireEvent.press(screen.getByRole('button', { name: 'Back' }));
+    expect(screen.getByLabelText('Email').props.value).toBe('existing@example.com');
+    await expect(readPendingSignup()).resolves.toBeNull();
+  });
+
+  it('recovers unconfirmed sign-in even if pending-state storage is unavailable', async () => {
+    jest.mocked(AsyncStorage.getItem).mockRejectedValueOnce(new Error('unavailable'));
+    const screen = render(<SignInScreen initialMode="signIn" />);
+    await act(async () => {});
+    fireEvent.changeText(screen.getByLabelText('Email'), 'tech@example.com');
+    jest.mocked(AsyncStorage.setItem).mockRejectedValueOnce(new Error('unavailable'));
+    fireEvent.changeText(screen.getByLabelText('Password'), 'Password123!');
+    mockSignIn.mockResolvedValueOnce({ error: new Error('Email not confirmed'), session: null });
+    await act(async () => { fireEvent.press(screen.getByRole('button', { name: 'Sign in' })); });
+    expect(screen.getByLabelText('Verification code')).toBeTruthy();
+    fireEvent.changeText(screen.getByLabelText('Verification code'), '12345678');
+    await act(async () => { fireEvent.press(screen.getByRole('button', { name: 'Verify email' })); });
+    expect(mockVerifyOtp).toHaveBeenCalledWith({ email: 'tech@example.com', token: '12345678', type: 'email' });
+  });
+
+  it('keeps verification to two actions and the standard upper-left Back control', async () => {
+    await savePendingSignup('pending@example.com');
+    const screen = render(<SignInScreen initialMode="signIn" />);
+    await screen.findByLabelText('Verification code');
+    expect(screen.getAllByRole('button')).toHaveLength(3);
+    expect(screen.getByRole('button', { name: 'Verify email' }).props.accessibilityState.disabled).toBe(true);
+    expect(screen.getByRole('button', { name: 'Resend email' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Back' })).toBeTruthy();
+    expect(screen.queryByText('Change email')).toBeNull();
+    expect(screen.queryByText('Reset password')).toBeNull();
+    expect(screen.queryByText('Back to sign in')).toBeNull();
+    fireEvent.changeText(screen.getByLabelText('Verification code'), '12345678');
+    expect(screen.getByRole('button', { name: 'Verify email' }).props.accessibilityState.disabled).toBe(false);
+  });
+
+  it('opens on the carousel and requires an explicit account action to show inputs', async () => {
+    const screen = render(<SignInScreen />);
+    expect(screen.queryByLabelText('Email')).toBeNull();
+    expect(await screen.findByRole('button', { name: 'Create account' })).toBeTruthy();
+    fireEvent.press(screen.getByRole('button', { name: 'Sign in' }));
+    fireEvent.changeText(screen.getByLabelText('Email'), 'tech@example.com');
+    fireEvent.press(screen.getByRole('button', { name: 'Back' }));
+    expect(screen.queryByLabelText('Email')).toBeNull();
+    fireEvent.press(screen.getByRole('button', { name: 'Sign in' }));
+    expect(screen.getByLabelText('Email').props.value).toBe('tech@example.com');
+  });
+
+  it('opens the signup form directly from the carousel', async () => {
+    const screen = render(<SignInScreen />);
+    fireEvent.press(await screen.findByRole('button', { name: 'Create account' }));
+    expect(screen.getByText('Create your account')).toBeTruthy();
+    expect(screen.getByRole('checkbox')).toBeTruthy();
+    expect(screen.queryByLabelText('First name')).toBeNull();
+  });
+
+  it('bypasses the default carousel for pending verification', async () => {
+    await savePendingSignup('pending@example.com');
+    const screen = render(<SignInScreen />);
+    expect(await screen.findByLabelText('Verification code')).toBeTruthy();
+  });
+
 });

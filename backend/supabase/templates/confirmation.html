@@ -55,10 +55,17 @@
             <tr>
               <td class="body-text" style="padding:16px 28px 0 28px;font-family:'Ubuntu',ui-sans-serif,system-ui,sans-serif;font-size:15px;line-height:1.6;color:#2b3441;">
                 <p style="margin:0;color:#2b3441;">
-                  Thanks for creating a FieldSoli account for <strong style="color:#2b3441;">{{ .Email }}</strong>. Confirm this address to finish signing up.
+                  Thanks for creating a FieldSoli account for <strong style="color:#2b3441;">{{ .Email }}</strong>.
                 </p>
+                {{ if .Data.signup_legal_v1 }}
+                <p style="margin:16px 0 0;color:#2b3441;">Enter this code in FieldSoli to finish signing up:</p>
+                <p style="margin:16px 0;font-size:24px;font-weight:700;letter-spacing:4px;">{{ .Token }}</p>
+                {{ else }}
+                <p style="margin:16px 0 0;color:#2b3441;">Confirm this address to finish signing up.</p>
+                {{ end }}
               </td>
             </tr>
+            {{ if not .Data.signup_legal_v1 }}
             <tr>
               <td align="center" style="padding:28px 28px 8px 28px;">
                 <table role="presentation" cellspacing="0" cellpadding="0" border="0">
@@ -86,6 +93,7 @@
                 </p>
               </td>
             </tr>
+            {{ end }}
             <tr>
               <td class="body-text" style="padding:24px 28px 28px 28px;font-family:'Ubuntu',ui-sans-serif,system-ui,sans-serif;font-size:12px;line-height:1.6;color:#2b3441;">
                 <p style="margin:0;color:#2b3441;">

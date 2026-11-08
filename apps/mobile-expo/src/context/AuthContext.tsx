@@ -11,12 +11,20 @@ import { clearAnalyticsConsentCache } from '../lib/analytics/consentStorage';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { AUTH_CONFIRM_URL, AUTH_RESET_PASSWORD_URL } from '../lib/authUrls';
 import { newPasswordPolicyError } from '../lib/passwordPolicy';
+import { clearPendingSignup } from '../lib/pendingSignup';
 import { commitPasswordAutofill } from '../lib/passwordAutofill';
 import { observeAddressLocationLifecycle, setAddressLocationAccount } from '../lib/addressLocation';
 
 export type SignUpProfileSeed = {
   firstName: string;
   lastName: string;
+  legalAcceptance?: {
+    accepted: true;
+    termsVersion: string;
+    privacyVersion: string;
+    appVersion: string;
+    platform: string;
+  };
 };
 
 type AuthContextValue = {
@@ -100,6 +108,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (s === null) {
             void clearSignedOutAnalyticsState();
           } else {
+            void clearPendingSignup();
             signedOutAnalyticsClearedRef.current = false;
           }
         }
@@ -124,6 +133,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (next === null) {
         void clearSignedOutAnalyticsState();
       } else {
+        void clearPendingSignup();
         signedOutAnalyticsClearedRef.current = false;
       }
     });
@@ -151,7 +161,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (policyError) return { error: new Error(policyError), session: null };
         const signUpOptions: {
           emailRedirectTo: string;
-          data?: { first_name: string; last_name: string };
+          data?: { first_name: string; last_name: string; signup_legal_v1?: SignUpProfileSeed['legalAcceptance'] };
         } = {
           emailRedirectTo: AUTH_CONFIRM_URL,
         };
@@ -159,6 +169,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           signUpOptions.data = {
             first_name: profile.firstName.trim(),
             last_name: profile.lastName.trim(),
+            ...(profile.legalAcceptance ? { signup_legal_v1: profile.legalAcceptance } : {}),
           };
         }
         const { data, error } = await supabase.auth.signUp({

@@ -1,0 +1,24 @@
+# Data contract
+
+## Boundaries and invariants
+
+| ID | Rule |
+|---|---|
+| DATA-01 | Supabase owns identity/session/verification. Signup uses existing password signup with a bounded acceptance declaration; verification uses email plus code and requires a valid session. Password/code are memory-only and excluded from storage, logs, URLs and analytics. Existing secure auth storage owns session tokens. |
+| DATA-02 | `legal_acceptances` remains canonical: owner UUID, document type, exact version, server received-at timestamp, source, app version/platform. Unique owner/type/version preserves earliest record; account deletion cascades. Timestamp means receipt of acceptance declaration, never retroactively claimed checkbox-click time. |
+| DATA-03 | Proposed signup payload `signup_legal_v1`: explicit accepted=true, termsVersion, privacyVersion, appVersion, platform. Use a private INSERT-only auth.users trigger, security definer with empty search_path, fully qualified names and no exposed callable RPC. It derives user ID from NEW.id, validates bounded fields and known published document versions, inserts both rows atomically with account creation. Absent payload preserves old clients; malformed present payload fails safely. No metadata UPDATE trigger and no later metadata-to-consent backfill. Metadata is user-declared evidence only, never a JWT authorization claim. |
+| DATA-04 | Trigger has no anonymous Data API path; preserve tenant RLS and no client UPDATE/DELETE acceptance grants. Ordinary authenticated reacceptance stays explicit. Resolve membership of exact required versions, not merely latest-by-time, so old clients cannot undo a newer accepted version. Never accept unknown/future versions. Missing historical evidence must not be invented. |
+| DATA-05 | Pending verification envelope contains normalized email and creation time only, in device-local AsyncStorage, expires after 24h and clears on authentication, email change, or explicit cancellation. Stored state is only a navigation hint; signing in while unconfirmed or selecting Enter verification code restores access even if storage has failed or expired. OTP expiry is provider-owned, not this UI TTL. Do not store acceptance solely on-device; cross-device verification must retain server evidence. |
+| DATA-06 | No post-job invitation marker is created. Retain existing consent storage and the blocking pre-Home modal per owner revision. |
+| DATA-07 | Existing analytics consent table/cache remain authoritative. Missing is not granted or withdrawn. No thanks uses withdrawal. No capture/queue/identify/attribution before explicit valid consent, no retroactive first-job/signup events after grant. Account switches isolate all state. |
+| DATA-08 | Names remain nullable and editable in existing Profile; no backfill or forced profile-completion gate. Existing customer/document/business settings requirements remain contextual. |
+
+## Interfaces, compatibility and retention
+
+Auth payload version is additive. Trigger must coexist with private.handle_new_user profile creation; inspect trigger order and verify the full transaction. Never replace unrelated profile logic. Preserve legacy clients without payload: they retain genuine acceptance on sign-in. Use existing source mobile_signup; expose no service key. Acceptance allowlist must derive from verified published document history; current compiled constants are not proof of publication. B1 verified both current published versions as 2026-11-02; initial allowlist contains those versions, preserving future additions through reviewed migrations.
+
+Email confirmation template must support both code and old link during mixed-client rollout; do not change reset/invite/email-change templates inadvertently. Do not consume tokens on browser page render or log URL fragments. Codes and links share single-use behavior: recovery must explain a consumed code and offer sign-in/resend without automatic account creation.
+
+No historical data migration or new consent table is proposed. Generate additive trigger migration only during authorized implementation; test old-client and rollback behavior before any deployment. Rollback mobile retains durable legal rows; keep compatible template/trigger until old and new clients are supported. Operational logs must redact email, code, tokens and passwords; no new analytics events are required.
+
+Cost: existing Supabase/Auth/SMTP dependencies; one confirmation email plus explicit bounded resends. No new paid service. Hosted tier, send limits, OTP length/expiry, template and SMTP provider quotas require read-only verification (B2); do not assume local config equals production. Local Mailpit provides no-cost functional tests; real SMTP and native autofill still require sandbox/device proof. No paid-tier change authorized. Lock-in unchanged except the small provider-specific auth hook; table records remain ordinary Postgres rows.

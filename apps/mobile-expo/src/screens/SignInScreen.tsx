@@ -1,3 +1,4 @@
+import { color } from '@fieldsolo/design-system/lib/tokens';
 import { useFonts } from 'expo-font';
 import {
   fieldsoloExpoFontAssets,
@@ -7,6 +8,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
+  BackHandler,
   Image,
   Keyboard,
   KeyboardAvoidingView,
@@ -23,7 +25,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { recordSignupLegalAcceptances } from '@fieldsolo/api-client';
 
+import { clearPendingSignup, readPendingSignup, savePendingSignup } from '../lib/pendingSignup';
+
+import { AuthWelcome } from './AuthWelcome';
 import { useAuth } from '../context/AuthContext';
+import { PlatformHeaderAction } from '../components/platform/PlatformHeaderAction';
+import { TopHeaderBackIcon } from '../components/figma-icons/TopHeaderIcons';
 import { CanvasTiledBackground } from '../components/CanvasTiledBackground';
 import { analytics, emailProperties, errorProperties } from '../lib/analytics';
 import { analyticsConfig } from '../lib/analytics/config';
@@ -73,39 +80,25 @@ function authErrorMessage(error: unknown): string {
   return message || 'Something went wrong. Try again.';
 }
 
-function isInvalidLoginCredentials(error: unknown): boolean {
-  const message = error instanceof Error
-    ? error.message
-    : typeof error === 'object' && error !== null && 'message' in error
-      ? String((error as { message: unknown }).message)
-      : String(error);
-  return message.toLowerCase().includes('invalid login credentials');
-}
-
-function isEmailNotConfirmed(error: unknown): boolean {
-  const message = error instanceof Error
-    ? error.message
-    : typeof error === 'object' && error !== null && 'message' in error
-      ? String((error as { message: unknown }).message)
-      : String(error);
-  return message.toLowerCase().includes('email not confirmed');
-}
-
-export function SignInScreen() {
+export function SignInScreen({ initialMode = 'welcome' }: { initialMode?: 'welcome' | 'signIn' | 'signUp' } = {}) {
   const insets = useSafeAreaInsets();
   const { columnStyle } = useContentColumn();
   const scrollY = useMemo(() => new Animated.Value(0), []);
   const { signIn, signUp, requestPasswordReset, setSignupLegalPending } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
+  const [verificationCode, setVerificationCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [mode, setMode] = useState<
-    'signIn' | 'signUp' | 'checkEmail' | 'forgotPassword' | 'resetEmailSent'
-  >('signIn');
+  const restoreAllowed = useRef(true);
+  const [restoringEntry, setRestoringEntry] = useState(initialMode === 'welcome');
+  const [mode, setModeState] = useState<
+    'welcome' | 'signIn' | 'signUp' | 'checkEmail' | 'forgotPassword' | 'resetEmailSent'
+  >(initialMode);
+  const setMode = useCallback<typeof setModeState>((next) => {
+    restoreAllowed.current = false;
+    setModeState(next);
+  }, []);
   const [pendingConfirmEmail, setPendingConfirmEmail] = useState('');
   const [pendingResetEmail, setPendingResetEmail] = useState('');
   const [resendBusy, setResendBusy] = useState(false);
@@ -116,10 +109,8 @@ export function SignInScreen() {
   const [passwordFocused, setPasswordFocused] = useState(false);
   const previousModeRef = useRef(mode);
   const scrollViewRef = useRef<ScrollView>(null);
-  const lastNameInputRef = useRef<TextInput>(null);
   const emailInputRef = useRef<TextInput>(null);
   const passwordInputRef = useRef<TextInput>(null);
-  const confirmPasswordInputRef = useRef<TextInput>(null);
 
   const scrollInputIntoView = useCallback((nativeTarget?: number) => {
     if (nativeTarget == null) return;
@@ -131,7 +122,7 @@ export function SignInScreen() {
   }, []);
 
   useEffect(() => {
-    analytics.capture('auth_screen_viewed', { mode });
+    if (mode !== 'welcome') analytics.capture('auth_screen_viewed', { mode });
   }, [mode]);
 
   useEffect(() => {
@@ -140,7 +131,7 @@ export function SignInScreen() {
 
   useEffect(() => {
     if (previousModeRef.current === mode) return;
-    analytics.capture('auth_mode_changed', {
+    if (mode !== 'welcome' && previousModeRef.current !== 'welcome') analytics.capture('auth_mode_changed', {
       from_mode: previousModeRef.current,
       to_mode: mode,
     });
@@ -148,18 +139,48 @@ export function SignInScreen() {
   }, [mode]);
 
   useEffect(() => {
+    let active = true;
     const openSignInFromDeepLink = (url: string | null) => {
       if (!url || !isAppSignInDeepLink(url)) return;
       setMode('signIn');
       setError(null);
       setResendNotice(null);
     };
-    void Linking.getInitialURL().then(openSignInFromDeepLink);
+    void Promise.all([Linking.getInitialURL(), readPendingSignup()]).then(([url, pendingEmail]) => {
+      if (!active) return;
+      if (url) { openSignInFromDeepLink(url); return; }
+      if (restoreAllowed.current && pendingEmail) {
+        setEmail(pendingEmail);
+        setPendingConfirmEmail(pendingEmail);
+        setMode('checkEmail');
+      }
+    }).catch(() => undefined).finally(() => { if (active && initialMode === 'welcome') setRestoringEntry(false); });
     const subscription = Linking.addEventListener('url', ({ url }) => {
       openSignInFromDeepLink(url);
     });
+    return () => { active = false; subscription.remove(); };
+  }, [setMode, initialMode]);
+
+  const onAuthBack = useCallback(() => {
+    if (busy || resendBusy) return;
+    Keyboard.dismiss();
+    if (mode === 'checkEmail') {
+      void clearPendingSignup();
+      setEmail(pendingConfirmEmail);
+      setVerificationCode('');
+      setMode('signIn');
+    } else {
+      setMode('welcome');
+    }
+    setError(null);
+    setResendNotice(null);
+  }, [busy, resendBusy, mode, pendingConfirmEmail, setMode]);
+
+  useEffect(() => {
+    if (mode !== 'signIn' && mode !== 'signUp' && mode !== 'checkEmail') return;
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => { onAuthBack(); return true; });
     return () => subscription.remove();
-  }, []);
+  }, [mode, onAuthBack]);
 
   const [fontsLoaded] = useFonts(fieldsoloExpoFontAssets);
 
@@ -180,11 +201,7 @@ export function SignInScreen() {
   );
 
   const passwordMeetsPolicy = newPasswordMeetsPolicy(password);
-  const passwordsMatch = password.length > 0 && password === confirmPassword;
-  const showPasswordMismatch =
-    mode === 'signUp' && confirmPassword.length > 0 && password !== confirmPassword;
-  const canCreateAccount =
-    passwordMeetsPolicy && passwordsMatch && legalAccepted && !busy;
+  const canCreateAccount = passwordMeetsPolicy && legalAccepted && !busy;
   const primaryDisabled =
     mode === 'signUp' ? !canCreateAccount : mode === 'forgotPassword' ? busy : busy;
 
@@ -226,9 +243,21 @@ export function SignInScreen() {
     }
   }, [email, requestPasswordReset]);
 
+  const continueVerification = useCallback(async (targetEmail: string) => {
+    restoreAllowed.current = false;
+    setEmail(targetEmail);
+    setPendingConfirmEmail(targetEmail);
+    setPassword('');
+    setVerificationCode('');
+    setError(null);
+    setResendNotice(null);
+    setMode('checkEmail');
+    await savePendingSignup(targetEmail);
+  }, [setMode]);
+
   const onResendConfirmation = useCallback(async () => {
     const targetEmail = pendingConfirmEmail || email.trim().toLowerCase();
-    if (!targetEmail) return;
+    if (!targetEmail || busy || resendBusy) return;
     setResendNotice(null);
     setResendBusy(true);
     try {
@@ -238,18 +267,41 @@ export function SignInScreen() {
         options: { emailRedirectTo: AUTH_CONFIRM_URL },
       });
       if (resendErr) {
-        setResendNotice(authErrorMessage(resendErr));
+        setResendNotice(resendErr.status === 429
+          ? 'Please wait before requesting another email.'
+          : 'Could not request a confirmation email. Try again or sign in.');
         return;
       }
-      setResendNotice('Confirmation email sent. Check your inbox.');
-    } catch (e) {
-      setResendNotice(authErrorMessage(e));
+      setResendNotice('If this email needs confirmation, check your inbox for a code or confirmation link.');
+    } catch {
+      setResendNotice('Could not request a confirmation email. Check your connection and try again.');
     } finally {
       setResendBusy(false);
     }
-  }, [email, pendingConfirmEmail]);
+  }, [email, pendingConfirmEmail, busy, resendBusy]);
+
+  const onVerifyCode = useCallback(async () => {
+    if (busy || resendBusy || !verificationCode.trim() || !pendingConfirmEmail) return;
+    setBusy(true);
+    setError(null);
+    Keyboard.dismiss();
+    try {
+      const { data, error: verifyError } = await supabase.auth.verifyOtp({
+        email: pendingConfirmEmail,
+        token: verificationCode.trim(),
+        type: 'email',
+      });
+      if (verifyError || !data.session) setError('That code is invalid or has expired. Check the code or request a new one.');
+      else { setVerificationCode(''); await clearPendingSignup(); }
+    } catch {
+      setError('Could not verify your email. Check your connection and try again.');
+    } finally {
+      setBusy(false);
+    }
+  }, [busy, resendBusy, pendingConfirmEmail, verificationCode]);
 
   const onSubmit = useCallback(async () => {
+    restoreAllowed.current = false;
     setError(null);
     const trimmed = email.trim().toLowerCase();
     if (!trimmed || !password) {
@@ -264,14 +316,6 @@ export function SignInScreen() {
       const policyError = newPasswordPolicyError(password);
       if (policyError) {
         setError(policyError);
-        return;
-      }
-      if (password !== confirmPassword) {
-        setError('Passwords do not match.');
-        return;
-      }
-      if (!firstName.trim() || !lastName.trim()) {
-        setError('Enter your first and last name.');
         return;
       }
       if (!legalAccepted) {
@@ -297,8 +341,11 @@ export function SignInScreen() {
             ...emailProperties(trimmed),
             ...errorProperties(err),
           });
-          setError(authErrorMessage(err));
+          if (err.code === 'email_not_confirmed' || err.message.toLowerCase().includes('email not confirmed')) {
+            await continueVerification(trimmed);
+          } else setError(authErrorMessage(err));
         } else {
+          await clearPendingSignup();
           analytics.capture('sign_in_succeeded', {
             ...emailProperties(trimmed),
           });
@@ -306,14 +353,19 @@ export function SignInScreen() {
       } else {
         analytics.capture('sign_up_submitted', {
           ...emailProperties(trimmed),
-          first_name_present: firstName.trim().length > 0,
-          last_name_present: lastName.trim().length > 0,
         });
         // First/last name go into raw_user_meta_data so the
         // public.handle_new_user trigger can seed the profiles row.
         const { error: signUpErr, session: signUpSession } = await signUp(trimmed, password, {
-          firstName: firstName.trim(),
-          lastName: lastName.trim(),
+          firstName: '',
+          lastName: '',
+          legalAcceptance: {
+            accepted: true,
+            termsVersion: REQUIRED_TERMS_VERSION,
+            privacyVersion: REQUIRED_PRIVACY_VERSION,
+            appVersion: analyticsConfig.appVersion,
+            platform: analyticsConfig.platform,
+          },
         });
         if (signUpErr) {
           analytics.capture('sign_up_failed', {
@@ -321,7 +373,9 @@ export function SignInScreen() {
             ...emailProperties(trimmed),
             ...errorProperties(signUpErr),
           });
-          setError(authErrorMessage(signUpErr));
+          if (('code' in signUpErr && signUpErr.code === 'user_already_exists') || signUpErr.message.toLowerCase().includes('user already registered')) {
+            await continueVerification(trimmed);
+          } else setError(authErrorMessage(signUpErr));
           return;
         }
         analytics.capture('sign_up_succeeded', {
@@ -330,37 +384,15 @@ export function SignInScreen() {
         // Do not set signupLegalPending until we have a session. That flag
         // replaces SignInScreen with a spinner in App.tsx; flipping it early
         // unmounts this screen and drops the check-email state.
-        let acceptedUserId = signUpSession?.user.id ?? null;
+        const acceptedUserId = signUpSession?.user.id ?? null;
         if (!signUpSession) {
-          const { error: signInErr, session: immediateSession } = await signIn(
-            trimmed,
-            password,
-          );
-            if (signInErr) {
-              if (isInvalidLoginCredentials(signInErr)) {
-                setError(
-                  'An account already exists for this email. Sign in or reset your password.',
-                );
-                return;
-              }
-              if (isEmailNotConfirmed(signInErr)) {
-                await commitPasswordAutofill();
-                setPassword('');
-                setConfirmPassword('');
-                setPendingConfirmEmail(trimmed);
-                setResendNotice(null);
-                setMode('checkEmail');
-                announceAccessibilityMessage(
-                  `Check your email. We sent a confirmation link to ${trimmed}.`,
-                );
-                return;
-              }
-              setError(authErrorMessage(signInErr));
-              return;
-            }
-          acceptedUserId = immediateSession?.user.id ?? null;
+          await commitPasswordAutofill();
+          await continueVerification(trimmed);
+          announceAccessibilityMessage('Check your email, or sign in if you already have an account.');
+          return;
         }
 
+        await clearPendingSignup();
         setSignupLegalPending(true);
         try {
           await recordSignupLegalAcceptances(supabase, {
@@ -405,9 +437,9 @@ export function SignInScreen() {
     } finally {
       setBusy(false);
     }
-  }, [email, password, confirmPassword, firstName, lastName, legalAccepted, mode, setSignupLegalPending, signIn, signUp, requestPasswordReset]);
+  }, [email, password, legalAccepted, mode, setSignupLegalPending, signIn, signUp, requestPasswordReset, continueVerification]);
 
-  if (!fontsLoaded) {
+  if (!fontsLoaded || restoringEntry) {
     return (
       <View style={[styles.center, { paddingTop: insets.top }]}>
         <CanvasTiledBackground scrollY={scrollY} />
@@ -416,11 +448,22 @@ export function SignInScreen() {
     );
   }
 
+  if (mode === 'welcome') {
+    return <AuthWelcome onSignIn={() => setMode('signIn')} onCreateAccount={() => setMode('signUp')} />;
+  }
+
   const gap = space('Spacing/20');
 
   return (
     <View style={styles.root}>
       <CanvasTiledBackground scrollY={scrollY} />
+      {mode === 'checkEmail' || mode === 'signIn' || mode === 'signUp' ? (
+        <View style={{ paddingTop: insets.top + space('Spacing/8'), paddingHorizontal: space('Spacing/24') }}>
+          <PlatformHeaderAction accessibilityLabel="Back" disabled={busy || resendBusy} onPress={onAuthBack}>
+            <TopHeaderBackIcon size={28} color={fg.primary} />
+          </PlatformHeaderAction>
+        </View>
+      ) : null}
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.flex}
@@ -438,7 +481,7 @@ export function SignInScreen() {
               ? styles.scrollContentCentered
               : styles.scrollContentTop,
             {
-              paddingTop: insets.top + gap,
+              paddingTop: mode === 'checkEmail' || mode === 'signIn' || mode === 'signUp' ? gap : insets.top + gap,
               paddingBottom: insets.bottom + gap,
             },
           ]}
@@ -472,16 +515,36 @@ export function SignInScreen() {
                   Check your email
                 </Text>
                 <Text style={[text.body, { color: fg.secondary, marginBottom: space('Spacing/24') }]}>
-                  We sent a confirmation link to{' '}
-                  <Text style={[text.bodySemi, { color: fg.primary }]}>{pendingConfirmEmail}</Text>.
-                  Open the email and tap Confirm email to activate your account.
+                  Enter the verification code for{' '}<Text style={[text.bodySemi, { color: fg.primary }]}>{pendingConfirmEmail}</Text>.
                 </Text>
+                <DsTextInput
+                  accessibilityLabel="Verification code"
+                  value={verificationCode}
+                  onChangeText={setVerificationCode}
+                  autoComplete="one-time-code"
+                  textContentType="oneTimeCode"
+                  keyboardType="number-pad"
+                  editable={!busy}
+                  placeholder="Verification code"
+                  style={[styles.input, text.body, { color: fg.primary, marginBottom: gap }]}
+                />
+                {error ? <Text style={[text.caption, { color: '#b00020', marginBottom: gap }]}>{error}</Text> : null}
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: busy || resendBusy || !verificationCode.trim(), busy }}
+                  disabled={busy || resendBusy || !verificationCode.trim()}
+                  onPress={() => void onVerifyCode()}
+                  style={({ pressed }) => [styles.primaryButton, (busy || resendBusy || !verificationCode.trim()) && styles.primaryButtonDisabled, pressed && styles.primaryButtonPressed, { marginBottom: gap }]}
+                >
+                  {busy ? <ActivityIndicator color="#fff" /> : <Text style={[text.bodySemi, { color: '#fff' }]}>Verify email</Text>}
+                </Pressable>
                 {resendNotice ? (
                   <Text
+                    accessibilityLiveRegion="polite"
                     style={[
                       text.caption,
                       {
-                        color: resendNotice.includes('sent') ? fg.secondary : '#b00020',
+                        color: resendNotice.startsWith('If this email') ? fg.secondary : '#b00020',
                         marginBottom: gap,
                       },
                     ]}
@@ -491,33 +554,22 @@ export function SignInScreen() {
                 ) : null}
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityState={{ disabled: resendBusy, busy: resendBusy }}
+                  accessibilityState={{ disabled: busy || resendBusy, busy: resendBusy }}
                   onPress={() => void onResendConfirmation()}
-                  disabled={resendBusy}
+                  disabled={busy || resendBusy}
                   style={({ pressed }) => [
-                    styles.primaryButton,
-                    resendBusy && styles.primaryButtonDisabled,
-                    !resendBusy && pressed && styles.primaryButtonPressed,
+                    styles.secondaryButton,
+                    (busy || resendBusy) && styles.primaryButtonDisabled,
+                    pressed && styles.primaryButtonPressed,
                   ]}
                 >
                   {resendBusy ? (
-                    <ActivityIndicator color="#fff" />
+                    <ActivityIndicator color={fg.primary} />
                   ) : (
-                    <Text style={[text.bodySemi, { color: '#fff' }]}>Resend email</Text>
+                    <Text style={[text.bodySemi, { color: fg.primary }]}>Resend email</Text>
                   )}
                 </Pressable>
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={() => {
-                    setMode('signIn');
-                    setResendNotice(null);
-                    setError(null);
-                  }}
-                  disabled={resendBusy}
-                  style={styles.modeSwitch}
-                >
-                  <Text style={[text.bodySemi, { color: fg.primary }]}>Back to sign in</Text>
-                </Pressable>
+
               </>
             ) : mode === 'resetEmailSent' ? (
               <>
@@ -560,71 +612,6 @@ export function SignInScreen() {
                   : 'Sign in to keep track of your jobs, time & earnings.'}
             </Text>
 
-            {mode === 'signUp' ? (
-              <>
-                <Text
-                  style={[
-                    text.caption,
-                    { color: fg.secondary, marginBottom: space('Spacing/8') },
-                  ]}
-                >
-                  First name
-                </Text>
-                <DsTextInput
-                  value={firstName}
-                  onChangeText={(value) => {
-                    setFirstName(value);
-                    if (error) setError(null);
-                  }}
-                  accessibilityLabel="First name"
-                  autoCapitalize="words"
-                  autoComplete="name-given"
-                  autoCorrect={false}
-                  textContentType="givenName"
-                  returnKeyType="next"
-                  onFocus={(event) => scrollInputIntoView(event?.nativeEvent.target)}
-                  onSubmitEditing={() => lastNameInputRef.current?.focus()}
-                  placeholder="Alex"
-                  placeholderTextColor={fg.secondary}
-                  style={[styles.input, text.body, { color: fg.primary }]}
-                  editable={!busy}
-                />
-                <Text
-                  style={[
-                    text.caption,
-                    {
-                      color: fg.secondary,
-                      marginBottom: space('Spacing/8'),
-                      marginTop: gap,
-                    },
-                  ]}
-                >
-                  Last name
-                </Text>
-                <DsTextInput
-                  ref={lastNameInputRef}
-                  value={lastName}
-                  onChangeText={(value) => {
-                    setLastName(value);
-                    if (error) setError(null);
-                  }}
-                  accessibilityLabel="Last name"
-                  autoCapitalize="words"
-                  autoComplete="name-family"
-                  autoCorrect={false}
-                  textContentType="familyName"
-                  returnKeyType="next"
-                  onFocus={(event) => scrollInputIntoView(event?.nativeEvent.target)}
-                  onSubmitEditing={() => emailInputRef.current?.focus()}
-                  placeholder="Builder"
-                  placeholderTextColor={fg.secondary}
-                  style={[styles.input, text.body, { color: fg.primary }]}
-                  editable={!busy}
-                />
-                <View style={{ height: gap }} />
-              </>
-            ) : null}
-
             <Text style={[text.caption, { color: fg.secondary, marginBottom: space('Spacing/8') }]}>
               Email
             </Text>
@@ -632,6 +619,7 @@ export function SignInScreen() {
               ref={emailInputRef}
               value={email}
               onChangeText={(value) => {
+                  restoreAllowed.current = false;
                 setEmail(value);
                 if (error) setError(null);
               }}
@@ -672,6 +660,7 @@ export function SignInScreen() {
                 ref={passwordInputRef}
                 value={password}
                 onChangeText={(value) => {
+                  restoreAllowed.current = false;
                   setPassword(value);
                   if (error) setError(null);
                 }}
@@ -686,11 +675,8 @@ export function SignInScreen() {
                 autoCorrect={false}
                 secureTextEntry={!passwordVisible}
                 textContentType={mode === 'signIn' ? 'password' : 'newPassword'}
-                returnKeyType={mode === 'signUp' ? 'next' : 'done'}
-                onSubmitEditing={() => {
-                  if (mode === 'signUp') confirmPasswordInputRef.current?.focus();
-                  else void onSubmit();
-                }}
+                returnKeyType="done"
+                onSubmitEditing={() => { if (mode === 'signIn' || canCreateAccount) void onSubmit(); }}
                 placeholder={passwordFocused ? undefined : '••••••••'}
                 placeholderTextColor={fg.secondary}
                 style={[styles.passwordInput, text.body, { color: fg.primary }]}
@@ -742,42 +728,7 @@ export function SignInScreen() {
                     {NEW_PASSWORD_REQUIREMENT}
                   </Text>
                 ) : null}
-                <Text
-                  style={[
-                    text.caption,
-                    { color: fg.secondary, marginBottom: space('Spacing/8'), marginTop: gap },
-                  ]}
-                >
-                  Confirm password
-                </Text>
-                <DsTextInput
-                  ref={confirmPasswordInputRef}
-                  value={confirmPassword}
-                  onChangeText={(value) => {
-                    setConfirmPassword(value);
-                    if (error) setError(null);
-                  }}
-                  accessibilityLabel="Confirm password"
-                  autoCapitalize="none"
-                  autoComplete="new-password"
-                  autoCorrect={false}
-                  secureTextEntry={!passwordVisible}
-                  textContentType="newPassword"
-                  returnKeyType="done"
-                  onFocus={(event) => scrollInputIntoView(event?.nativeEvent.target)}
-                  onSubmitEditing={() => {
-                    if (canCreateAccount) void onSubmit();
-                  }}
-                  placeholder="Re-enter password"
-                  placeholderTextColor={fg.secondary}
-                  style={[styles.input, text.body, { color: fg.primary }]}
-                  editable={!busy}
-                />
-                {showPasswordMismatch ? (
-                  <Text style={[text.caption, { color: '#b00020', marginTop: space('Spacing/8') }]}>
-                    Passwords do not match.
-                  </Text>
-                ) : null}
+
               </>
             ) : null}
               </>
@@ -867,7 +818,6 @@ export function SignInScreen() {
                   return next;
                 });
                 setPassword('');
-                setConfirmPassword('');
                 setPasswordVisible(false);
                 setError(null);
               }}
@@ -882,6 +832,13 @@ export function SignInScreen() {
                     : 'Back to sign in'}
               </Text>
             </Pressable>
+
+            {mode === 'signIn' && pendingConfirmEmail && email.trim().toLowerCase() === pendingConfirmEmail ? (
+              <Pressable accessibilityRole="button" disabled={busy} style={{ alignSelf: 'flex-start', marginTop: space('Spacing/16'), minHeight: 44, justifyContent: 'center' }}
+                onPress={() => void continueVerification(email.trim().toLowerCase())}>
+                <Text style={[text.caption, styles.consentLink]}>Continue email verification</Text>
+              </Pressable>
+            ) : null}
 
             {mode === 'signIn' ? (
               <Text style={[text.caption, styles.legalFooter, { color: fg.secondary, marginTop: gap }]}>
@@ -981,12 +938,22 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     ...cardShadowRn,
-    backgroundColor: '#1a1a1a',
+    backgroundColor: color('Brand/Primary'),
     borderRadius: 8,
     paddingVertical: 14,
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 48,
+  },
+  secondaryButton: {
+    backgroundColor: 'transparent',
+    borderColor: 'rgba(43,52,65,0.18)',
+    borderWidth: 1,
+    borderRadius: 8,
+    minHeight: 48,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   primaryButtonDisabled: {
     opacity: 0.45,
