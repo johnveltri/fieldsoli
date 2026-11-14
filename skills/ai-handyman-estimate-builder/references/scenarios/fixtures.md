@@ -6,6 +6,17 @@
 
 “What will the narrower vanity expose at the floor and wall?” Finished surfaces verified → no restoration line. Missing tile or unpainted strip visible or measurable now → settle coverage, patch or finish boundary. Overlooked case: a supplied pop-up drain may require an overflow-compatible basin. Verify the pair before promising installation. If accessible stops already fail to isolate, agree shutdown responsibility and timing in advance. Skip asking the brand of the old faucet when confirmed dimensions and connections settle fit.
 
+## Running toilet or tank that drains with the supply off
+
+Ask which water level drops, whether water appears outside, and whether the flush mechanism seats fully. Verify the installed mechanism and access before selecting a gasket. For a proposed gasket repair, keep inspection, part, labor and testing together when one price covers them. Render genuinely unresolved discoveries as separate homeowner rows. Examples when the reported symptoms support both:
+
+| Possible work | Finding that changes the scope | Amount |
+|---|---|---:|
+| Replace the flush-valve assembly instead of the gasket repair | Inspection shows the valve body or sealing surface is damaged. Show the finding and quote the revised repair. | TBD |
+| Repair or replace the fill valve | After the tank holds water, the fill valve still drips at its normal shutoff level. Show the continued leak and quote the additional work. | TBD |
+
+Obtain approval before proceeding. If testing settles either concern, remove that conditional row.
+
 ## Toilet replacement
 
 “Have you verified the rough-in from the finished wall and the tank clearance for this model?” Confirmed → include setting that toilet, reconnecting and testing. Known mismatch → owner exchanges or selects another fixture before scheduling. “Does the base rock, and what can you actually see of the floor and flange?” Known uneven finish → settle how a stable set will be delivered; concealed broken flange → show it after lifting and obtain a repair price approval before proceeding. Soft subfloor outside the contractor's scope → stop and discuss who assesses it.

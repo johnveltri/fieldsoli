@@ -44,7 +44,7 @@ For any priced request, use the [pricing evidence guide](../pricing/guide.md) al
 
 - [Doors and exterior carpentry](carpentry.md) covers interior slabs, exterior prehung units, decks, stairs, rails and localized exterior trim.
 - [Surfaces and mounting](surfaces.md) covers drywall finish, flooring and transitions, shelving, cabinets and TVs.
-- [Plumbing fixtures and owner purchases](fixtures.md) covers faucets, vanities, toilets and customer-supplied fixtures or hardware.
+- [Plumbing fixtures and owner purchases](fixtures.md) covers running or dripping toilets, tank leak repairs, fixture swaps and customer-supplied hardware.
 
 ## Extend the library
 

@@ -1,0 +1,101 @@
+id,request,initial_review,initial_amount_rows,second_review,last_replayed,final_format,final_amount_rows,final_condition_or_option_rows,review_focus,final_review
+1,My office door rubs. Can you replace it with a slab like the others?,pass,2,pass,full second run,table,4,1,Fit the slab; price jamb or hinge-mount correction separately if support fails.,pass
+2,Cold air comes in under our front door. We already ordered the replacement.,revise,1,pass,full second run,table,2,0,"Show the ordered replacement installation pending type and fit, as well as the check.",pass
+3,Our upstairs leak left a brown patch on the dining room ceiling. Can you make it disappear?,pass,3,pass,full second run,table,4,2,Restore the stained ceiling after the leak stops; distinguish wet or deteriorated material.,pass
+4,Could you patch the holes the electrician left? Our wall has a texture.,pass,2,revise,targeted third run,table,3,0,Patch the openings and match the texture; settle the finish boundary up front.,pass
+5,The middle plank in my click-floor is gouged. Can you just swap it?,pass,1,pass,full second run,table,4,2,Include access and reinstatement in replacing the matching plank.,pass
+6,Please replace our bedroom carpet with vinyl. I want the door to still swing.,revise,3,pass,full second run,table,6,2,Include the transition and clarify door fitting if the raised finish obstructs swing.,pass
+7,The toilet rocks. Do we need to buy a new one?,pass,4,pass,full second run,table,5,3,"Separate reset, broken flange, soft floor and cracked-porcelain replacement.",pass
+8,Could you put this wider vanity where the little one is?,pass,3,pass,full second run,table,5,2,"Wider vanity fit, restoration boundaries and incompatible services affect the scope.",pass
+9,The white seam along my tub is peeling. Can you redo that this week?,pass,2,pass,full second run,table,2,1,Renew the seam; distinguish failed adjacent material from sealant work.,pass
+10,We bought a TV and want it up over the mantel with no dangling wires.,pass,3,pass,full second run,table,5,2,"Mounting, cable treatment and a possible electrician need separate coverage.",pass
+11,Can you hang three heavy floating shelves on my plaster wall?,pass,2,pass,full second run,table,3,1,Hang three shelves subject to support; distinguish opening and restoring plaster for backing.,pass
+12,One kitchen cabinet door hangs crooked. Can you make it shut again?,pass,3,pass,full second run,table,3,2,Hinge adjustment and a failed mounting or hinge have different work scopes.,pass
+13,The big pantry drawer sticks halfway. Is it worth replacing the whole thing?,pass,3,pass,full second run,table,3,2,Diagnose the sticking drawer before pricing a slide or box replacement.,pass
+14,Can you fix the ripped screen the cat got through?,pass,2,pass,full second run,table,3,2,Rescreen the panel; a failed frame is a conditional repair.,pass
+15,Our double-pane window stays cloudy after cleaning. Can you reseal it?,pass,3,pass,full second run,table,3,1,Diagnostic/measurement first; glass or sash solutions depend on the affected assembly.,pass
+16,Please fix our front lock; my key works with the door open.,pass,2,pass,full second run,table,3,2,A key that works with the door open calls for alignment checks before lock replacement.,pass
+17,A corner of the trim by our garage feels soft. Can you patch the bad bit?,pass,3,pass,full second run,table,5,3,"Distinguish limited trim replacement, extra affected length and a framing handoff.",pass
+18,Can you put a grab bar in the shower where my mom reaches?,pass,2,pass,full second run,table,3,1,Installation depends on proper support; extra backing or a different position is a decision.,pass
+19,I'd like that giant bathroom mirror removed and saved for my sister.,pass,2,pass,full second run,table,3,1,Scope removal with salvage limits; wall restoration can have its own price.,pass
+20,Could you assemble the bunk bed before our guests arrive?,pass,1,pass,full second run,table,3,1,Kit assembly includes safety-critical setup; damage or missing parts may delay the visit.,pass
+21,My closet doors jump out of their track. Can you make them work?,pass,3,pass,full second run,table,3,2,Adjust the track and identify failed guides/rollers when applicable.,pass
+22,We have six sets of inside-mount blinds. Can you install them all?,pass,1,pass,full second run,table,3,1,Six owner-supplied blinds; fit and openings need checking before installation.,pass
+23,Can you smooth the ceiling around the new light? The electrician left it rough.,pass,2,revise,targeted third run,table,4,3,Confirm patch/finish boundary and who would remove the light if access required it.,pass
+24,Can you finish the baseboard after our new flooring went in?,pass,1,pass,full second run,table,3,1,Price the measured trim run and identify finish responsibilities.,pass
+25,"Can you fix a cabinet pull, the sticking pantry latch and a loose towel ring in one visit?",revise,5,pass,full second run,table,6,3,Show each of the three repairs; independently failed mounts and hardware need identifiable prices.,pass
+26,The old dishwasher died. Can you install the new one and take the old one?,pass,3,pass,full second run,table,6,3,Show installation and requested removal; trapped-unit access can change the price.,pass
+27,"We never had a dishwasher, but could you put one in the cabinet by the sink?",revise,3,pass,full second run,table,9,4,Separate installation and cabinet preparation from any missing plumbing/electrical services.,pass
+28,Can you get our new refrigerator through these narrow doors and hook it up?,pass,3,revise,targeted third run,table,6,3,"Separate access, refrigerator setup and the possible water connection.",pass
+29,I ordered a gas range to replace an electric one. Can you connect it?,pass,4,pass,full second run,table,4,2,Identify gas-service and electrical prerequisites before pricing the appliance hookup.,pass
+30,Will you fit the induction cooktop where our old one sits?,pass,4,pass,full second run,table,5,3,"Cooktop fit, electrical work and any counter modification have different price owners.",pass
+31,Can you hang the new microwave? We'd like it to vent outside.,pass,3,revise,targeted third run,table,6,4,Distinguish mounting from connecting or creating an exterior exhaust route.,pass
+32,We have a hood in a box and want someone to install it for $200.,revise,2,pass,full second run,table,7,5,Keep the owner's $200 target separate; identify ducted or recirculating setup.,pass
+33,Could you replace our wall oven without touching the cabinets?,pass,2,pass,full second run,table,3,1,Verify fit before installation; the owner explicitly wants to retain the cabinets untouched.,pass
+34,Can you stack my dryer on my washer to free up floor space?,pass,2,pass,full second run,table,3,1,Verify both models and stacking kit; connection and testing require a supported combination.,pass
+35,The new dryer is here. Can you move the dryer cord from the old machine?,pass,2,pass,full second run,table,4,2,"Cord reuse depends on condition, listing and receptacle; replacement can be an alternative.",pass
+36,Our ventless dryer is arriving. What do you need for the install?,pass,1,pass,full second run,table,4,2,Set up a ventless dryer with the model's collection or drain arrangement.,pass
+37,Can we move our washer from the basement to the upstairs closet?,revise,3,pass,full second run,table,11,6,"Separate relocation from new upstairs services, access and restoration if needed.",pass
+38,We want a new disposal where the old one leaks.,pass,1,pass,full second run,table,3,1,Identify the leaking connection/assembly; retain the disposal replacement price boundary.,pass
+39,Can you install a built-in ice maker in this empty wet bar opening?,revise,2,pass,full second run,table,10,5,"Identify missing water/drain arrangements, including a pump only if required and supported.",pass
+40,Can you put our freestanding wine cooler behind a cabinet door?,revise,1,pass,full second run,table,4,2,Check permitted ventilation and show a feasible placement path without promising enclosure.,pass
+41,Can you freshen up our bathroom without tearing into the shower?,revise,1,pass,full second run,table,5,4,A cosmetic refresh needs identified selections or a walkthrough; keep the shower out.,pass
+42,"We want the bathroom gutted and put back, including a tiled shower.",revise,4,pass,full second run,table,16,3,"Break out the gut, required trades, shower build/waterproofing, tile and fit-out.",pass
+43,Our cabinet boxes are good. Can you replace the doors and countertops?,pass,2,revise,targeted third run,table,7,1,Keep the cabinet fronts and counter replacement separately visible.,pass
+44,Can you knock our kitchen back to studs and give us a new layout?,revise,3,revise,targeted third run,table,16,0,"Include the requested new layout plus meaningful demolition, services and finish packages.",pass
+45,Can you make two basement rooms into one family room?,revise,3,pass,full second run,table,7,3,Show the wall assessment and conditional support or service work before removal.,pass
+46,"We want a place for Dad in the detached garage, with a bath and kitchenette.",revise,3,revise,targeted third run,table,16,4,"Separate approved conversion, shell/services, bathroom and kitchenette.",pass
+47,Can we put a floor up there for Christmas boxes? Maybe a guest room later.,pass,1,pass,full second run,table,3,1,Price storage only; verify support without selling the future bedroom.,pass
+48,Can you add a bedroom with a closet off the back of our house?,revise,3,pass,full second run,table,12,2,"Identify design/site, foundation, shell, services and bedroom/closet finish.",pass
+49,We want the house freshened up before listing. No gut remodel.,revise,1,pass,full second run,table,5,4,Itemize the walk-through or candidate cosmetic selections before promising execution.,pass
+50,Can we swap these deck boards and keep everything underneath?,pass,2,pass,full second run,table,4,2,Base resurfacing depends on sound framing; price discovered framing repair separately.,pass
+51,Our porch steps bounce and the railing wiggles. Can you rebuild them?,pass,3,pass,full second run,table,4,1,Stair and rail rebuilds are separate; address concealed unsafe attachment or support.,pass
+52,Please take out our old fence and gate and replace the whole side.,pass,3,pass,full second run,table,4,1,"Fence removal, replacement run and new gate each have scope boundaries.",pass
+53,The gate drags after rain. Can you shave the bottom?,pass,3,pass,full second run,table,5,3,Determine why the gate drags; distinguish adjustment from post or support repair.,pass
+54,We bought a pergola kit. Can you build it this Saturday?,pass,1,pass,full second run,table,4,2,"Assembly depends on verified kit, anchors and site; preparation can be a separate prerequisite.",pass
+55,Several pavers wobble by the step. Can you fix just those?,pass,2,pass,full second run,table,4,2,Price the local reset and distinguish an underlying base failure.,pass
+56,Can you extend our patio out to the raised beds?,pass,2,pass,full second run,table,5,2,Separate site preparation and finished patio extension; check drainage and tie-in.,pass
+57,We're looking for someone who can mow the lawn every ten days.,revise,1,pass,full second run,table,3,2,The mowing rate is per visit; trimming/clippings need explicit coverage if offered.,pass
+58,Two beds need mulch. Can you deliver and spread it?,pass,2,revise,targeted third run,table,5,2,Deliver and spread mulch; area/depth govern the quantity.,pass
+59,Can you cut our tall hedge and take the branches away?,pass,2,pass,full second run,table,3,1,Trim and remove the branches as requested; distinguish debris handling.,pass
+60,Can you sod the bare strip the plumbers dug up?,pass,2,pass,full second run,table,3,1,Prepare the released trench and lay sod; confirm establishment watering and settlement.,pass
+61,One sprinkler zone won't turn on. Can you replace the bad valve?,pass,3,pass,full second run,table,4,2,Price diagnosis; separate valve vs electrical/control failure without assuming either.,pass
+62,Water pools next to the house. Can you bury the downspout?,pass,2,pass,full second run,table,5,2,Determine runoff source and outlet before pricing the underground run.,pass
+63,"I'd like the gutters cleaned before winter, including the detached garage.",pass,3,pass,full second run,table,4,2,Include both buildings; distinguish any separately priced obstruction clearance.,pass
+64,Wind-driven rain gets past a window. Can you seal the outside?,revise,3,pass,full second run,table,4,2,Distinguish diagnostic opening from actual flashing repair after the leak path is exposed.,pass
+65,Two strips of vinyl siding blew off. Can you make it look the same?,pass,2,revise,targeted third run,table,5,4,Replace the two pieces; price damaged adjoining material only if found.,pass
+66,The block wall behind my patio leans. Can you just straighten it?,pass,1,pass,full second run,table,2,0,An unstable wall calls for assessment before a defined repair.,pass
+67,Will you prep a spot for a shed kit I'm assembling?,pass,2,pass,full second run,table,2,0,Scope the prepared shed base separately from the owner's kit assembly.,pass
+68,My outdoor socket trips when holiday lights go on. Can you switch it out?,pass,2,revise,targeted third run,table,4,3,Start with safe electrical assessment; the damaged part is unknown.,pass
+69,Can you screen in our covered porch so bugs stay out?,revise,2,pass,full second run,table,5,2,Existing porch screens and any new door have separate coverage.,pass
+70,The deck gets slippery. Can you wash it and stain it while you're here?,pass,2,pass,full second run,table,2,0,Washing and staining are distinct; product and drying conditions affect timing.,pass
+71,Can you put the new mailbox beside the driveway?,revise,1,pass,full second run,table,4,2,Price mailbox mounting and distinguish reuse vs additional post/foundation.,pass
+72,Could you move our swingset from the old house and put it together here?,pass,4,pass,full second run,table,3,0,"Dismantling, transport and reassembly are separate; damaged hardware may change scope.",pass
+73,Can you keep our walkway clear whenever it snows?,pass,1,pass,full second run,table,3,2,"Define snowfall trigger, per-event service area and any optional treatment.",pass
+74,Our pool fence gate no longer latches. Can you come fix it?,pass,3,pass,full second run,table,3,1,Establish a safely latching gate; failed hardware and unstable supports can require different work.,pass
+75,A storm knocked a branch onto our shed. Can you clear it and fix the roof?,pass,3,pass,full second run,table,4,1,Branch removal and roof work need separate parties and conditional structural assessment.,pass
+76,"Homeowner: “Does this quote include painting?” My existing bid says “Patch two bedroom holes and prime, $280.” Review before rewriting.",revise,0,pass,full second run,table,2,1,"Show the $280 current bid once, preserve review-first and identify requested paint pricing.",pass
+77,"Homeowner asks for tile haul-away. My bid says “Remove backsplash, stack tile by garage, $400.” Draft now; I haven't agreed to hauling.",revise,1,pass,full second run,table,2,1,Show $400 removal/staging; unagreed haul-away belongs outside the base as an option.,pass
+78,Customer says “This dark mark under my sink looks like mold. Can you replace the cabinet?” All I have is their description of a photo.,pass,3,revise,targeted third run,table,7,6,Assessment before replacement; suspected mold in a described photo is unconfirmed.,pass
+79,“There's a stain under the upstairs shower. Can you fix it?” No picture or inspection yet. I need a scope draft now.,pass,4,revise,targeted third run,table,7,6,"Show diagnostic scope now; access, source repair and reinstatement depend on findings.",pass
+80,Can you repair the rotted door trim and replace the chipped sill without replacing my door?,pass,3,pass,full second run,table,3,1,"Separate damaged trim and sill, substrate repair and structural handoff.",pass
+81,Can we get a tile allowance for the hall bathroom so we can shop this weekend?,pass,1,pass,full second run,table,1,0,Tile allowance awaits selected quantity/grade; avoid an invented job price.,pass
+82,Can you work through my move-in punch list until noon?,pass,1,pass,full second run,table,1,0,Price the time window; do not assume a guaranteed number of tasks by noon.,pass
+83,We have one shelf and a coat hook. Is this two callout fees?,revise,2,pass,full second run,table,3,0,"Clarify how a single visit minimum applies, alongside both mounting tasks.",pass
+84,How much to paint the fence? It might be 100 feet.,pass,1,pass,full second run,table,1,0,Approximate fence length requires measurement; faces and condition affect price.,pass
+85,Can you replace the screen door for $300? That's all we can spend.,pass,1,pass,full second run,table,1,0,"The $300 is a spending limit, not an accepted screen door price.",pass
+86,Can you build a simple closet organizer and tell me what the deposit covers?,pass,1,pass,full second run,table,1,0,"Deposit is a payment term, not another charge for closet fabrication.",pass
+87,Can I see the price to patch the screen versus replacing the screen door?,pass,2,pass,full second run,table,2,1,Mesh repair and door replacement are mutually exclusive options.,pass
+88,We have about 60 feet of baseboard. Can we get a price?,pass,1,pass,full second run,table,3,2,Preserve approximate baseboard length while measurement and rate remain open.,pass
+89,Can you unclog our bathroom sink and fix its loose handle?,pass,4,pass,full second run,table,4,2,Both the drain and loose handle require visible scope; unrelated parts remain conditional.,pass
+90,"Please replace two towel bars and a paper holder. Contractor here: I want structured items, not prose.",revise,2,pass,full second run,structured,3,1,"Respect structured items; identify priced states, mounting or finish decisions and quantities.",pass
+91,Can you patch and repaint the nail pops in our guest room before guests arrive Friday?,pass,2,pass,full second run,table,2,0,Nail-pop repair and repainting require an agreed finish boundary and schedule.,pass
+92,"Can you replace our washer, dryer and dishwasher? They're all arriving this week.",pass,3,revise,targeted third run,table,12,9,"Include all three appliances and define supply, connection and removal responsibility.",pass
+93,My neighbor and I share a fence. Can you replace the broken panel next week?,pass,2,pass,full second run,table,2,1,Panel replacement depends on boundary/access; any failed support changes the job.,pass
+94,Could you assemble two bookshelves and get rid of the boxes for us?,pass,2,pass,full second run,table,2,0,Include both bookshelves and the requested carton disposal destination.,pass
+95,Water is spreading from under the kitchen sink. Can you tell us it's safe to wait until tomorrow?,safety-only,0,pass,full second run,table,1,0,Address the active water hazard first; any later assessment is contingent on stabilization.,pass
+96,Can you replace our washer without taking off the laundry door? The opening seems tight.,pass,1,pass,full second run,table,2,0,Washer travel must respect the owner's explicit door-retention requirement.,pass
+97,The garage door makes a bang and won't lift. Can you adjust the opener?,pass,2,pass,full second run,table,3,2,A bang and immobile door need a specialist assessment before a repair price.,pass
+98,I bought a bath fan. Can you swap it before the painter comes?,revise,1,pass,full second run,table,5,3,"Separate any change to the opening, duct or ceiling finish from a compatible fan swap.",pass
+99,Can you refinish the stairs and include the electrician for step lights?,revise,2,pass,full second run,table,3,1,Keep electrical and refinishing scopes separate; assign any finish restoration explicitly.,pass
+100,Can you stain the fence and maybe pressure-wash the patio while you're here?,pass,2,pass,full second run,table,2,1,"Patio washing is optional, outside the fence staining base price.",pass
