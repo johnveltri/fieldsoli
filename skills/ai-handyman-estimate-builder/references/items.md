@@ -4,7 +4,7 @@ Keep the job title, promised result, readiness and contractor review at job leve
 
 | Item field | Meaning |
 |---|---|
-| type | included, condition, owner_action, boundary or open_question |
+| type | included, condition, option, alternative, owner_action, boundary or open_question |
 | description | Observable deliverable, decision or limit in the contractor's words |
 | quantity, unit, quantity_status | Use null when unknown. Preserve ranges, approximate, measured or contractor-confirmed status and original wording. |
 | responsibility | Person doing, buying, checking or deciding. Unknown stays null. |
@@ -13,7 +13,16 @@ Keep the job title, promised result, readiness and contractor review at job leve
 | approval_step | For extras, when and how the homeowner sees the price or measured extent and authorizes proceeding. Preserve a specified method. |
 | timing | When an owner action, check or visit is due, if established |
 
+Keep proposed options and replacement alternatives outside the base. Attach the price and approval to the individual option or condition; in structured output render an unpriced amount as TBD or use a null amount with an explicit TBD display label.
+
 If one fixed figure covers several lines, record it once at job or group level and reference that group on the lines. Keep any quoted unit rate separate from the base. A rate can be known while its extension is unknown.
+
+Examples of decisions that need separate amounts:
+
+- Put matching finish paint outside a patch or smoothing base until selected. In a reface or kitchen rebuild, give cabinet fronts, fabricated tops, backsplash and optional end-panel work their own coverage. For landscaping, an owner can choose edging separately from weeding.
+- Count the same access operation once. If door removal for delivery is a conditional row, the carry row covers the clear-route move. A torn interlock in adjoining siding has a different remedy from repairing backing or the weather layer.
+- A new appliance circuit and mounting reinforcement need different providers or work. In a multi-appliance job, identify the affected appliance and the specific service, such as a dryer exhaust change or new washer valves. Split new water, sewer and electrical service for a detached building.
+- A specialist can assess material without being hired to remediate it. Keep the assessment and any later treatment separate. When inspection could find functioning equipment or an already-repaired leak, put outlet replacement or active-source repair in a conditional row after the diagnostic base.
 
 For researched pricing record evidence URL or quote ID, source and check dates, geography, currency, unit, inclusions, lower/upper values when supported and confidence limitations. Keep historical comparisons outside the base and identify the contractor’s explicit adoption when converting a planning figure to a quoted price.
 

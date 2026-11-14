@@ -1,5 +1,7 @@
 # AI Handyman Estimate Builder: 100-request field test
 
+[First-turn line items and conditional TBD rows across all 100 original requests](first-pass-line-items/report.md).
+
 **Completed-job pricing:** [Blind multi-city estimates compared with itemized homeowner payments](paid-handyman-jobs/report.md).
 
 **Current pricing:** [Chicago replay of all 100 requests, local comparisons, corrections and independent provider check](chicago-replay/report.md).
