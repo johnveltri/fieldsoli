@@ -16,15 +16,19 @@ Storm-door fit and opening dimensions are confirmed. The scope includes interior
 
 **Builder · Homeowner copy**
 
-**Back entry door replacement**  
+**Estimate — back entry door replacement**
+
 Scope draft — pricing to follow.
 
-I'll replace your back entry door and reinstall your existing storm door so both swing and latch properly.
+| Line item | Scope | Amount |
+|---|---|---:|
+| Replace back entry door and refit storm door | Remove and haul away the old unit, fit the new prehung door and seal the perimeter. Reinstall the interior casing, fill nail holes and rehang the storm door. Check the swing and latch on both doors. You’ll handle the interior painting. | TBD |
+| **Base total** | | **TBD** |
 
-- Remove and haul away the old entry unit.
-- Set your new prehung entry unit and seal the exterior perimeter.
-- Reinstall the interior casing and fill the nail holes. You'll handle the interior painting.
-- Rehang the storm door and check the swing and latch on both doors.
+**Possible additional work**
 
-**When the old sill comes out**  
-If the exposed sill support is soft and needs a localized repair, I'll show you the area and give you a separate price. I'll wait for your approval by text before doing that repair. If the damage extends into structural framing, I'll stop and discuss bringing in a carpenter with you before we decide how to proceed.
+| Line item | When it applies | Amount |
+|---|---|---:|
+| Localized sill support repair | If removal exposes soft wood in the sill support, I’ll show you the damage and price the repair. | TBD |
+
+The sill repair is outside the base price. I’ll wait for your approval by text before starting it. If the damage extends into structural framing, I’ll stop and discuss bringing in a carpenter.
