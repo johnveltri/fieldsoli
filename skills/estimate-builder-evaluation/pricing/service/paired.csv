@@ -1,0 +1,16 @@
+provider,case,actual,original,research,original_error,research_error,original_within20,research_within20,closer,donors
+Alegria,38,200,180,167,20,33,True,True,original,B Frye | Brown | Pro Appliance Installs | Grand Appliance
+B Frye,38,175,180,167,5,8,True,True,original,Alegria | Brown | Pro Appliance Installs | Grand Appliance
+Brown,38,120,180,172,60,52,False,False,research,Alegria | B Frye | Pro Appliance Installs | Grand Appliance
+Pro Appliance Installs,26,235,260,243.97,25,8.97,True,True,research,Grand Appliance | Appliance Installation Inc | Appliance Werks | Carmona
+Pro Appliance Installs,31,215,240,178.5,25,36.5,True,True,original,Grand Appliance | Appliance Installation Inc | Appliance Werks | Carmona
+Pro Appliance Installs,38,165,180,172,15,7,True,True,research,Alegria | B Frye | Brown | Grand Appliance
+Grand Appliance,26,228,260,247.47,32,19.47,True,True,research,Pro Appliance Installs | Appliance Installation Inc | Appliance Werks | Carmona
+Grand Appliance,31,178,240,197,62,19,False,True,research,Pro Appliance Installs | Appliance Installation Inc | Appliance Werks | Carmona
+Grand Appliance,38,169,180,170,11,1,True,True,research,Alegria | B Frye | Brown | Pro Appliance Installs
+Appliance Installation Inc,26,195,260,247.47,65,52.47,False,False,research,Pro Appliance Installs | Grand Appliance | Appliance Werks | Carmona
+Appliance Installation Inc,31,170,240,197,70,27,False,True,research,Pro Appliance Installs | Grand Appliance | Appliance Werks | Carmona
+Appliance Werks,26,265,260,231.5,5,33.5,True,True,original,Pro Appliance Installs | Grand Appliance | Appliance Installation Inc | Carmona
+Appliance Werks,31,179,240,196.5,61,17.5,False,True,research,Pro Appliance Installs | Grand Appliance | Appliance Installation Inc | Carmona
+Carmona,26,259.94,260,231.5,0.06,28.44,True,True,original,Pro Appliance Installs | Grand Appliance | Appliance Installation Inc | Appliance Werks
+Carmona,31,259.9,240,178.5,19.9,81.4,True,False,original,Pro Appliance Installs | Grand Appliance | Appliance Installation Inc | Appliance Werks

@@ -1,0 +1,4 @@
+interface:
+  display_name: "AI Handyman Estimate Builder"
+  short_description: "Walk a residential repair from rough notes to a scoped estimate"
+  default_prompt: "Use $ai-handyman-estimate-builder to help me scope this handyman job."

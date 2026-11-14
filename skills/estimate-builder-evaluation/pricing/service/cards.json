@@ -1,0 +1,257 @@
+[
+  {
+    "provider": "Alegria",
+    "market": "Smyrna GA",
+    "url": "https://www.alegria.llc/atlanta-handyman-price-list",
+    "effective": "undated",
+    "accessed": "2026-11-13",
+    "scope": "dishwasher and OTR combined $125–250 excluded; 55 inch eligible; cable concealment extra; $125 minimum incl 1 hour",
+    "rates": [
+      {
+        "service": "tv",
+        "usd": 125,
+        "kind": "fixed"
+      },
+      {
+        "service": "disposal",
+        "usd": 200,
+        "kind": "fixed"
+      },
+      {
+        "service": "hour",
+        "usd": 65,
+        "kind": "fixed"
+      }
+    ]
+  },
+  {
+    "provider": "B Frye",
+    "market": "Indio CA",
+    "url": "https://www.bfryethehandyguy.com/pricing/",
+    "effective": "undated",
+    "accessed": "2026-11-13",
+    "scope": "labor only; $129 incl 1.5h; subsequent one-person rate; no wire hiding; microwave style unspecified so excluded",
+    "rates": [
+      {
+        "service": "dishwasher",
+        "usd": 250,
+        "kind": "fixed"
+      },
+      {
+        "service": "disposal",
+        "usd": 175,
+        "kind": "fixed"
+      },
+      {
+        "service": "tv",
+        "usd": 139,
+        "kind": "fixed"
+      },
+      {
+        "service": "hour",
+        "usd": 79,
+        "kind": "fixed"
+      }
+    ]
+  },
+  {
+    "provider": "Brown",
+    "market": "San Diego CA",
+    "url": "https://www.handymanbrown.com/rates",
+    "effective": "2024-01-01",
+    "accessed": "2026-11-13",
+    "scope": "$120 visit minimum applied to $90 disposal line; incidental materials included but not appliance/bracket; one-worker TV with existing outlet",
+    "rates": [
+      {
+        "service": "dishwasher",
+        "usd": 180,
+        "kind": "fixed"
+      },
+      {
+        "service": "disposal",
+        "usd": 120,
+        "kind": "fixed"
+      },
+      {
+        "service": "tv",
+        "usd": 120,
+        "kind": "fixed"
+      }
+    ]
+  },
+  {
+    "provider": "Mr Fix-It",
+    "market": "Bakersfield CA",
+    "url": "https://mrfixitpros.com/pricing",
+    "effective": "undated",
+    "accessed": "2026-11-13",
+    "scope": "first hour $139–159 then residential hourly; dishwasher $280.75–422.50, disposal $189–375.25 and TV $189–517 are ranges",
+    "rates": [
+      {
+        "service": "hour",
+        "usd": 94.5,
+        "kind": "fixed"
+      }
+    ]
+  },
+  {
+    "provider": "Pro Appliance Installs",
+    "market": "Middle GA",
+    "url": "https://proapplianceinstalls.com/pricing",
+    "effective": "undated",
+    "accessed": "2026-11-13",
+    "scope": "standard work uses existing services; braided supply line included; haul $50; flange corrections extra",
+    "rates": [
+      {
+        "service": "dishwasher",
+        "usd": 185,
+        "kind": "fixed",
+        "haul": 50
+      },
+      {
+        "service": "otr",
+        "usd": 165,
+        "kind": "fixed",
+        "haul": 50
+      },
+      {
+        "service": "disposal",
+        "usd": 165,
+        "kind": "fixed"
+      }
+    ]
+  },
+  {
+    "provider": "Grand Appliance",
+    "market": "Midwest US",
+    "url": "https://www.grandappliance.com/services",
+    "effective": "undated",
+    "accessed": "2026-11-13",
+    "scope": "normal install parts and labor; haul $39 per single unit; retailer service",
+    "rates": [
+      {
+        "service": "dishwasher",
+        "usd": 189,
+        "kind": "fixed",
+        "haul": 39
+      },
+      {
+        "service": "otr",
+        "usd": 139,
+        "kind": "fixed",
+        "haul": 39
+      },
+      {
+        "service": "disposal",
+        "usd": 169,
+        "kind": "fixed"
+      }
+    ]
+  },
+  {
+    "provider": "Appliance Installation Inc",
+    "market": "Tucker GA",
+    "url": "https://www.applianceinstallationinc.com/",
+    "effective": "undated",
+    "accessed": "2026-11-13",
+    "scope": "haul included; installation accessories supplied by customer; range hood conversion extra",
+    "rates": [
+      {
+        "service": "dishwasher",
+        "usd": 195,
+        "kind": "fixed",
+        "haul": 0
+      },
+      {
+        "service": "otr",
+        "usd": 170,
+        "kind": "fixed",
+        "haul": 0
+      },
+      {
+        "service": "disposal",
+        "usd": 125,
+        "kind": "fixed"
+      }
+    ]
+  },
+  {
+    "provider": "Appliance Werks",
+    "market": "Voorhees NJ",
+    "url": "https://www.shopappliancewerks.com/installation.html",
+    "effective": "undated",
+    "accessed": "2026-11-13",
+    "scope": "dishwasher kit included; haul $40; basement and upstairs kitchen case by case",
+    "rates": [
+      {
+        "service": "dishwasher",
+        "usd": 225,
+        "kind": "fixed",
+        "haul": 40
+      },
+      {
+        "service": "otr",
+        "usd": 139,
+        "kind": "fixed",
+        "haul": 40
+      }
+    ]
+  },
+  {
+    "provider": "Carmona",
+    "market": "Redding CA",
+    "url": "https://www.carmonasappliances.com/catalog/add-ons-services",
+    "effective": "undated",
+    "accessed": "2026-11-13",
+    "scope": "retailer service SKUs; haul $59.95; other accessories and delivery not itemized for these installs",
+    "rates": [
+      {
+        "service": "dishwasher",
+        "usd": 199.99,
+        "kind": "fixed",
+        "haul": 59.95
+      },
+      {
+        "service": "otr",
+        "usd": 199.95,
+        "kind": "fixed",
+        "haul": 59.95
+      }
+    ]
+  },
+  {
+    "provider": "Winchester",
+    "market": "Central Ohio",
+    "url": "https://winchesterhomeservices.com/wp-content/uploads/2026/04/whs_pricelist.pdf",
+    "effective": "2026-04-21",
+    "accessed": "2026-11-13",
+    "scope": "materials extra; two published floors only; disposal range $175–275 excluded",
+    "rates": [
+      {
+        "service": "dishwasher",
+        "usd": 250,
+        "kind": "floor"
+      },
+      {
+        "service": "tv",
+        "usd": 175,
+        "kind": "floor"
+      }
+    ]
+  },
+  {
+    "provider": "Mediocre Handyman",
+    "market": "Southern NJ",
+    "url": "https://mediocrehandyman.com/pricing",
+    "effective": "undated",
+    "accessed": "2026-11-13",
+    "scope": "$150 TV both retrieved versions; fishing wire extra; microwave type unspecified; dishwasher/disposal approximate; hourly editions disagree so excluded",
+    "rates": [
+      {
+        "service": "tv",
+        "usd": 150,
+        "kind": "fixed"
+      }
+    ]
+  }
+]

@@ -1,0 +1,21 @@
+region,project,national_signed_pct_error,regional_signed_pct_error
+new-england,Minor Kitchen Remodel | Midrange,-1.652,-1.641
+new-england,Major Kitchen Remodel | Midrange,-1.437,-1.455
+new-england,Major Kitchen Remodel | Upscale,-4.987,-2.833
+new-england,Bath Remodel | Midrange,-5.156,-3.079
+new-england,Bath Remodel | Upscale,-2.7,-1.402
+mountain,Minor Kitchen Remodel | Midrange,-0.112,-3.404
+mountain,Major Kitchen Remodel | Midrange,1.539,-3.041
+mountain,Major Kitchen Remodel | Upscale,2.926,-2.501
+mountain,Bath Remodel | Midrange,4.888,-0.483
+mountain,Bath Remodel | Upscale,2.667,-1.632
+south-atlantic,Minor Kitchen Remodel | Midrange,-0.382,-0.947
+south-atlantic,Major Kitchen Remodel | Midrange,2.118,-0.217
+south-atlantic,Major Kitchen Remodel | Upscale,1.605,-0.469
+south-atlantic,Bath Remodel | Midrange,2.066,-1.229
+south-atlantic,Bath Remodel | Upscale,1.733,-0.824
+east-north-central,Minor Kitchen Remodel | Midrange,5.38,0.67
+east-north-central,Major Kitchen Remodel | Midrange,-0.385,0.883
+east-north-central,Major Kitchen Remodel | Upscale,2.352,1.13
+east-north-central,Bath Remodel | Midrange,4.93,-0.094
+east-north-central,Bath Remodel | Upscale,3.721,-0.265

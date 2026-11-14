@@ -1,0 +1,12 @@
+set,provider,upper_sqft,base_low_usd,base_high_usd,weekly_factor
+train,GG Sarasota,4999,43,43,1
+train,GG Sarasota,6000,44,44,1
+train,GG Sarasota,7000,46,46,1
+train,GG Sarasota,8000,47,47,1
+train,GG Sarasota,9000,49,49,1
+train,GG Sarasota,10000,50,50,1
+train,GG Sarasota,11000,52,52,1
+original,EasyDay MN,8000,55,55,0.85
+original,EasyDay MN,14000,75,75,0.85
+supplement,Just Right TX,5000,42,55,1
+supplement,Just Right TX,10000,56,81,1

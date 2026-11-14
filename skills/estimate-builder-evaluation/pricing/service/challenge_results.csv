@@ -1,0 +1,7 @@
+provider,market,url,service,target,scope,accessed,prediction,abs_error,within20
+Appliance Alliance NW,Olympia WA,https://www.appliancealliancenw.com/install-rates,dishwasher,225,base install; hose $30 extra,2026-11-13,195,30.0,True
+Appliance Alliance NW,Olympia WA,https://www.appliancealliancenw.com/install-rates,otr,190,combined over-the-range/hood line,2026-11-13,165,25.0,True
+Appliance Alliance NW,Olympia WA,https://www.appliancealliancenw.com/install-rates,disposal,175,installation; under-sink plumbing extra,2026-11-13,167.0,8.0,True
+The Mounting Man,Houston TX,https://www.themountingman.com/houston/,tv,200,55 inch normal surface; bracket and wire cover extra,2026-11-13,132.0,68.0,False
+Mazter,Seattle WA,https://mazterappliances.setmore.com/,dishwasher_with_haul,225,also includes pickup at a local store; package proxy,2026-11-13,235,10.0,True
+Mazter,Seattle WA,https://mazterappliances.setmore.com/,disposal,,specific owner-supplied price $145 conflicts with checkout display $165; abstain,2026-11-13,,,
