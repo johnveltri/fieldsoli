@@ -1,0 +1,35 @@
+{
+  "train_jobs": 17050,
+  "eligible_holdout": 4490,
+  "scored": 4482,
+  "unsupported": {
+    "04": 4,
+    "10": 4
+  },
+  "models": {
+    "pooled": {
+      "n": 4482,
+      "mae": 6847.11,
+      "median_absolute_error": 3200.0,
+      "bias": -4215.67,
+      "within25_pct": 13.36,
+      "interval_coverage_pct": 81.5
+    },
+    "type": {
+      "n": 4482,
+      "mae": 5893.33,
+      "median_absolute_error": 2300.0,
+      "bias": -3166.41,
+      "within25_pct": 20.75,
+      "interval_coverage_pct": 80.79
+    },
+    "type_and_division": {
+      "n": 4482,
+      "mae": 5853.04,
+      "median_absolute_error": 2400.0,
+      "bias": -2996.83,
+      "within25_pct": 21.62,
+      "interval_coverage_pct": 79.74
+    }
+  }
+}

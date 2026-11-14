@@ -1,0 +1,125 @@
+{
+  "dev": {
+    "jobs": 12,
+    "original": {
+      "n": 12,
+      "mae": 392.17,
+      "median_ape_pct": 17.3,
+      "bias": -7.17,
+      "within20": 7,
+      "inside_range": 12,
+      "mean_range_width": 2116.67
+    },
+    "revised": {
+      "n": 12,
+      "mae": 340.58,
+      "median_ape_pct": 17.3,
+      "bias": -19.75,
+      "within20": 8,
+      "inside_range": 11,
+      "mean_range_width": 2104.17
+    },
+    "paired_original": {
+      "n": 12,
+      "mae": 392.17,
+      "median_ape_pct": 17.3,
+      "bias": -7.17,
+      "within20": 7,
+      "inside_range": 12,
+      "mean_range_width": 2116.67
+    },
+    "paired_revised": {
+      "n": 12,
+      "mae": 340.58,
+      "median_ape_pct": 17.3,
+      "bias": -19.75,
+      "within20": 8,
+      "inside_range": 11,
+      "mean_range_width": 2104.17
+    },
+    "closer": 4,
+    "farther": 1
+  },
+  "test": {
+    "jobs": 12,
+    "original": {
+      "n": 12,
+      "mae": 1863.41,
+      "median_ape_pct": 36.6,
+      "bias": 913.52,
+      "within20": 2,
+      "inside_range": 10,
+      "mean_range_width": 4360.08
+    },
+    "revised": {
+      "n": 12,
+      "mae": 1852.91,
+      "median_ape_pct": 31.9,
+      "bias": 924.02,
+      "within20": 2,
+      "inside_range": 10,
+      "mean_range_width": 4360.08
+    },
+    "paired_original": {
+      "n": 12,
+      "mae": 1863.41,
+      "median_ape_pct": 36.6,
+      "bias": 913.52,
+      "within20": 2,
+      "inside_range": 10,
+      "mean_range_width": 4360.08
+    },
+    "paired_revised": {
+      "n": 12,
+      "mae": 1852.91,
+      "median_ape_pct": 31.9,
+      "bias": 924.02,
+      "within20": 2,
+      "inside_range": 10,
+      "mean_range_width": 4360.08
+    },
+    "closer": 2,
+    "farther": 0
+  },
+  "extra": {
+    "jobs": 7,
+    "original": {
+      "n": 7,
+      "mae": 1168.81,
+      "median_ape_pct": 23.3,
+      "bias": 992.05,
+      "within20": 2,
+      "inside_range": 6,
+      "mean_range_width": 4237.86
+    },
+    "revised": {
+      "n": 7,
+      "mae": 1168.81,
+      "median_ape_pct": 23.3,
+      "bias": 992.05,
+      "within20": 2,
+      "inside_range": 6,
+      "mean_range_width": 4237.86
+    },
+    "paired_original": {
+      "n": 7,
+      "mae": 1168.81,
+      "median_ape_pct": 23.3,
+      "bias": 992.05,
+      "within20": 2,
+      "inside_range": 6,
+      "mean_range_width": 4237.86
+    },
+    "paired_revised": {
+      "n": 7,
+      "mae": 1168.81,
+      "median_ape_pct": 23.3,
+      "bias": 992.05,
+      "within20": 2,
+      "inside_range": 6,
+      "mean_range_width": 4237.86
+    },
+    "closer": 0,
+    "farther": 0
+  }
+}

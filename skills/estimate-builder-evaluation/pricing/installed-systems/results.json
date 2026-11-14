@@ -1,0 +1,110 @@
+{
+  "checksum": "e6e6ede0030baec616014a33271871f1845edc97c33c877e8de525bae5837529",
+  "filters": {
+    "sheet rows after header": 20108,
+    "invalid or missing installation/payment date or payment before install": 3082,
+    "invalid positive cost or exterior count": 29,
+    "missing usable site": 4,
+    "no MA project state, including summary/empty rows": 14,
+    "duplicate same site/date/input/cost rows": 23,
+    "ambiguous same site/date rows": 64
+  },
+  "eligible": 16892,
+  "train": {
+    "n": 12156,
+    "first_install": "2015-01-21",
+    "last_install": "2018-09-20",
+    "last_rebate_date": "2018-09-20",
+    "actual_median": 8261.78
+  },
+  "cutoff": "2018-09-26",
+  "late_payment_training_exclusions": 1356,
+  "holdout": {
+    "n": 3339,
+    "first_install": "2018-09-26",
+    "last_install": "2019-03-20",
+    "last_rebate_date": "2019-11-20",
+    "actual_median": 9539.01
+  },
+  "cross_split_site_exclusions": 41,
+  "holdout_indoor_model_coverage": {
+    "indoor/outdoor specific rows": 688,
+    "fallback rows": 2651
+  },
+  "results": {
+    "flat": {
+      "mae": 5148.0,
+      "median_abs_error": 3661.78,
+      "bias": -2721.8,
+      "within_25_pct_fraction": 0.2848,
+      "central80_coverage_fraction": 0.7601,
+      "mean_interval_width": 12897.86
+    },
+    "outdoor": {
+      "mae": 4806.98,
+      "median_abs_error": 3165.0,
+      "bias": -2776.53,
+      "within_25_pct_fraction": 0.277,
+      "central80_coverage_fraction": 0.7628,
+      "mean_interval_width": 11721.08
+    },
+    "outdoor_and_indoor": {
+      "mae": 4413.37,
+      "median_abs_error": 2838.75,
+      "bias": -2484.55,
+      "within_25_pct_fraction": 0.3558,
+      "central80_coverage_fraction": 0.7655,
+      "mean_interval_width": 10679.56
+    }
+  },
+  "outdoor_group_results": {
+    "1": {
+      "train_n": 9213,
+      "train_median_cost": 7060.0,
+      "holdout": {
+        "n": 2525,
+        "first_install": "2018-09-26",
+        "last_install": "2019-03-20",
+        "last_rebate_date": "2019-11-20",
+        "actual_median": 8172.0
+      },
+      "model_mae": {
+        "flat": 4373.82,
+        "outdoor": 4448.56,
+        "outdoor_and_indoor": 4090.53
+      }
+    },
+    "2": {
+      "train_n": 2450,
+      "train_median_cost": 11629.86,
+      "holdout": {
+        "n": 671,
+        "first_install": "2018-09-26",
+        "last_install": "2019-03-20",
+        "last_rebate_date": "2019-10-16",
+        "actual_median": 14200.0
+      },
+      "model_mae": {
+        "flat": 7366.38,
+        "outdoor": 5949.95,
+        "outdoor_and_indoor": 5369.26
+      }
+    },
+    "3": {
+      "train_n": 493,
+      "train_median_cost": 12400.0,
+      "holdout": {
+        "n": 143,
+        "first_install": "2018-09-27",
+        "last_install": "2019-03-20",
+        "last_rebate_date": "2019-06-26",
+        "actual_median": 13995.0
+      },
+      "model_mae": {
+        "flat": 8408.7,
+        "outdoor": 5772.56,
+        "outdoor_and_indoor": 5628.57
+      }
+    }
+  }
+}

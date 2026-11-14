@@ -1,0 +1,106 @@
+id,group,receipt_item,paid,old_item,old_point,old_error,new_item,new_point,new_error
+D01,dev,Pump and installation materials,200,"Pump, gravel, basin and connections",195,-5,"Pump, gravel, basin and connections",195,-5
+D01,dev,Handyman labor,250,"One scheduled handyman visit with hand digging, roughly 3–6 hours",235,-15,"One scheduled handyman visit with hand digging, roughly 3–6 hours",235,-15
+D02,dev,Equipment and parts,3400,Wholesale matched indoor/outdoor equipment and sundries,3250,-150,Wholesale matched indoor/outdoor equipment and sundries,3250,-150
+D02,dev,Removal and installation labor,1800,"Eight installer person-hours covering removal, changeout and startup",800,-1000,"Eight installer person-hours covering removal, changeout and startup",980,-820
+D03,dev,Fixture purchased by homeowner,250,Owner-bought American Standard VorMax,365,115,Owner-bought American Standard VorMax,365,115
+D03,dev,Installation labor,175,Plumber one-hour replacement visit and seal,200,25,Plumber one-hour replacement visit and seal,200,25
+D03,dev,Old fixture haul-away,50,Old toilet haul,40,-10,Old toilet haul,40,-10
+D04,dev,Four lock hardware pieces at $95 each,380,Four supplied lock pieces,125,-255,Four supplied lock pieces,125,-255
+D04,dev,Install four locks at $35 each,140,Swap four locks on one trip,120,-20,Swap four locks on one trip,200,60
+D04,dev,Consultation,15,One site visit,65,50,One site visit,74,59
+D05,dev,Door,900,Two-car sectional door installed,1120,220,Two-car sectional door installed,1120,220
+D05,dev,Windows,200,Window option incremental to door,190,-10,Window option incremental to door,190,-10
+D05,dev,Opener,300,LiftMaster 1/2-hp opener installed,345,45,LiftMaster 1/2-hp opener installed,345,45
+D06,dev,50-gallon water heater,500,50-gallon Rheem gas heater,490,-10,50-gallon Rheem gas heater,455,-45
+D06,dev,Hardware bundle,105,"Fittings, straps, venting and pan alarm",165,60,"Fittings, straps, venting and pan alarm",165,60
+D06,dev,Eight feet of copper pipe,125,Eight feet copper pipe,42,-83,Eight feet copper pipe,42,-83
+D06,dev,City permit,150,Municipal permit,85,-65,Municipal permit,85,-65
+D06,dev,Labor,300,Licensed installation and removal,455,155,Licensed installation and removal,455,155
+D07,dev,Two torsion springs at $375 each,750,"Matched pair, ordinary to higher-cycle .225 wire options",215,-535,"Matched pair, ordinary to higher-cycle .225 wire options",215,-535
+D07,dev,Labor,200,"Urgent technician dispatch, installation and balancing",320,120,"Urgent technician dispatch, installation and balancing",285,85
+D08,dev,Paint,336,"Owner-purchased wall and ceiling paint, approx 10–24 gallons depending on coats",440,104,"Owner-purchased wall and ceiling paint, approx 10–24 gallons depending on coats",440,104
+D08,dev,Labor,1950,"Interior painting labor, masking and sprayed ceilings on one engagement",1700,-250,"Interior painting labor, masking and sprayed ceilings on one engagement",1700,-250
+D09,dev,IKEA PAX system,985,Owner-purchased PAX units and selected interiors,1450,465,Owner-purchased PAX units and selected interiors,1450,465
+D09,dev,Carpentry and materials,997,"Finish carpentry and sundries, no purchase of supplied moulding or assembly labor",710,-287,"Finish carpentry and sundries, no purchase of supplied moulding or assembly labor",710,-287
+D09,dev,"Caulking, priming and painting",500,"Painter to caulk, prime and coat visible built-in surfaces",730,230,"Painter to caulk, prime and coat visible built-in surfaces",730,230
+D10,dev,Hollywood-style stair installation,250,"Hollywood-style stair installation only, 13 steps, $14–39/step equivalent",325,75,"Hollywood-style stair installation only, 13 steps, $14–39/step equivalent",325,75
+D10,dev,Hall runner cutting and re-serging,250,"Three sections cut, re-serged and delivered as a loose hallway runner",185,-65,"Three sections cut, re-serged and delivered as a loose hallway runner",185,-65
+D11,dev,Flat painter charge,2500,"Painter's combined price for interior plus deck (including access, prep and coating)",2300,-200,"Painter's combined price for interior plus deck (including access, prep and coating)",2300,-200
+D11,dev,"Paint, stain, paper, tape and caulk",700,"Owner-purchased paint, stain, paper, tape and caulk",460,-240,"Owner-purchased paint, stain, paper, tape and caulk",460,-240
+D12,dev,Interior patching and painting,1500,"Patch and repaint seven rooms with five ceilings, materials and priority scheduling",2900,1400,"Patch and repaint seven rooms and five ceilings, including supplies, assuming localized repairs at the point and no priority fee",2550,1050
+D12,dev,Finish baseboards after flooring,300,"Return and finish baseboards after new floors, including protection",350,50,"Return and finish baseboards after new floors, including protection",350,50
+T01,test,Repair roof flashing at conduit,240,"Flashing repair with mobilization, consumables and roof access",245,5,"Flashing repair with mobilization, consumables and roof access",245,5
+T01,test,Remove high soil near foundation,50,Cut and move excess soil during same visit,180,130,Cut and move excess soil during same visit,180,130
+T02,test,Supply one insulated glass unit,125,21-in-square low-E divided IGU supplied,140,15,21-in-square low-E divided IGU supplied,140,15
+T02,test,Install glass unit with ladder,150,Glazier visit and ladder installation,250,100,Glazier visit and ladder installation,250,100
+T02,test,Replace two sets of shower-door vinyl seals,130,Supply and replace two sets of shower seals,205,75,Supply and replace two sets of shower seals,205,75
+T02,test,Apply new silicone to one guest shower,75,Prep and renew guest shower silicone,120,45,Prep and renew guest shower silicone,120,45
+T02,test,Sales tax on glass,10.31,Tax on glass only,12,1.69,Tax on glass only,12,1.69
+T03,test,Hard-start kit supplied and fitted,396,Supply and fit 5-2-1 kit and verify operation,270,-126,Supply and fit 5-2-1 kit and verify operation,280,-116
+T03,test,One-time system checkup,89,One-system checkup,95,6,One-system checkup,95,6
+T04,test,Supply and fit two Turbo 200 capacitors,838,"Two supplied and fitted Turbo 200 capacitors at $170–375 each, likely $245 each",490,-348,"Two supplied and fitted Turbo 200 capacitors at $170–375 each, likely $303 each",606,-232
+T04,test,Discounted one-time tune-ups for two systems,98,"Two discounted tune-ups including coil, drains and rooftop checks",115,17,"Two discounted tune-ups including coil, drains and rooftop checks",115,17
+T05,test,Exterior work on three brick chimneys,2219.73,"Three chimney exteriors, crowns, counterflashing, sealing and refractory liners, shared staging",13500,11280.27,"Three chimney exteriors, crowns, counterflashing, sealing and refractory liners, shared staging",13500,11280.27
+T05,test,Living-room fireplace repair and cleaning,947.38,"Living-room hearth, firebrick, smoke chamber, damper and flue cleaning",2650,1702.62,"Living-room hearth, firebrick, smoke chamber, damper and flue cleaning",2650,1702.62
+T05,test,Den fireplace repair and cleaning,715.94,"Den removal, hearth and chamber repair and flue cleaning",2450,1734.06,"Den removal, hearth and chamber repair and flue cleaning",2450,1734.06
+T05,test,Bedroom gas fireplace and flue cleaning,141.99,Gas fireplace and flue cleaning,225,83.01,Gas fireplace and flue cleaning,225,83.01
+T05,test,Sales tax,358.23,Estimated sales tax,1694,1335.77,Estimated sales tax,1694,1335.77
+T06,test,Labor to repair cracks,490,Crack repair before skim,325,-165,Crack repair before skim,325,-165
+T06,test,Labor to skim-coat and sand walls and ceiling,1985,Skim and sand bedroom walls and ceiling,1250,-735,Skim and sand bedroom walls and ceiling,1250,-735
+T06,test,Mud and caulking materials,200,Joint compound and caulk,75,-125,Joint compound and caulk,75,-125
+T06,test,Sales tax,222.75,Sales tax allowance,149,-73.75,Sales tax allowance,149,-73.75
+T07,test,"Bathroom foyer face: handle, panels and hole repairs",300,"Foyer face, handle, panels and small holes",210,-90,"Foyer face, handle, panels and small holes",210,-90
+T07,test,Bathroom office face: handle and hole repairs,150,"Office face, handle and holes",110,-40,"Office face, handle and holes",110,-40
+T07,test,"Right library closet: handle, lock holes and veneer",300,"Right closet handle, lock holes and veneer patch",165,-135,"Right closet handle, lock holes and veneer patch",165,-135
+T07,test,"Left library closet: handle, wood and hole repairs",200,"Left closet handle, replace missing wood and fill holes",175,-25,"Left closet handle, replace missing wood and fill holes",175,-25
+T07,test,"Study hall right: handle, panels and cracked top rail",325,"Hall right handle, panels, reinforce top rail",265,-60,"Hall right handle, panels, reinforce top rail",265,-60
+T07,test,"Study door: handle, panels and two cracked stiles",325,"Study handle, panels and two stiles",325,0,"Study handle, panels and two stiles",325,0
+T07,test,"Unmarked door: handle, panels and holes",300,"Unmarked door handle, panels and holes",210,-90,"Unmarked door handle, panels and holes",210,-90
+T07,test,"Study hall left: handle, panels and holes",300,"Hall left handle, panels and holes",210,-90,"Hall left handle, panels and holes",210,-90
+T07,test,"Birch sheet material, two sheets",67.74,Two sheets quarter-inch birch,80,12.26,Two sheets quarter-inch birch,80,12.26
+T08,test,Dishwasher,509.99,Bosch SHE3AR75UC dishwasher,540,30.01,Bosch SHE3AR75UC dishwasher,540,30.01
+T08,test,Installation kit,29.99,Six-foot install kit,25,-4.99,Six-foot install kit,25,-4.99
+T08,test,Installation labor,139.99,Retailer installation labor,135,-4.99,Retailer installation labor,135,-4.99
+T08,test,Haul-away service,14.99,Haul away,20,5.01,Haul away,20,5.01
+T08,test,Sales tax,59.84,Estimated sales tax,61,1.16,Estimated sales tax,61,1.16
+T09,test,Owner-purchased custom red oak vents,2100,"27 oak vent units including larger returns, approx $35–97 per unit blended",1540,-560,"27 oak vent units including larger returns, approx $35–97 per unit blended",1540,-560
+T09,test,Professional installation labor,1000,"Fit, enlarge and finish-match 27 units, approx $22–80 per location",1100,100,"Fit, enlarge and finish-match 27 units, approx $22–80 per location",1100,100
+T10,test,"Two can lights, trim, wiring and junction boxes",72,"Two can lights with trims, cable, junction boxes and consumables",105,33,"Two can lights with trims, cable, junction boxes and consumables",105,33
+T10,test,Electrician labor,200,"Scheduled licensed electrical work, one shared visit",295,95,"Scheduled licensed electrical work, one shared visit",295,95
+T11,test,Pair of safety drums,157.36,Two safety drums installed,75,-82.36,Two safety drums installed,75,-82.36
+T11,test,Pair of end bearing plates,158.06,Two end bearing plates installed,80,-78.06,Two end bearing plates installed,80,-78.06
+T11,test,Two number 1 hinges,48.24,Two no. 1 hinges installed,38,-10.24,Two no. 1 hinges installed,38,-10.24
+T11,test,Two number 2 hinges,50.6,Two no. 2 hinges installed,38,-12.6,Two no. 2 hinges installed,38,-12.6
+T11,test,Two number 3 hinges,50.6,Two no. 3 hinges installed,38,-12.6,Two no. 3 hinges installed,38,-12.6
+T11,test,Ten ball-bearing rollers,250.7,Ten long-stem rollers installed,170,-80.7,Ten long-stem rollers installed,170,-80.7
+T11,test,General setup and adjustments,162.5,"General adjustment, setup, sensors and remotes",110,-52.5,"General adjustment, setup, sensors and remotes",110,-52.5
+T11,test,Pair of seven-foot cables,171.7,Pair of cables installed,75,-96.7,Pair of cables installed,75,-96.7
+T11,test,Pair of lifetime torsion springs,1189.7,Pair high-cycle lifetime-warranty .234x2x39 springs supplied and installed,520,-669.7,Pair high-cycle lifetime-warranty .234x2x39 springs supplied and installed,520,-669.7
+T11,test,Shop supplies,111.97,Shop supplies,24,-87.97,Shop supplies,24,-87.97
+T11,test,Net sales tax after invoice tax adjustment,139.97,Estimated net tax,45,-94.97,Estimated net tax,45,-94.97
+T12,test,"Contractor exterior painting, both levels",7246.08,"Contractor exterior repaint, both levels",5350,-1896.08,"Contractor exterior repaint, both levels",5350,-1896.08
+T12,test,Two gallons of homeowner-purchased porch-floor paint,77.36,Owner-bought two gallons porch-floor paint,80,2.64,Owner-bought two gallons porch-floor paint,80,2.64
+X01,extra,Service labor and paint pickup,360,"Combined service labor including picket, gate, wax ring replacement and paint pickup",275,-85,"Combined service labor including picket, gate, wax ring replacement and paint pickup",275,-85
+X01,extra,Paint and wax ring,70,One can of paint and wax ring,55,-15,One can of paint and wax ring,55,-15
+X02,extra,"Doors and trim, materials and installation",3000,"Two exterior units, four interior doors, assumed one to three closet openings, trim, installation, pickup and disposal",7350,4350,"Two exterior units, four interior doors, assumed one to three closet openings, trim, installation, pickup and disposal",7350,4350
+X02,extra,Replace and finish deteriorated window ledges,1000,"Replace three window ledges with plastic and mud, sand and finish",690,-310,"Replace three window ledges with plastic and mud, sand and finish",690,-310
+X03,extra,Open non-load-bearing wall,1500,Open and remove a single non-load-bearing wall including local protection and debris,1650,150,Open and remove a single non-load-bearing wall including local protection and debris,1650,150
+X03,extra,"New cabinetry, peninsula, countertop and overhead lights: materials",2000,"Supply additional cabinets, peninsula, countertop and lights",3050,1050,"Supply additional cabinets, peninsula, countertop and lights",3050,1050
+X03,extra,"Install new cabinetry, peninsula, countertop and recessed lights",1000,"Install cabinetry, peninsula, top and recessed lights",3100,2100,"Install cabinetry, peninsula, top and recessed lights",3100,2100
+Y01,extra,Two 18-inch base cabinets with drawers,590,Two 18-inch drawer base cabinets,350,-240,Two 18-inch drawer base cabinets,350,-240
+Y01,extra,Two 4 × 8 ft beadboard sheets,48,Two 4×8 beadboard sheets,65,17,Two 4×8 beadboard sheets,65,17
+Y01,extra,Ten 1 × 12 pine boards,340,Ten 1×12 pine boards,195,-145,Ten 1×12 pine boards,195,-145
+Y01,extra,One 2 × 12 yellow pine board,58,One 2×12 yellow pine board,21,-37,One 2×12 yellow pine board,21,-37
+Y01,extra,One 2 × 4 yellow pine board,8,One 2×4 yellow pine board,7,-1,One 2×4 yellow pine board,7,-1
+Y01,extra,100 pocket screws,7,100 pocket screws,12,5,100 pocket screws,12,5
+Y01,extra,Pint of wood stain,18,Pint of wood stain,11,-7,Pint of wood stain,11,-7
+Y01,extra,Pint of beadboard paint,18,Pint of beadboard paint,12,-6,Pint of beadboard paint,12,-6
+Y01,extra,Gallon of cabinet-grade paint,54,Gallon cabinet-grade paint,55,1,Gallon cabinet-grade paint,55,1
+Y01,extra,Handyman labor including procurement and hauling,660,Handyman time over three sessions including procurement and haul,750,90,Handyman time over three sessions including procurement and haul,750,90
+Y02,extra,Painting with homeowner-supplied paint,100,Painting with owner-supplied paint,195,95,Painting with owner-supplied paint,195,95
+Y02,extra,Mirrors and hooks including purchase and mounting,300,Purchased mirrors and hooks plus return visit and mounting,240,-60,Purchased mirrors and hooks plus return visit and mounting,240,-60
+Y03,extra,Two doors and other materials purchased by customer,330,Two owner-bought doors and other materials,555,225,Two owner-bought doors and other materials,555,225
+Y03,extra,"Handyman labor including pickup, door installation and dryer vent",587,"Handyman service including pickup, both installations, frames and vent",550,-37,"Handyman service including pickup, both installations, frames and vent",550,-37
+Y04,extra,"Billed materials, including contractor markup",148.14,Materials including contractor markup,118,-30.14,Materials including contractor markup,118,-30.14
+Y04,extra,All remaining net service and labor charges after credit,458.5,Net service and labor after earlier consultation credit,293,-165.5,Net service and labor after earlier consultation credit,293,-165.5

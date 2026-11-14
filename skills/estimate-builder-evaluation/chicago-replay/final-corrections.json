@@ -1,0 +1,5 @@
+[
+ {"id":7,"city_job_price":null,"references":[{"market":"Palatine and NW suburbs","low":190,"high":260,"typical":225},{"market":"DuPage County","low":315,"high":315}],"contract":210,"effect":"Protect city-vs-suburb boundary, show both real regional prices; no price change to homeowner."},
+ {"id":10,"assumed_tv_inches":55,"conditional_low":135,"standard_mid_offer":207,"regular_high":317,"discounted_other_offer":287,"contract":220,"effect":"Keep ordinary vs specialty mounts separate. Offer spread replaces false single-market figure; no evidence of improved point prediction."},
+ {"id":83,"scheduled_first_hour_city":150,"northwest_suburbs_first_hour":120,"contract":100,"contract_extra_hour":60,"effect":"Name the alternative provider and first-hour terms; no second hour booked and no change to contractor agreement."}
+]

@@ -1,0 +1,63 @@
+{
+  "coverage": {
+    "partial": 57,
+    "conditional": 35,
+    "exact": 2,
+    "unavailable": 6
+  },
+  "numeric_before": 58,
+  "numeric_after": 45,
+  "floors": 2,
+  "paired_replay": {
+    "n": 20,
+    "before": {
+      "mae": 97.02,
+      "bias": -18.03,
+      "within20": 4
+    },
+    "after": {
+      "mae": 32.17,
+      "bias": -4.97,
+      "within20": 15
+    }
+  },
+  "paired_different_target_source": {
+    "n": 11,
+    "before": {
+      "mae": 45.18,
+      "bias": 7.45,
+      "within20": 2
+    },
+    "after": {
+      "mae": 26.68,
+      "bias": 22.77,
+      "within20": 7
+    }
+  },
+  "verification_with_conditional": {
+    "n": 4,
+    "before": {
+      "mae": 144.25,
+      "bias": -144.25,
+      "within20": 1
+    },
+    "after": {
+      "mae": 98.12,
+      "bias": 29.38,
+      "within20": 2
+    }
+  },
+  "verification_matched": {
+    "n": 3,
+    "before": {
+      "mae": 54.0,
+      "bias": -54.0,
+      "within20": 1
+    },
+    "after": {
+      "mae": 75.83,
+      "bias": -15.83,
+      "within20": 1
+    }
+  }
+}

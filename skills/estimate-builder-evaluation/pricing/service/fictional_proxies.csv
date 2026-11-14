@@ -1,0 +1,16 @@
+provider,fictional_case,target_with_applicable_haul,prediction,abs_error,within20
+Alegria,38,200,180,20,True
+B Frye,38,175,180,5,True
+Brown,38,120,180,60,False
+Pro Appliance Installs,26,235,260,25,True
+Pro Appliance Installs,31,215,240,25,True
+Pro Appliance Installs,38,165,180,15,True
+Grand Appliance,26,228,260,32,True
+Grand Appliance,31,178,240,62,False
+Grand Appliance,38,169,180,11,True
+Appliance Installation Inc,26,195,260,65,False
+Appliance Installation Inc,31,170,240,70,False
+Appliance Werks,26,265,260,5,True
+Appliance Werks,31,179,240,61,False
+Carmona,26,259.94,260,0.06,True
+Carmona,31,259.9,240,19.9,True

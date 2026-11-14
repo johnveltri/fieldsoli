@@ -1,0 +1,55 @@
+provider,service,kind,method,actual,prediction,abs_error,within20
+Alegria,tv,fixed,service,125,139,14,True
+Alegria,tv,fixed,pooled,125,169.5,44.5,False
+Alegria,disposal,fixed,service,200,165,35,True
+Alegria,disposal,fixed,pooled,200,169.5,30.5,True
+Alegria,hour,fixed,service,65,86.75,21.75,False
+Alegria,hour,fixed,pooled,65,86.75,21.75,False
+B Frye,dishwasher,fixed,service,250,192.0,58.0,False
+B Frye,dishwasher,fixed,pooled,250,169,81,False
+B Frye,disposal,fixed,service,175,165,10,True
+B Frye,disposal,fixed,pooled,175,169,6,True
+B Frye,tv,fixed,service,139,125,14,True
+B Frye,tv,fixed,pooled,139,169,30,False
+B Frye,hour,fixed,service,79,79.75,0.75,True
+B Frye,hour,fixed,pooled,79,79.75,0.75,True
+Brown,dishwasher,fixed,service,180,197.495,17.495,True
+Brown,dishwasher,fixed,pooled,180,170,10,True
+Brown,disposal,fixed,service,120,169,49,False
+Brown,disposal,fixed,pooled,120,170,50,False
+Brown,tv,fixed,service,120,139,19,True
+Brown,tv,fixed,pooled,120,170,50,False
+Mr Fix-It,hour,fixed,service,94.5,72.0,22.5,False
+Mr Fix-It,hour,fixed,pooled,94.5,72.0,22.5,False
+Pro Appliance Installs,dishwasher,fixed,service,185,197.495,12.495,True
+Pro Appliance Installs,dishwasher,fixed,pooled,185,170,15,True
+Pro Appliance Installs,otr,fixed,service,165,154.5,10.5,True
+Pro Appliance Installs,otr,fixed,pooled,165,170,5,True
+Pro Appliance Installs,disposal,fixed,service,165,169,4,True
+Pro Appliance Installs,disposal,fixed,pooled,165,170,5,True
+Grand Appliance,dishwasher,fixed,service,189,197.495,8.495,True
+Grand Appliance,dishwasher,fixed,pooled,189,170,19,True
+Grand Appliance,otr,fixed,service,139,167.5,28.5,False
+Grand Appliance,otr,fixed,pooled,139,170,31,False
+Grand Appliance,disposal,fixed,service,169,165,4,True
+Grand Appliance,disposal,fixed,pooled,169,170,1,True
+Appliance Installation Inc,dishwasher,fixed,service,195,194.495,0.505,True
+Appliance Installation Inc,dishwasher,fixed,pooled,195,169,26,True
+Appliance Installation Inc,otr,fixed,service,170,152.0,18.0,True
+Appliance Installation Inc,otr,fixed,pooled,170,169,1,True
+Appliance Installation Inc,disposal,fixed,service,125,169,44,False
+Appliance Installation Inc,disposal,fixed,pooled,125,169,44,False
+Appliance Werks,dishwasher,fixed,service,225,192.0,33.0,True
+Appliance Werks,dishwasher,fixed,pooled,225,169.5,55.5,False
+Appliance Werks,otr,fixed,service,139,167.5,28.5,False
+Appliance Werks,otr,fixed,pooled,139,169.5,30.5,False
+Carmona,dishwasher,fixed,service,199.99,192.0,7.99,True
+Carmona,dishwasher,fixed,pooled,199.99,167.0,32.99,True
+Carmona,otr,fixed,service,199.95,152.0,47.95,False
+Carmona,otr,fixed,pooled,199.95,167.0,32.95,True
+Winchester,dishwasher,floor,service,250,,,
+Winchester,dishwasher,floor,pooled,250,,,
+Winchester,tv,floor,service,175,,,
+Winchester,tv,floor,pooled,175,,,
+Mediocre Handyman,tv,fixed,service,150,125,25,True
+Mediocre Handyman,tv,fixed,pooled,150,170,20,True
