@@ -12,6 +12,9 @@ Keep the job title, promised result, readiness and contractor review at job leve
 | pricing | status (unpriced, supplied_fixed, supplied_unit_rate, supplied_allowance, researched_planning_range, historical_comparison or included_in_bundle), supplied wording, coverage and base treatment. Keep each supplied figure once at its correct coverage. |
 | approval_step | For extras, when and how the homeowner sees the price or measured extent and authorizes proceeding. Preserve a specified method. |
 | timing | When an owner action, check or visit is due, if established |
+| id | Stable row identifier across revisions and requested exports, such as L1, C1 or O1 |
+| verification | For each TBD, the specific check, measurement, selection or quote, who resolves it, when, and the scope or price decision it settles. Unknown responsibility is explicitly pending. |
+| total_treatment | Base scope with price pending, included in a named package, outside base requiring approval, optional outside base, or coverage pending and excluded from priced subtotal. Distinguish scope inclusion from a priced amount. |
 
 Keep proposed options and replacement alternatives outside the base. Attach the price and approval to the individual option or condition; in structured output render an unpriced amount as TBD or use a null amount with an explicit TBD display label.
 
